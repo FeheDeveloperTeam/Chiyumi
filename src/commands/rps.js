@@ -14,9 +14,9 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("rps")
     .setNameLocalizations({ ko: "가위바위보" })
-    .setDescription(nya("치유미코인을 걸고 가위바위보를 합니다."))
+    .setDescription("치유미코인을 걸고 가위바위보를 합니다")
     .setDescriptionLocalizations({
-      ko: nya("치유미코인을 걸고 가위바위보를 합니다."),
+      ko: "치유미코인을 걸고 가위바위보를 합니다",
     })
     .addStringOption((option) =>
       option
