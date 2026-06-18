@@ -67,14 +67,15 @@ module.exports = {
     const subcommand = interaction.options.getSubcommand();
 
     if (subcommand === "delete") {
-      const messageId = interaction.options.getString("message_id", true);
+      const rawMessageId = interaction.options.getString("message_id", true);
+      const messageId = extractMessageId(rawMessageId);
       await deleteVerifyMessage(interaction, messageId);
       return;
     }
 
     const customId =
       subcommand === "edit"
-        ? `verify-setup:role:edit:${interaction.options.getString("message_id", true)}`
+        ? `verify-setup:role:edit:${extractMessageId(interaction.options.getString("message_id", true))}`
         : "verify-setup:role:create";
 
     const roleSelect = new RoleSelectMenuBuilder()
@@ -92,6 +93,11 @@ module.exports = {
     });
   },
 };
+
+function extractMessageId(input) {
+  const matches = input.match(/\d{15,20}/g);
+  return matches ? matches[matches.length - 1] : input;
+}
 
 async function deleteVerifyMessage(interaction, messageId) {
   try {
