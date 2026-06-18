@@ -26,7 +26,16 @@ module.exports = {
       .setLabel("일일 지급 받기")
       .setStyle(ButtonStyle.Success);
 
-    const row = new ActionRowBuilder().addComponents(checkButton, claimButton);
+    const devButton = new ButtonBuilder()
+      .setCustomId("coin-action:dev")
+      .setLabel("개발자: 코인 지급/차감")
+      .setStyle(ButtonStyle.Danger);
+
+    const row = new ActionRowBuilder().addComponents(
+      checkButton,
+      claimButton,
+      devButton,
+    );
 
     await interaction.reply({
       content: nya("어떤 기능을 사용할까요?"),

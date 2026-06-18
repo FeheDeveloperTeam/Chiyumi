@@ -21,6 +21,7 @@ const {
   setLogOption,
 } = require("../utils/guildConfig");
 const { buildLogContent, buildLogRows } = require("../commands/log");
+const { isDeveloper } = require("../utils/devUser");
 const { buildBjEmbed } = require("../commands/blackjack");
 const {
   drawCard,
@@ -42,6 +43,7 @@ const ANNOUNCE_MODAL_PREFIX = "announce-modal:";
 const LOG_ACTION_PREFIX = "log-action:";
 const LOG_TOGGLE_PREFIX = "log-toggle:";
 const LOG_CHANNEL_SELECT_ID = "log-channel-select";
+const COIN_DEV_MODAL_ID = "coin-dev-modal";
 const DEFAULT_VERIFY_MESSAGE = nya("아래 버튼을 눌러 서버 인증을 완료하세요.");
 
 function hasManageGuild(interaction) {
@@ -292,6 +294,19 @@ async function handleButton(interaction) {
       return;
     }
 
+    if (action === "dev") {
+      if (!isDeveloper(interaction.user.id)) {
+        await interaction.reply({
+          content: nya("이 버튼은 개발자만 사용할 수 있습니다. (오류 코드: DEV-001)"),
+          ephemeral: true,
+        });
+        return;
+      }
+
+      await showDevGrantModal(interaction);
+      return;
+    }
+
     return;
   }
 
@@ -381,6 +396,72 @@ async function handleButton(interaction) {
       ephemeral: true,
     });
   }
+}
+
+async function showDevGrantModal(interaction) {
+  const modal = new ModalBuilder()
+    .setCustomId(COIN_DEV_MODAL_ID)
+    .setTitle("코인 지급/차감");
+
+  const userIdInput = new TextInputBuilder()
+    .setCustomId("user_id")
+    .setLabel("대상 사용자 ID")
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true);
+
+  const amountInput = new TextInputBuilder()
+    .setCustomId("amount")
+    .setLabel("금액 (지급은 양수, 차감은 음수)")
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder("예: 100 또는 -100")
+    .setRequired(true);
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(userIdInput),
+    new ActionRowBuilder().addComponents(amountInput),
+  );
+
+  await interaction.showModal(modal);
+}
+
+async function handleDevGrantModal(interaction) {
+  if (!isDeveloper(interaction.user.id)) {
+    await interaction.reply({
+      content: nya("이 기능은 개발자만 사용할 수 있습니다. (오류 코드: DEV-001)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const targetUserId = interaction.fields.getTextInputValue("user_id").trim();
+  const amountText = interaction.fields.getTextInputValue("amount").trim();
+  const amount = Number(amountText);
+
+  if (!/^\d{15,20}$/.test(targetUserId)) {
+    await interaction.reply({
+      content: nya("올바른 사용자 ID가 아닙니다. (오류 코드: DEV-002)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  if (!Number.isInteger(amount) || amount === 0) {
+    await interaction.reply({
+      content: nya("올바른 금액이 아닙니다. (오류 코드: DEV-003)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const newBalance = addBalance(targetUserId, amount);
+  const actionText = amount > 0 ? "지급" : "차감";
+
+  await interaction.reply({
+    content: nya(
+      `<@${targetUserId}>님에게 ${Math.abs(amount)} 치유미코인을 ${actionText}했습니다. 현재 보유량: ${newBalance}개`,
+    ),
+    ephemeral: true,
+  });
 }
 
 async function handleBlackjackAction(interaction) {
@@ -601,6 +682,11 @@ async function showMessageModal(interaction, setup) {
 }
 
 async function handleModalSubmit(interaction) {
+  if (interaction.customId === COIN_DEV_MODAL_ID) {
+    await handleDevGrantModal(interaction);
+    return;
+  }
+
   if (interaction.customId.startsWith(ANNOUNCE_MODAL_PREFIX)) {
     await handleAnnounceModal(interaction);
     return;
