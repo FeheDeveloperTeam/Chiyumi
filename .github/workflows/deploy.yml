@@ -5,9 +5,14 @@ on:
     branches:
       - main
 
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout code
@@ -35,6 +40,7 @@ jobs:
 
           api() {
             curl --fail-with-body --silent --show-error \
+              --connect-timeout 10 --max-time 30 \
               -H "Authorization: Bearer ${COREDLAB_API_KEY}" \
               -H "Accept: application/json" \
               "$@"
@@ -129,6 +135,7 @@ jobs:
 
           api() {
             curl --fail-with-body --silent --show-error \
+              --connect-timeout 10 --max-time 30 \
               -H "Authorization: Bearer ${COREDLAB_API_KEY}" \
               -H "Accept: application/json" \
               "$@"
