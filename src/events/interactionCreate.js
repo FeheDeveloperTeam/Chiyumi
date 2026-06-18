@@ -5,17 +5,25 @@ const {
   Events,
   ModalBuilder,
   PermissionFlagsBits,
+  RoleSelectMenuBuilder,
   TextInputBuilder,
   TextInputStyle,
 } = require("discord.js");
 const { nya } = require("../utils/nya");
 
 const VERIFY_BUTTON_PREFIX = "verify:";
+const VERIFY_ACTION_PREFIX = "verify-action:";
+const VERIFY_ACTION_MODAL_PREFIX = "verify-action-modal:";
 const VERIFY_SETUP_ROLE_SELECT_PREFIX = "verify-setup:role:";
 const VERIFY_SETUP_DEFAULT_PREFIX = "verify-setup:default:";
 const VERIFY_SETUP_MODAL_PREFIX = "verify-setup:modal:";
 const VERIFY_MODAL_PREFIX = "verify-modal:";
 const DEFAULT_VERIFY_MESSAGE = nya("아래 버튼을 눌러 서버 인증을 완료하세요.");
+
+function extractMessageId(input) {
+  const matches = input.match(/\d{15,20}/g);
+  return matches ? matches[matches.length - 1] : input;
+}
 
 module.exports = {
   name: Events.InteractionCreate,
@@ -126,6 +134,28 @@ async function handleRoleSelect(interaction) {
 }
 
 async function handleButton(interaction) {
+  if (interaction.customId.startsWith(VERIFY_ACTION_PREFIX)) {
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
+      await interaction.reply({
+        content: nya(
+          "이 설정은 역할 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
+        ),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const action = interaction.customId.slice(VERIFY_ACTION_PREFIX.length);
+
+    if (action === "create") {
+      await replyWithRoleSelect(interaction, "verify-setup:role:create");
+      return;
+    }
+
+    await showMessageIdModal(interaction, action);
+    return;
+  }
+
   if (interaction.customId.startsWith(VERIFY_SETUP_DEFAULT_PREFIX)) {
     const setup = parseSetupCustomId(
       interaction.customId,
@@ -192,6 +222,70 @@ async function handleButton(interaction) {
   }
 }
 
+async function replyWithRoleSelect(interaction, customId) {
+  const roleSelect = new RoleSelectMenuBuilder()
+    .setCustomId(customId)
+    .setPlaceholder("인증 완료 시 지급할 역할을 선택하세요.")
+    .setMinValues(1)
+    .setMaxValues(1);
+
+  const row = new ActionRowBuilder().addComponents(roleSelect);
+
+  await interaction.reply({
+    content: nya("인증 버튼 설정을 시작합니다. 먼저 지급할 역할을 선택하세요."),
+    components: [row],
+    ephemeral: true,
+  });
+}
+
+async function showMessageIdModal(interaction, action) {
+  const modal = new ModalBuilder()
+    .setCustomId(`${VERIFY_ACTION_MODAL_PREFIX}${action}`)
+    .setTitle(action === "edit" ? "수정할 메시지 ID 입력" : "삭제할 메시지 ID 입력");
+
+  const messageIdInput = new TextInputBuilder()
+    .setCustomId("message_id")
+    .setLabel("인증 메시지의 메시지 ID")
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder("메시지 ID 또는 메시지 ID가 포함된 텍스트를 입력하세요.")
+    .setRequired(true);
+
+  const row = new ActionRowBuilder().addComponents(messageIdInput);
+  modal.addComponents(row);
+
+  await interaction.showModal(modal);
+}
+
+async function deleteVerifyMessage(interaction, messageId) {
+  try {
+    const message = await interaction.channel.messages.fetch(messageId);
+
+    if (message.author.id !== interaction.client.user.id) {
+      await interaction.reply({
+        content: nya(
+          "이 봇이 만든 메시지만 삭제할 수 있습니다. (오류 코드: VERIFY-004)",
+        ),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    await message.delete();
+    await interaction.reply({
+      content: nya("인증 메시지를 삭제했습니다."),
+      ephemeral: true,
+    });
+  } catch (error) {
+    console.error(error);
+    await interaction.reply({
+      content: nya(
+        "메시지를 삭제하지 못했습니다. 메시지 ID와 채널이 맞는지 확인해주세요. (오류 코드: VERIFY-001)",
+      ),
+      ephemeral: true,
+    });
+  }
+}
+
 async function showMessageModal(interaction, setup) {
   const modal = new ModalBuilder()
     .setCustomId(buildSetupCustomId(VERIFY_MODAL_PREFIX, setup))
@@ -212,6 +306,21 @@ async function showMessageModal(interaction, setup) {
 }
 
 async function handleModalSubmit(interaction) {
+  if (interaction.customId.startsWith(VERIFY_ACTION_MODAL_PREFIX)) {
+    const action = interaction.customId.slice(VERIFY_ACTION_MODAL_PREFIX.length);
+    const messageId = extractMessageId(
+      interaction.fields.getTextInputValue("message_id"),
+    );
+
+    if (action === "delete") {
+      await deleteVerifyMessage(interaction, messageId);
+      return;
+    }
+
+    await replyWithRoleSelect(interaction, `verify-setup:role:edit:${messageId}`);
+    return;
+  }
+
   if (!interaction.customId.startsWith(VERIFY_MODAL_PREFIX)) return;
 
   const setup = parseSetupCustomId(interaction.customId, VERIFY_MODAL_PREFIX);
