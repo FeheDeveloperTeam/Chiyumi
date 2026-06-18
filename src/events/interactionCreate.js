@@ -10,7 +10,7 @@ const {
 } = require("discord.js");
 
 const VERIFY_BUTTON_PREFIX = "verify:";
-const VERIFY_SETUP_ROLE_SELECT = "verify-setup:role";
+const VERIFY_SETUP_ROLE_SELECT_PREFIX = "verify-setup:role:";
 const VERIFY_SETUP_DEFAULT_PREFIX = "verify-setup:default:";
 const VERIFY_SETUP_MODAL_PREFIX = "verify-setup:modal:";
 const VERIFY_MODAL_PREFIX = "verify-modal:";
@@ -63,7 +63,7 @@ module.exports = {
 };
 
 async function handleRoleSelect(interaction) {
-  if (interaction.customId !== VERIFY_SETUP_ROLE_SELECT) return;
+  if (!interaction.customId.startsWith(VERIFY_SETUP_ROLE_SELECT_PREFIX)) return;
 
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
     await interaction.reply({
@@ -75,6 +75,10 @@ async function handleRoleSelect(interaction) {
 
   const roleId = interaction.values[0];
   const role = interaction.guild.roles.cache.get(roleId);
+  const setup = parseSetupCustomId(
+    interaction.customId,
+    VERIFY_SETUP_ROLE_SELECT_PREFIX,
+  );
 
   if (!role) {
     await interaction.update({
@@ -94,12 +98,12 @@ async function handleRoleSelect(interaction) {
   }
 
   const defaultButton = new ButtonBuilder()
-    .setCustomId(`${VERIFY_SETUP_DEFAULT_PREFIX}${role.id}`)
+    .setCustomId(buildSetupCustomId(VERIFY_SETUP_DEFAULT_PREFIX, setup, role.id))
     .setLabel("기본 메시지로 생성")
     .setStyle(ButtonStyle.Success);
 
   const customButton = new ButtonBuilder()
-    .setCustomId(`${VERIFY_SETUP_MODAL_PREFIX}${role.id}`)
+    .setCustomId(buildSetupCustomId(VERIFY_SETUP_MODAL_PREFIX, setup, role.id))
     .setLabel("메시지 입력")
     .setStyle(ButtonStyle.Primary);
 
@@ -113,14 +117,20 @@ async function handleRoleSelect(interaction) {
 
 async function handleButton(interaction) {
   if (interaction.customId.startsWith(VERIFY_SETUP_DEFAULT_PREFIX)) {
-    const roleId = interaction.customId.slice(VERIFY_SETUP_DEFAULT_PREFIX.length);
-    await sendVerifyMessage(interaction, roleId, DEFAULT_VERIFY_MESSAGE);
+    const setup = parseSetupCustomId(
+      interaction.customId,
+      VERIFY_SETUP_DEFAULT_PREFIX,
+    );
+    await saveVerifyMessage(interaction, setup, DEFAULT_VERIFY_MESSAGE);
     return;
   }
 
   if (interaction.customId.startsWith(VERIFY_SETUP_MODAL_PREFIX)) {
-    const roleId = interaction.customId.slice(VERIFY_SETUP_MODAL_PREFIX.length);
-    await showMessageModal(interaction, roleId);
+    const setup = parseSetupCustomId(
+      interaction.customId,
+      VERIFY_SETUP_MODAL_PREFIX,
+    );
+    await showMessageModal(interaction, setup);
     return;
   }
 
@@ -169,9 +179,9 @@ async function handleButton(interaction) {
   }
 }
 
-async function showMessageModal(interaction, roleId) {
+async function showMessageModal(interaction, setup) {
   const modal = new ModalBuilder()
-    .setCustomId(`${VERIFY_MODAL_PREFIX}${roleId}`)
+    .setCustomId(buildSetupCustomId(VERIFY_MODAL_PREFIX, setup))
     .setTitle("인증 메시지 설정");
 
   const messageInput = new TextInputBuilder()
@@ -191,14 +201,14 @@ async function showMessageModal(interaction, roleId) {
 async function handleModalSubmit(interaction) {
   if (!interaction.customId.startsWith(VERIFY_MODAL_PREFIX)) return;
 
-  const roleId = interaction.customId.slice(VERIFY_MODAL_PREFIX.length);
+  const setup = parseSetupCustomId(interaction.customId, VERIFY_MODAL_PREFIX);
   const message = interaction.fields.getTextInputValue("message");
 
-  await sendVerifyMessage(interaction, roleId, message);
+  await saveVerifyMessage(interaction, setup, message);
 }
 
-async function sendVerifyMessage(interaction, roleId, message) {
-  const role = interaction.guild.roles.cache.get(roleId);
+async function saveVerifyMessage(interaction, setup, message) {
+  const role = interaction.guild.roles.cache.get(setup.roleId);
 
   if (!role) {
     await interaction.reply({
@@ -224,13 +234,75 @@ async function sendVerifyMessage(interaction, roleId, message) {
 
   const row = new ActionRowBuilder().addComponents(verifyButton);
 
-  await interaction.channel.send({
+  if (setup.action === "edit") {
+    await editVerifyMessage(interaction, setup.messageId, message, row, role);
+    return;
+  }
+
+  const createdMessage = await interaction.channel.send({
     content: message,
     components: [row],
   });
 
   await interaction.reply({
-    content: `${role} 역할을 지급하는 인증 버튼을 생성했습니다.`,
+    content: `${role} 역할을 지급하는 인증 버튼을 생성했습니다. 메시지 ID: ${createdMessage.id}`,
     ephemeral: true,
   });
+}
+
+async function editVerifyMessage(interaction, messageId, message, row, role) {
+  try {
+    const targetMessage = await interaction.channel.messages.fetch(messageId);
+
+    if (targetMessage.author.id !== interaction.client.user.id) {
+      await interaction.reply({
+        content: "이 봇이 만든 메시지만 수정할 수 있습니다.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    await targetMessage.edit({
+      content: message,
+      components: [row],
+    });
+
+    await interaction.reply({
+      content: `${role} 역할을 지급하는 인증 메시지를 수정했습니다.`,
+      ephemeral: true,
+    });
+  } catch (error) {
+    console.error(error);
+    await interaction.reply({
+      content:
+        "메시지를 수정하지 못했습니다. 메시지 ID와 채널이 맞는지 확인해주세요.",
+      ephemeral: true,
+    });
+  }
+}
+
+function parseSetupCustomId(customId, prefix) {
+  const parts = customId.slice(prefix.length).split(":");
+  const action = parts[0];
+
+  if (action === "edit") {
+    return {
+      action,
+      messageId: parts[1],
+      roleId: parts[2],
+    };
+  }
+
+  return {
+    action: "create",
+    roleId: parts[1],
+  };
+}
+
+function buildSetupCustomId(prefix, setup, roleId = setup.roleId) {
+  if (setup.action === "edit") {
+    return `${prefix}edit:${setup.messageId}:${roleId}`;
+  }
+
+  return `${prefix}create:${roleId}`;
 }
