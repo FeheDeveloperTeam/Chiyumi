@@ -2,6 +2,8 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ChannelSelectMenuBuilder,
+  ChannelType,
   EmbedBuilder,
   Events,
   ModalBuilder,
@@ -12,7 +14,13 @@ const {
 } = require("discord.js");
 const { nya } = require("../utils/nya");
 const { getBalance, claimDaily } = require("../utils/credits");
-const { sendLog } = require("../utils/guildConfig");
+const {
+  sendLog,
+  setLogChannel,
+  getLogOptions,
+  setLogOption,
+} = require("../utils/guildConfig");
+const { buildLogContent, buildLogRows } = require("../commands/log");
 
 const COIN_ACTION_PREFIX = "coin-action:";
 const VERIFY_BUTTON_PREFIX = "verify:";
@@ -23,7 +31,14 @@ const VERIFY_SETUP_DEFAULT_PREFIX = "verify-setup:default:";
 const VERIFY_SETUP_MODAL_PREFIX = "verify-setup:modal:";
 const VERIFY_MODAL_PREFIX = "verify-modal:";
 const ANNOUNCE_MODAL_PREFIX = "announce-modal:";
+const LOG_ACTION_PREFIX = "log-action:";
+const LOG_TOGGLE_PREFIX = "log-toggle:";
+const LOG_CHANNEL_SELECT_ID = "log-channel-select";
 const DEFAULT_VERIFY_MESSAGE = nya("아래 버튼을 눌러 서버 인증을 완료하세요.");
+
+function hasManageGuild(interaction) {
+  return Boolean(interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild));
+}
 
 function formatRemainingTime(ms) {
   const totalMinutes = Math.ceil(ms / 60000);
@@ -49,6 +64,11 @@ module.exports = {
 
     if (interaction.isRoleSelectMenu()) {
       await handleRoleSelect(interaction);
+      return;
+    }
+
+    if (interaction.isChannelSelectMenu()) {
+      await handleChannelSelect(interaction);
       return;
     }
 
@@ -147,7 +167,84 @@ async function handleRoleSelect(interaction) {
   });
 }
 
+async function handleChannelSelect(interaction) {
+  if (interaction.customId !== LOG_CHANNEL_SELECT_ID) return;
+
+  if (!hasManageGuild(interaction)) {
+    await interaction.reply({
+      content: nya(
+        "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
+      ),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const channelId = interaction.values[0];
+  setLogChannel(interaction.guild.id, channelId);
+
+  await interaction.update({
+    content: buildLogContent(interaction.guild.id),
+    components: buildLogRows(interaction.guild.id),
+  });
+}
+
 async function handleButton(interaction) {
+  if (interaction.customId.startsWith(LOG_ACTION_PREFIX)) {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({
+        content: nya(
+          "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
+        ),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const action = interaction.customId.slice(LOG_ACTION_PREFIX.length);
+
+    if (action === "channel") {
+      const channelSelect = new ChannelSelectMenuBuilder()
+        .setCustomId(LOG_CHANNEL_SELECT_ID)
+        .setPlaceholder("로그를 받을 채널을 선택하세요")
+        .addChannelTypes(ChannelType.GuildText)
+        .setMinValues(1)
+        .setMaxValues(1);
+
+      const row = new ActionRowBuilder().addComponents(channelSelect);
+
+      await interaction.update({
+        content: nya("로그를 받을 채널을 선택하세요."),
+        components: [row],
+      });
+      return;
+    }
+
+    return;
+  }
+
+  if (interaction.customId.startsWith(LOG_TOGGLE_PREFIX)) {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({
+        content: nya(
+          "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
+        ),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const key = interaction.customId.slice(LOG_TOGGLE_PREFIX.length);
+    const options = getLogOptions(interaction.guild.id);
+    setLogOption(interaction.guild.id, key, !options[key]);
+
+    await interaction.update({
+      content: buildLogContent(interaction.guild.id),
+      components: buildLogRows(interaction.guild.id),
+    });
+    return;
+  }
+
   if (interaction.customId.startsWith(COIN_ACTION_PREFIX)) {
     const action = interaction.customId.slice(COIN_ACTION_PREFIX.length);
 
