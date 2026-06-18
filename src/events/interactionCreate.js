@@ -2,6 +2,7 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  EmbedBuilder,
   Events,
   ModalBuilder,
   PermissionFlagsBits,
@@ -20,6 +21,7 @@ const VERIFY_SETUP_ROLE_SELECT_PREFIX = "verify-setup:role:";
 const VERIFY_SETUP_DEFAULT_PREFIX = "verify-setup:default:";
 const VERIFY_SETUP_MODAL_PREFIX = "verify-setup:modal:";
 const VERIFY_MODAL_PREFIX = "verify-modal:";
+const ANNOUNCE_MODAL_PREFIX = "announce-modal:";
 const DEFAULT_VERIFY_MESSAGE = nya("아래 버튼을 눌러 서버 인증을 완료하세요.");
 
 function formatRemainingTime(ms) {
@@ -334,6 +336,45 @@ async function deleteVerifyMessage(interaction, messageId) {
   }
 }
 
+async function handleAnnounceModal(interaction) {
+  const [channelId, mention] = interaction.customId
+    .slice(ANNOUNCE_MODAL_PREFIX.length)
+    .split(":");
+
+  const title = interaction.fields.getTextInputValue("title");
+  const content = interaction.fields.getTextInputValue("content");
+
+  const channel = interaction.guild.channels.cache.get(channelId);
+
+  if (!channel) {
+    await interaction.reply({
+      content: nya("채널을 찾을 수 없습니다. (오류 코드: ANNOUNCE-001)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const embed = new EmbedBuilder()
+    .setTitle(title)
+    .setDescription(content)
+    .setColor(0xe1aa74)
+    .setTimestamp();
+
+  const mentionContent =
+    mention === "everyone" ? "@everyone" : mention === "here" ? "@here" : undefined;
+
+  await channel.send({
+    content: mentionContent,
+    embeds: [embed],
+    allowedMentions: mentionContent ? { parse: ["everyone"] } : { parse: [] },
+  });
+
+  await interaction.reply({
+    content: nya(`${channel}에 공지를 보냈습니다.`),
+    ephemeral: true,
+  });
+}
+
 async function showMessageModal(interaction, setup) {
   const modal = new ModalBuilder()
     .setCustomId(buildSetupCustomId(VERIFY_MODAL_PREFIX, setup))
@@ -354,6 +395,11 @@ async function showMessageModal(interaction, setup) {
 }
 
 async function handleModalSubmit(interaction) {
+  if (interaction.customId.startsWith(ANNOUNCE_MODAL_PREFIX)) {
+    await handleAnnounceModal(interaction);
+    return;
+  }
+
   if (interaction.customId.startsWith(VERIFY_ACTION_MODAL_PREFIX)) {
     const action = interaction.customId.slice(VERIFY_ACTION_MODAL_PREFIX.length);
     const messageId = extractMessageId(

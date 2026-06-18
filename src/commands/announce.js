@@ -1,10 +1,12 @@
 const {
+  ActionRowBuilder,
   ChannelType,
-  EmbedBuilder,
+  ModalBuilder,
   PermissionFlagsBits,
   SlashCommandBuilder,
+  TextInputBuilder,
+  TextInputStyle,
 } = require("discord.js");
-const { nya } = require("../utils/nya");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -25,24 +27,6 @@ module.exports = {
     )
     .addStringOption((option) =>
       option
-        .setName("title")
-        .setNameLocalizations({ ko: "제목" })
-        .setDescription("공지 제목")
-        .setDescriptionLocalizations({ ko: "공지 제목" })
-        .setRequired(true)
-        .setMaxLength(256),
-    )
-    .addStringOption((option) =>
-      option
-        .setName("content")
-        .setNameLocalizations({ ko: "내용" })
-        .setDescription("공지 내용")
-        .setDescriptionLocalizations({ ko: "공지 내용" })
-        .setRequired(true)
-        .setMaxLength(4000),
-    )
-    .addStringOption((option) =>
-      option
         .setName("mention")
         .setNameLocalizations({ ko: "멘션" })
         .setDescription("Whether to ping @everyone or @here")
@@ -56,27 +40,31 @@ module.exports = {
 
   async execute(interaction) {
     const channel = interaction.options.getChannel("channel", true);
-    const title = interaction.options.getString("title", true);
-    const content = interaction.options.getString("content", true);
     const mention = interaction.options.getString("mention") ?? "none";
 
-    const embed = new EmbedBuilder()
-      .setTitle(title)
-      .setDescription(content)
-      .setColor(0xe1aa74)
-      .setTimestamp();
+    const modal = new ModalBuilder()
+      .setCustomId(`announce-modal:${channel.id}:${mention}`)
+      .setTitle("공지 작성");
 
-    const mentionContent = mention === "everyone" ? "@everyone" : mention === "here" ? "@here" : undefined;
+    const titleInput = new TextInputBuilder()
+      .setCustomId("title")
+      .setLabel("공지 제목")
+      .setStyle(TextInputStyle.Short)
+      .setMaxLength(256)
+      .setRequired(true);
 
-    await channel.send({
-      content: mentionContent,
-      embeds: [embed],
-      allowedMentions: mentionContent ? { parse: ["everyone"] } : { parse: [] },
-    });
+    const contentInput = new TextInputBuilder()
+      .setCustomId("content")
+      .setLabel("공지 내용")
+      .setStyle(TextInputStyle.Paragraph)
+      .setMaxLength(4000)
+      .setRequired(true);
 
-    await interaction.reply({
-      content: nya(`${channel}에 공지를 보냈습니다`),
-      ephemeral: true,
-    });
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(titleInput),
+      new ActionRowBuilder().addComponents(contentInput),
+    );
+
+    await interaction.showModal(modal);
   },
 };
