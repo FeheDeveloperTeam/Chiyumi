@@ -13,7 +13,7 @@ const {
   TextInputStyle,
 } = require("discord.js");
 const { nya } = require("../utils/nya");
-const { getBalance, claimDaily } = require("../utils/credits");
+const { getBalance, addBalance, claimDaily } = require("../utils/credits");
 const {
   sendLog,
   setLogChannel,
@@ -21,8 +21,16 @@ const {
   setLogOption,
 } = require("../utils/guildConfig");
 const { buildLogContent, buildLogRows } = require("../commands/log");
+const { buildBjEmbed } = require("../commands/blackjack");
+const {
+  drawCard,
+  handTotal,
+  getSession: getBjSession,
+  deleteSession: deleteBjSession,
+} = require("../utils/blackjack");
 
 const COIN_ACTION_PREFIX = "coin-action:";
+const BJ_ACTION_PREFIX = "bj-action:";
 const VERIFY_BUTTON_PREFIX = "verify:";
 const VERIFY_ACTION_PREFIX = "verify-action:";
 const VERIFY_ACTION_MODAL_PREFIX = "verify-action-modal:";
@@ -245,6 +253,11 @@ async function handleButton(interaction) {
     return;
   }
 
+  if (interaction.customId.startsWith(BJ_ACTION_PREFIX)) {
+    await handleBlackjackAction(interaction);
+    return;
+  }
+
   if (interaction.customId.startsWith(COIN_ACTION_PREFIX)) {
     const action = interaction.customId.slice(COIN_ACTION_PREFIX.length);
 
@@ -368,6 +381,89 @@ async function handleButton(interaction) {
       ephemeral: true,
     });
   }
+}
+
+async function handleBlackjackAction(interaction) {
+  const [sessionId, action] = interaction.customId
+    .slice(BJ_ACTION_PREFIX.length)
+    .split(":");
+  const session = getBjSession(sessionId);
+
+  if (!session) {
+    await interaction.reply({
+      content: nya("이미 종료된 게임입니다. (오류 코드: BJ-002)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  if (interaction.user.id !== session.userId) {
+    await interaction.reply({
+      content: nya("자신이 시작한 게임만 진행할 수 있습니다. (오류 코드: BJ-003)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  if (action === "hit") {
+    session.playerCards.push(drawCard());
+
+    if (handTotal(session.playerCards) > 21) {
+      deleteBjSession(sessionId);
+      const newBalance = addBalance(session.userId, -session.bet);
+      await interaction.update({
+        embeds: [
+          buildBjEmbed(session, {
+            revealDealer: true,
+            result: nya(
+              `버스트! ${session.bet} 치유미코인을 잃었습니다. 현재 보유: ${newBalance}개`,
+            ),
+          }),
+        ],
+        components: [],
+      });
+      return;
+    }
+
+    await interaction.update({
+      embeds: [buildBjEmbed(session)],
+    });
+    return;
+  }
+
+  while (handTotal(session.dealerCards) < 17) {
+    session.dealerCards.push(drawCard());
+  }
+
+  const playerTotal = handTotal(session.playerCards);
+  const dealerTotal = handTotal(session.dealerCards);
+
+  let delta;
+  let resultText;
+
+  if (dealerTotal > 21 || playerTotal > dealerTotal) {
+    delta = session.bet;
+    resultText = `승리! ${delta} 치유미코인을 획득했습니다.`;
+  } else if (playerTotal === dealerTotal) {
+    delta = 0;
+    resultText = "비겼습니다.";
+  } else {
+    delta = -session.bet;
+    resultText = `패배! ${session.bet} 치유미코인을 잃었습니다.`;
+  }
+
+  deleteBjSession(sessionId);
+  const newBalance = addBalance(session.userId, delta);
+
+  await interaction.update({
+    embeds: [
+      buildBjEmbed(session, {
+        revealDealer: true,
+        result: nya(`${resultText} 현재 보유: ${newBalance}개`),
+      }),
+    ],
+    components: [],
+  });
 }
 
 async function replyWithRoleSelect(interaction, customId) {
