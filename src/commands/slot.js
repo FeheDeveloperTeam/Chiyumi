@@ -2,7 +2,14 @@ const { SlashCommandBuilder } = require("discord.js");
 const { nya } = require("../utils/nya");
 const { getBalance, addBalance } = require("../utils/credits");
 
-const SYMBOLS = ["🍒", "🍋", "🍇", "🔔", "💎"];
+const JACKPOT_MULTIPLIERS = {
+  "🍒": 4,
+  "🍋": 5,
+  "🍇": 6,
+  "🔔": 7,
+  "💎": 10,
+};
+const SYMBOLS = Object.keys(JACKPOT_MULTIPLIERS);
 const HIDDEN_SYMBOL = "❓";
 const REVEAL_DELAY_MS = 800;
 
@@ -14,6 +21,12 @@ function buildReelText(reels, revealedCount) {
   return reels
     .map((symbol, index) => (index < revealedCount ? symbol : HIDDEN_SYMBOL))
     .join(" ");
+}
+
+function findPairSymbol(reels) {
+  if (reels[0] === reels[1]) return reels[0];
+  if (reels[1] === reels[2]) return reels[1];
+  return reels[0];
 }
 
 module.exports = {
@@ -59,12 +72,15 @@ module.exports = {
 
     let delta;
     let resultText;
+    let multiplier;
 
     if (allMatch) {
-      delta = bet * 5;
-      resultText = "잭폿";
+      multiplier = JACKPOT_MULTIPLIERS[reels[0]];
+      delta = bet * multiplier;
+      resultText = "잭팟";
     } else if (twoMatch) {
-      delta = bet;
+      multiplier = Math.max(1, Math.floor(JACKPOT_MULTIPLIERS[findPairSymbol(reels)] / 2));
+      delta = bet * multiplier;
       resultText = "당첨";
     } else {
       delta = -bet;
@@ -83,10 +99,12 @@ module.exports = {
     const newBalance = addBalance(userId, delta);
     const deltaText = delta > 0 ? `+${delta}` : `${delta}`;
 
+    const multiplierText = multiplier ? ` (${multiplier}배)` : "";
+
     await wait(REVEAL_DELAY_MS);
     await interaction.editReply(
       nya(
-        `🎰 ${reels.join(" ")} → ${resultText}! (${deltaText} 치유미코인, 현재 보유: ${newBalance}개)`,
+        `🎰 ${reels.join(" ")} → ${resultText}${multiplierText}! (${deltaText} 치유미코인, 현재 보유: ${newBalance}개)`,
       ),
     );
   },
