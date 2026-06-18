@@ -63,7 +63,7 @@ module.exports = {
     const embed = new EmbedBuilder()
       .setTitle(title)
       .setDescription(content)
-      .setColor(0x5865f2)
+      .setColor(0xe1aa74)
       .setTimestamp();
 
     const mentionContent = mention === "everyone" ? "@everyone" : mention === "here" ? "@here" : undefined;
