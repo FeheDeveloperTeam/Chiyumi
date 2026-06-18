@@ -1,4 +1,4 @@
-const DEV_USER_ID = "1517171143193268346";
+const DEV_USER_ID = "826036359499481109";
 
 function isDeveloper(userId) {
   return userId === DEV_USER_ID;
