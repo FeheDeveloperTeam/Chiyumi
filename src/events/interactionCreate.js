@@ -12,6 +12,7 @@ const {
 } = require("discord.js");
 const { nya } = require("../utils/nya");
 const { getBalance, claimDaily } = require("../utils/credits");
+const { sendLog } = require("../utils/guildConfig");
 
 const COIN_ACTION_PREFIX = "coin-action:";
 const VERIFY_BUTTON_PREFIX = "verify:";
@@ -373,6 +374,18 @@ async function handleAnnounceModal(interaction) {
     content: nya(`${channel}에 공지를 보냈습니다.`),
     ephemeral: true,
   });
+
+  const logEmbed = new EmbedBuilder()
+    .setTitle("공지 전송")
+    .addFields(
+      { name: "채널", value: `${channel}` },
+      { name: "작성자", value: `${interaction.user}` },
+      { name: "제목", value: title },
+    )
+    .setColor(0xe1aa74)
+    .setTimestamp();
+
+  await sendLog(interaction.guild, logEmbed);
 }
 
 async function showMessageModal(interaction, setup) {
