@@ -6,7 +6,11 @@ const { Client, Collection, GatewayIntentBits } = require("discord.js");
 const { requireEnv } = require("./utils/env");
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
 });
 
 client.commands = new Collection();
