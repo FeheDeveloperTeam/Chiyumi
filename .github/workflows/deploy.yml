@@ -1,0 +1,104 @@
+name: Deploy to CoredLab
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate JavaScript files
+        run: find src -name "*.js" -print0 | xargs -0 -n1 node --check
+
+      - name: Upload files to CoredLab
+        env:
+          COREDLAB_API_KEY: ${{ secrets.COREDLAB_API_KEY }}
+          COREDLAB_SERVER_ID: ${{ secrets.COREDLAB_SERVER_ID }}
+          COREDLAB_BASE_URL: ${{ vars.COREDLAB_BASE_URL || 'https://host.coredlabgame.cloud' }}
+        run: |
+          set -euo pipefail
+
+          api() {
+            curl --fail-with-body --silent --show-error \
+              -H "Authorization: Bearer ${COREDLAB_API_KEY}" \
+              -H "Accept: application/json" \
+              "$@"
+          }
+
+          url_encode() {
+            python -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$1"
+          }
+
+          create_folder() {
+            local root="$1"
+            local name="$2"
+
+            api \
+              -X POST "${COREDLAB_BASE_URL}/api/client/servers/${COREDLAB_SERVER_ID}/files/create-folder" \
+              -H "Content-Type: application/json" \
+              --data "{\"root\":\"${root}\",\"name\":\"${name}\"}" || true
+          }
+
+          while IFS= read -r dir; do
+            [ "$dir" = "." ] && continue
+
+            parent="/$(dirname "$dir")"
+            name="$(basename "$dir")"
+
+            if [ "$parent" = "/." ]; then
+              parent="/"
+            fi
+
+            create_folder "$parent" "$name"
+          done < <(
+            find . -type d \
+              -not -path "./.git*" \
+              -not -path "./.github*" \
+              -not -path "./node_modules*" \
+              | sort
+          )
+
+          while IFS= read -r file; do
+            remote_path="/${file#./}"
+            encoded_path="$(url_encode "$remote_path")"
+
+            api \
+              -X POST "${COREDLAB_BASE_URL}/api/client/servers/${COREDLAB_SERVER_ID}/files/write?file=${encoded_path}" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary "@${file}"
+          done < <(
+            find . -type f \
+              -not -path "./.git*" \
+              -not -path "./.github*" \
+              -not -path "./node_modules*" \
+              -not -name ".env" \
+              | sort
+          )
+
+      - name: Restart CoredLab server
+        env:
+          COREDLAB_API_KEY: ${{ secrets.COREDLAB_API_KEY }}
+          COREDLAB_SERVER_ID: ${{ secrets.COREDLAB_SERVER_ID }}
+          COREDLAB_BASE_URL: ${{ vars.COREDLAB_BASE_URL || 'https://host.coredlabgame.cloud' }}
+        run: |
+          curl --fail-with-body --silent --show-error \
+            -X POST "${COREDLAB_BASE_URL}/api/client/servers/${COREDLAB_SERVER_ID}/power" \
+            -H "Authorization: Bearer ${COREDLAB_API_KEY}" \
+            -H "Accept: application/json" \
+            -H "Content-Type: application/json" \
+            --data '{"signal":"restart"}'
