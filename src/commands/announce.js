@@ -40,12 +40,25 @@ module.exports = {
         .setDescriptionLocalizations({ ko: "공지 내용" })
         .setRequired(true)
         .setMaxLength(4000),
+    )
+    .addStringOption((option) =>
+      option
+        .setName("mention")
+        .setNameLocalizations({ ko: "멘션" })
+        .setDescription("Whether to ping @everyone or @here")
+        .setDescriptionLocalizations({ ko: "에브리핑 또는 히어핑 여부" })
+        .addChoices(
+          { name: "없음", value: "none" },
+          { name: "에브리핑 (@everyone)", value: "everyone" },
+          { name: "히어핑 (@here)", value: "here" },
+        ),
     ),
 
   async execute(interaction) {
     const channel = interaction.options.getChannel("channel", true);
     const title = interaction.options.getString("title", true);
     const content = interaction.options.getString("content", true);
+    const mention = interaction.options.getString("mention") ?? "none";
 
     const embed = new EmbedBuilder()
       .setTitle(title)
@@ -53,7 +66,13 @@ module.exports = {
       .setColor(0x5865f2)
       .setTimestamp();
 
-    await channel.send({ embeds: [embed] });
+    const mentionContent = mention === "everyone" ? "@everyone" : mention === "here" ? "@here" : undefined;
+
+    await channel.send({
+      content: mentionContent,
+      embeds: [embed],
+      allowedMentions: mentionContent ? { parse: ["everyone"] } : { parse: [] },
+    });
 
     await interaction.reply({
       content: nya(`${channel}에 공지를 보냈습니다`),
