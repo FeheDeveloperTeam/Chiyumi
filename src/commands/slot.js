@@ -3,6 +3,18 @@ const { nya } = require("../utils/nya");
 const { getBalance, addBalance } = require("../utils/credits");
 
 const SYMBOLS = ["🍒", "🍋", "🍇", "🔔", "💎"];
+const HIDDEN_SYMBOL = "❓";
+const REVEAL_DELAY_MS = 800;
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function buildReelText(reels, revealedCount) {
+  return reels
+    .map((symbol, index) => (index < revealedCount ? symbol : HIDDEN_SYMBOL))
+    .join(" ");
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -59,12 +71,22 @@ module.exports = {
       resultText = "낙첨";
     }
 
+    await interaction.reply(
+      nya(`🎰 ${buildReelText(reels, 0)} 두근두근...`),
+    );
+
+    for (let revealed = 1; revealed <= reels.length; revealed += 1) {
+      await wait(REVEAL_DELAY_MS);
+      await interaction.editReply(nya(`🎰 ${buildReelText(reels, revealed)}`));
+    }
+
     const newBalance = addBalance(userId, delta);
     const deltaText = delta > 0 ? `+${delta}` : `${delta}`;
 
-    await interaction.reply(
+    await wait(REVEAL_DELAY_MS);
+    await interaction.editReply(
       nya(
-        `${reels.join(" ")} → ${resultText}! (${deltaText} 치유미코인, 현재 보유: ${newBalance}개)`,
+        `🎰 ${reels.join(" ")} → ${resultText}! (${deltaText} 치유미코인, 현재 보유: ${newBalance}개)`,
       ),
     );
   },
