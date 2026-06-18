@@ -14,6 +14,13 @@ function saveAll(configs) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(configs, null, 2));
 }
 
+const DEFAULT_LOG_OPTIONS = {
+  messageDelete: false,
+  messageEdit: false,
+  voiceJoin: false,
+  voiceLeave: false,
+};
+
 function setLogChannel(guildId, channelId) {
   const configs = loadAll();
   configs[guildId] = { ...(configs[guildId] ?? {}), logChannelId: channelId };
@@ -23,6 +30,25 @@ function setLogChannel(guildId, channelId) {
 function getLogChannelId(guildId) {
   const configs = loadAll();
   return configs[guildId]?.logChannelId ?? null;
+}
+
+function getLogOptions(guildId) {
+  const configs = loadAll();
+  return { ...DEFAULT_LOG_OPTIONS, ...(configs[guildId]?.logOptions ?? {}) };
+}
+
+function setLogOption(guildId, key, enabled) {
+  const configs = loadAll();
+  const current = configs[guildId] ?? {};
+  configs[guildId] = {
+    ...current,
+    logOptions: {
+      ...DEFAULT_LOG_OPTIONS,
+      ...(current.logOptions ?? {}),
+      [key]: enabled,
+    },
+  };
+  saveAll(configs);
 }
 
 async function sendLog(guild, embed) {
@@ -35,4 +61,10 @@ async function sendLog(guild, embed) {
   await channel.send({ embeds: [embed] }).catch(() => {});
 }
 
-module.exports = { setLogChannel, getLogChannelId, sendLog };
+module.exports = {
+  setLogChannel,
+  getLogChannelId,
+  sendLog,
+  getLogOptions,
+  setLogOption,
+};
