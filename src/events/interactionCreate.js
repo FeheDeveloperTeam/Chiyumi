@@ -8,13 +8,14 @@ const {
   TextInputBuilder,
   TextInputStyle,
 } = require("discord.js");
+const { nya } = require("../utils/nya");
 
 const VERIFY_BUTTON_PREFIX = "verify:";
 const VERIFY_SETUP_ROLE_SELECT_PREFIX = "verify-setup:role:";
 const VERIFY_SETUP_DEFAULT_PREFIX = "verify-setup:default:";
 const VERIFY_SETUP_MODAL_PREFIX = "verify-setup:modal:";
 const VERIFY_MODAL_PREFIX = "verify-modal:";
-const DEFAULT_VERIFY_MESSAGE = "아래 버튼을 눌러 서버 인증을 완료하세요.";
+const DEFAULT_VERIFY_MESSAGE = nya("아래 버튼을 눌러 서버 인증을 완료하세요.");
 
 module.exports = {
   name: Events.InteractionCreate,
@@ -49,7 +50,9 @@ module.exports = {
       console.error(error);
 
       const message = {
-        content: "명령어를 실행하는 중 오류가 발생했습니다.",
+        content: nya(
+          "명령어를 실행하는 중 오류가 발생했습니다. (오류 코드: CMD-001)",
+        ),
         ephemeral: true,
       };
 
@@ -67,7 +70,9 @@ async function handleRoleSelect(interaction) {
 
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
     await interaction.reply({
-      content: "이 설정은 역할 관리 권한이 있는 관리자만 사용할 수 있습니다.",
+      content: nya(
+        "이 설정은 역할 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
+      ),
       ephemeral: true,
     });
     return;
@@ -82,7 +87,9 @@ async function handleRoleSelect(interaction) {
 
   if (!role) {
     await interaction.update({
-      content: "선택한 역할을 찾을 수 없습니다. 다시 시도해주세요.",
+      content: nya(
+        "선택한 역할을 찾을 수 없습니다. 다시 시도해주세요. (오류 코드: ROLE-001)",
+      ),
       components: [],
     });
     return;
@@ -90,8 +97,9 @@ async function handleRoleSelect(interaction) {
 
   if (!role.editable) {
     await interaction.update({
-      content:
-        "이 역할은 봇이 지급할 수 없습니다. 봇 역할을 해당 역할보다 위로 올려주세요.",
+      content: nya(
+        "이 역할은 봇이 지급할 수 없습니다. 봇 역할을 해당 역할보다 위로 올려주세요. (오류 코드: ROLE-002)",
+      ),
       components: [],
     });
     return;
@@ -110,7 +118,9 @@ async function handleRoleSelect(interaction) {
   const row = new ActionRowBuilder().addComponents(defaultButton, customButton);
 
   await interaction.update({
-    content: `${role} 역할을 인증 역할로 선택했습니다. 인증 메시지를 어떻게 만들까요?`,
+    content: nya(
+      `${role} 역할을 인증 역할로 선택했습니다. 인증 메시지를 어떻게 만들까요?`,
+    ),
     components: [row],
   });
 }
@@ -138,7 +148,7 @@ async function handleButton(interaction) {
 
   if (!interaction.inGuild()) {
     await interaction.reply({
-      content: "서버에서만 사용할 수 있는 버튼입니다.",
+      content: nya("서버에서만 사용할 수 있는 버튼입니다. (오류 코드: GUILD-001)"),
       ephemeral: true,
     });
     return;
@@ -149,7 +159,9 @@ async function handleButton(interaction) {
 
   if (!role) {
     await interaction.reply({
-      content: "인증 역할을 찾을 수 없습니다. 관리자에게 문의해주세요.",
+      content: nya(
+        "인증 역할을 찾을 수 없습니다. 관리자에게 문의해주세요. (오류 코드: ROLE-003)",
+      ),
       ephemeral: true,
     });
     return;
@@ -157,7 +169,7 @@ async function handleButton(interaction) {
 
   if (interaction.member.roles.cache.has(role.id)) {
     await interaction.reply({
-      content: `이미 ${role} 역할을 가지고 있습니다.`,
+      content: nya(`이미 ${role} 역할을 가지고 있습니다.`),
       ephemeral: true,
     });
     return;
@@ -166,14 +178,15 @@ async function handleButton(interaction) {
   try {
     await interaction.member.roles.add(role);
     await interaction.reply({
-      content: `${role} 역할이 지급되었습니다.`,
+      content: nya(`${role} 역할이 지급되었습니다.`),
       ephemeral: true,
     });
   } catch (error) {
     console.error(error);
     await interaction.reply({
-      content:
-        "역할을 지급하지 못했습니다. 봇 권한과 역할 순서를 확인해주세요.",
+      content: nya(
+        "역할을 지급하지 못했습니다. 봇 권한과 역할 순서를 확인해주세요. (오류 코드: ROLE-004)",
+      ),
       ephemeral: true,
     });
   }
@@ -212,7 +225,9 @@ async function saveVerifyMessage(interaction, setup, message) {
 
   if (!role) {
     await interaction.reply({
-      content: "인증 역할을 찾을 수 없습니다. 다시 설정해주세요.",
+      content: nya(
+        "인증 역할을 찾을 수 없습니다. 다시 설정해주세요. (오류 코드: ROLE-005)",
+      ),
       ephemeral: true,
     });
     return;
@@ -220,8 +235,9 @@ async function saveVerifyMessage(interaction, setup, message) {
 
   if (!role.editable) {
     await interaction.reply({
-      content:
-        "이 역할은 봇이 지급할 수 없습니다. 봇 역할을 해당 역할보다 위로 올려주세요.",
+      content: nya(
+        "이 역할은 봇이 지급할 수 없습니다. 봇 역할을 해당 역할보다 위로 올려주세요. (오류 코드: ROLE-006)",
+      ),
       ephemeral: true,
     });
     return;
@@ -245,7 +261,9 @@ async function saveVerifyMessage(interaction, setup, message) {
   });
 
   await interaction.reply({
-    content: `${role} 역할을 지급하는 인증 버튼을 생성했습니다. 메시지 ID: ${createdMessage.id}`,
+    content: nya(
+      `${role} 역할을 지급하는 인증 버튼을 생성했습니다. 메시지 ID: ${createdMessage.id}`,
+    ),
     ephemeral: true,
   });
 }
@@ -256,7 +274,9 @@ async function editVerifyMessage(interaction, messageId, message, row, role) {
 
     if (targetMessage.author.id !== interaction.client.user.id) {
       await interaction.reply({
-        content: "이 봇이 만든 메시지만 수정할 수 있습니다.",
+        content: nya(
+          "이 봇이 만든 메시지만 수정할 수 있습니다. (오류 코드: VERIFY-002)",
+        ),
         ephemeral: true,
       });
       return;
@@ -268,14 +288,15 @@ async function editVerifyMessage(interaction, messageId, message, row, role) {
     });
 
     await interaction.reply({
-      content: `${role} 역할을 지급하는 인증 메시지를 수정했습니다.`,
+      content: nya(`${role} 역할을 지급하는 인증 메시지를 수정했습니다.`),
       ephemeral: true,
     });
   } catch (error) {
     console.error(error);
     await interaction.reply({
-      content:
-        "메시지를 수정하지 못했습니다. 메시지 ID와 채널이 맞는지 확인해주세요.",
+      content: nya(
+        "메시지를 수정하지 못했습니다. 메시지 ID와 채널이 맞는지 확인해주세요. (오류 코드: VERIFY-003)",
+      ),
       ephemeral: true,
     });
   }

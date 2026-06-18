@@ -4,6 +4,7 @@ const {
   RoleSelectMenuBuilder,
   SlashCommandBuilder,
 } = require("discord.js");
+const { nya } = require("../utils/nya");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -87,7 +88,7 @@ module.exports = {
     const row = new ActionRowBuilder().addComponents(roleSelect);
 
     await interaction.reply({
-      content: "인증 버튼 설정을 시작합니다. 먼저 지급할 역할을 선택하세요.",
+      content: nya("인증 버튼 설정을 시작합니다. 먼저 지급할 역할을 선택하세요."),
       components: [row],
       ephemeral: true,
     });
@@ -105,7 +106,9 @@ async function deleteVerifyMessage(interaction, messageId) {
 
     if (message.author.id !== interaction.client.user.id) {
       await interaction.reply({
-        content: "이 봇이 만든 메시지만 삭제할 수 있습니다.",
+        content: nya(
+          "이 봇이 만든 메시지만 삭제할 수 있습니다. (오류 코드: VERIFY-004)",
+        ),
         ephemeral: true,
       });
       return;
@@ -113,14 +116,15 @@ async function deleteVerifyMessage(interaction, messageId) {
 
     await message.delete();
     await interaction.reply({
-      content: "인증 메시지를 삭제했습니다.",
+      content: nya("인증 메시지를 삭제했습니다."),
       ephemeral: true,
     });
   } catch (error) {
     console.error(error);
     await interaction.reply({
-      content:
-        "메시지를 삭제하지 못했습니다. 메시지 ID와 채널이 맞는지 확인해주세요.",
+      content: nya(
+        "메시지를 삭제하지 못했습니다. 메시지 ID와 채널이 맞는지 확인해주세요. (오류 코드: VERIFY-001)",
+      ),
       ephemeral: true,
     });
   }
