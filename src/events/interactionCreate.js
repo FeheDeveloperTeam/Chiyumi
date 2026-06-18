@@ -1,12 +1,36 @@
-const { Events } = require("discord.js");
+const {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  Events,
+  ModalBuilder,
+  PermissionFlagsBits,
+  TextInputBuilder,
+  TextInputStyle,
+} = require("discord.js");
 
 const VERIFY_BUTTON_PREFIX = "verify:";
+const VERIFY_SETUP_ROLE_SELECT = "verify-setup:role";
+const VERIFY_SETUP_DEFAULT_PREFIX = "verify-setup:default:";
+const VERIFY_SETUP_MODAL_PREFIX = "verify-setup:modal:";
+const VERIFY_MODAL_PREFIX = "verify-modal:";
+const DEFAULT_VERIFY_MESSAGE = "아래 버튼을 눌러 서버 인증을 완료하세요.";
 
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction) {
     if (interaction.isButton()) {
       await handleButton(interaction);
+      return;
+    }
+
+    if (interaction.isRoleSelectMenu()) {
+      await handleRoleSelect(interaction);
+      return;
+    }
+
+    if (interaction.isModalSubmit()) {
+      await handleModalSubmit(interaction);
       return;
     }
 
@@ -38,7 +62,68 @@ module.exports = {
   },
 };
 
+async function handleRoleSelect(interaction) {
+  if (interaction.customId !== VERIFY_SETUP_ROLE_SELECT) return;
+
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
+    await interaction.reply({
+      content: "이 설정은 역할 관리 권한이 있는 관리자만 사용할 수 있습니다.",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const roleId = interaction.values[0];
+  const role = interaction.guild.roles.cache.get(roleId);
+
+  if (!role) {
+    await interaction.update({
+      content: "선택한 역할을 찾을 수 없습니다. 다시 시도해주세요.",
+      components: [],
+    });
+    return;
+  }
+
+  if (!role.editable) {
+    await interaction.update({
+      content:
+        "이 역할은 봇이 지급할 수 없습니다. 봇 역할을 해당 역할보다 위로 올려주세요.",
+      components: [],
+    });
+    return;
+  }
+
+  const defaultButton = new ButtonBuilder()
+    .setCustomId(`${VERIFY_SETUP_DEFAULT_PREFIX}${role.id}`)
+    .setLabel("기본 메시지로 생성")
+    .setStyle(ButtonStyle.Success);
+
+  const customButton = new ButtonBuilder()
+    .setCustomId(`${VERIFY_SETUP_MODAL_PREFIX}${role.id}`)
+    .setLabel("메시지 입력")
+    .setStyle(ButtonStyle.Primary);
+
+  const row = new ActionRowBuilder().addComponents(defaultButton, customButton);
+
+  await interaction.update({
+    content: `${role} 역할을 인증 역할로 선택했습니다. 인증 메시지를 어떻게 만들까요?`,
+    components: [row],
+  });
+}
+
 async function handleButton(interaction) {
+  if (interaction.customId.startsWith(VERIFY_SETUP_DEFAULT_PREFIX)) {
+    const roleId = interaction.customId.slice(VERIFY_SETUP_DEFAULT_PREFIX.length);
+    await sendVerifyMessage(interaction, roleId, DEFAULT_VERIFY_MESSAGE);
+    return;
+  }
+
+  if (interaction.customId.startsWith(VERIFY_SETUP_MODAL_PREFIX)) {
+    const roleId = interaction.customId.slice(VERIFY_SETUP_MODAL_PREFIX.length);
+    await showMessageModal(interaction, roleId);
+    return;
+  }
+
   if (!interaction.customId.startsWith(VERIFY_BUTTON_PREFIX)) return;
 
   if (!interaction.inGuild()) {
@@ -82,4 +167,70 @@ async function handleButton(interaction) {
       ephemeral: true,
     });
   }
+}
+
+async function showMessageModal(interaction, roleId) {
+  const modal = new ModalBuilder()
+    .setCustomId(`${VERIFY_MODAL_PREFIX}${roleId}`)
+    .setTitle("인증 메시지 설정");
+
+  const messageInput = new TextInputBuilder()
+    .setCustomId("message")
+    .setLabel("인증 버튼 위에 표시할 메시지")
+    .setStyle(TextInputStyle.Paragraph)
+    .setPlaceholder(DEFAULT_VERIFY_MESSAGE)
+    .setRequired(true)
+    .setMaxLength(1800);
+
+  const row = new ActionRowBuilder().addComponents(messageInput);
+  modal.addComponents(row);
+
+  await interaction.showModal(modal);
+}
+
+async function handleModalSubmit(interaction) {
+  if (!interaction.customId.startsWith(VERIFY_MODAL_PREFIX)) return;
+
+  const roleId = interaction.customId.slice(VERIFY_MODAL_PREFIX.length);
+  const message = interaction.fields.getTextInputValue("message");
+
+  await sendVerifyMessage(interaction, roleId, message);
+}
+
+async function sendVerifyMessage(interaction, roleId, message) {
+  const role = interaction.guild.roles.cache.get(roleId);
+
+  if (!role) {
+    await interaction.reply({
+      content: "인증 역할을 찾을 수 없습니다. 다시 설정해주세요.",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  if (!role.editable) {
+    await interaction.reply({
+      content:
+        "이 역할은 봇이 지급할 수 없습니다. 봇 역할을 해당 역할보다 위로 올려주세요.",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const verifyButton = new ButtonBuilder()
+    .setCustomId(`${VERIFY_BUTTON_PREFIX}${role.id}`)
+    .setLabel("인증 받기")
+    .setStyle(ButtonStyle.Success);
+
+  const row = new ActionRowBuilder().addComponents(verifyButton);
+
+  await interaction.channel.send({
+    content: message,
+    components: [row],
+  });
+
+  await interaction.reply({
+    content: `${role} 역할을 지급하는 인증 버튼을 생성했습니다.`,
+    ephemeral: true,
+  });
 }
