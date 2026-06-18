@@ -10,7 +10,9 @@ const {
   TextInputStyle,
 } = require("discord.js");
 const { nya } = require("../utils/nya");
+const { getBalance } = require("../utils/credits");
 
+const COIN_ACTION_PREFIX = "coin-action:";
 const VERIFY_BUTTON_PREFIX = "verify:";
 const VERIFY_ACTION_PREFIX = "verify-action:";
 const VERIFY_ACTION_MODAL_PREFIX = "verify-action-modal:";
@@ -134,6 +136,21 @@ async function handleRoleSelect(interaction) {
 }
 
 async function handleButton(interaction) {
+  if (interaction.customId.startsWith(COIN_ACTION_PREFIX)) {
+    const action = interaction.customId.slice(COIN_ACTION_PREFIX.length);
+
+    if (action === "check") {
+      const balance = getBalance(interaction.user.id);
+      await interaction.reply({
+        content: nya(`${interaction.user}님의 치유미코인 보유량: ${balance}개`),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    return;
+  }
+
   if (interaction.customId.startsWith(VERIFY_ACTION_PREFIX)) {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
       await interaction.reply({
