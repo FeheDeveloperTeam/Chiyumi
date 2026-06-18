@@ -10,7 +10,7 @@ const {
   TextInputStyle,
 } = require("discord.js");
 const { nya } = require("../utils/nya");
-const { getBalance } = require("../utils/credits");
+const { getBalance, claimDaily } = require("../utils/credits");
 
 const COIN_ACTION_PREFIX = "coin-action:";
 const VERIFY_BUTTON_PREFIX = "verify:";
@@ -21,6 +21,15 @@ const VERIFY_SETUP_DEFAULT_PREFIX = "verify-setup:default:";
 const VERIFY_SETUP_MODAL_PREFIX = "verify-setup:modal:";
 const VERIFY_MODAL_PREFIX = "verify-modal:";
 const DEFAULT_VERIFY_MESSAGE = nya("아래 버튼을 눌러 서버 인증을 완료하세요.");
+
+function formatRemainingTime(ms) {
+  const totalMinutes = Math.ceil(ms / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours > 0) return `${hours}시간 ${minutes}분`;
+  return `${minutes}분`;
+}
 
 function extractMessageId(input) {
   const matches = input.match(/\d{15,20}/g);
@@ -143,6 +152,28 @@ async function handleButton(interaction) {
       const balance = getBalance(interaction.user.id);
       await interaction.reply({
         content: nya(`${interaction.user}님의 치유미코인 보유량: ${balance}개`),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    if (action === "claim") {
+      const result = claimDaily(interaction.user.id);
+
+      if (!result.success) {
+        await interaction.reply({
+          content: nya(
+            `이미 오늘의 지급을 받았습니다. ${formatRemainingTime(result.remainingMs)} 후에 다시 받을 수 있습니다. (오류 코드: COIN-001)`,
+          ),
+          ephemeral: true,
+        });
+        return;
+      }
+
+      await interaction.reply({
+        content: nya(
+          `오늘의 치유미코인 ${result.amount}개를 지급받았습니다! 현재 보유량: ${result.balance}개`,
+        ),
         ephemeral: true,
       });
       return;

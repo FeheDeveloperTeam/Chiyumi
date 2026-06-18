@@ -21,7 +21,12 @@ module.exports = {
       .setLabel("잔액 조회")
       .setStyle(ButtonStyle.Primary);
 
-    const row = new ActionRowBuilder().addComponents(checkButton);
+    const claimButton = new ButtonBuilder()
+      .setCustomId("coin-action:claim")
+      .setLabel("일일 지급 받기")
+      .setStyle(ButtonStyle.Success);
+
+    const row = new ActionRowBuilder().addComponents(checkButton, claimButton);
 
     await interaction.reply({
       content: nya("어떤 기능을 사용할까요?"),
