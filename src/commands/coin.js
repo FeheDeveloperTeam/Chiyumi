@@ -12,7 +12,7 @@ module.exports = {
     .setNameLocalizations({ ko: "코인" })
     .setDescription("This is 치유미코인. Manage your coin.")
     .setDescriptionLocalizations({
-      ko: "이거는 치유미코인입니다. 코인 관련 기능을 사용합니다.",
+      ko: nya("이거는 치유미코인입니다. 코인 관련 기능을 사용합니다."),
     }),
 
   async execute(interaction) {
