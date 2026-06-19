@@ -29,9 +29,18 @@ const {
   getSession: getBjSession,
   deleteSession: deleteBjSession,
 } = require("../utils/blackjack");
+const {
+  getAccountByRiotId,
+  getSummonerByPuuid,
+  getLeagueEntriesByPuuid,
+  getMatchIdsByPuuid,
+  getMatchById,
+} = require("../utils/riot");
 
 const COIN_ACTION_PREFIX = "coin-action:";
 const BJ_ACTION_PREFIX = "bj-action:";
+const STATS_ACTION_PREFIX = "stats-action:";
+const STATS_MODAL_PREFIX = "stats-modal:";
 const VERIFY_BUTTON_PREFIX = "verify:";
 const VERIFY_ACTION_PREFIX = "verify-action:";
 const VERIFY_ACTION_MODAL_PREFIX = "verify-action-modal:";
@@ -340,6 +349,16 @@ async function handleButton(interaction) {
     return;
   }
 
+  if (interaction.customId.startsWith(STATS_ACTION_PREFIX)) {
+    const action = interaction.customId.slice(STATS_ACTION_PREFIX.length);
+
+    if (action === "lol") {
+      await showLolStatsModal(interaction);
+    }
+
+    return;
+  }
+
   if (interaction.customId.startsWith(VERIFY_ACTION_PREFIX)) {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
       await interaction.reply({
@@ -495,6 +514,123 @@ async function handleDevGrantModal(interaction, direction) {
     ),
     ephemeral: true,
   });
+}
+
+async function showLolStatsModal(interaction) {
+  const modal = new ModalBuilder()
+    .setCustomId(STATS_MODAL_PREFIX)
+    .setTitle("리그 오브 레전드 전적 검색");
+
+  const riotIdInput = new TextInputBuilder()
+    .setCustomId("riot_id")
+    .setLabel("닉네임#태그")
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder("예: Hide on bush#KR1")
+    .setRequired(true);
+
+  modal.addComponents(new ActionRowBuilder().addComponents(riotIdInput));
+
+  await interaction.showModal(modal);
+}
+
+const QUEUE_NAMES = {
+  420: "솔로랭크",
+  440: "자유랭크",
+  430: "일반(블라인드)",
+  400: "일반(드래프트)",
+  450: "칼바람 나락",
+};
+
+function formatDuration(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  const remaining = seconds % 60;
+  return `${minutes}분 ${remaining}초`;
+}
+
+async function handleLolStatsModal(interaction) {
+  const riotId = interaction.fields.getTextInputValue("riot_id").trim();
+  const [gameName, tagLine] = riotId.split("#").map((part) => part?.trim());
+
+  if (!gameName || !tagLine) {
+    await interaction.reply({
+      content: nya(
+        "닉네임#태그 형식으로 입력해주세요. 예: Hide on bush#KR1 (오류 코드: STATS-001)",
+      ),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  await interaction.deferReply({ ephemeral: true });
+
+  let account;
+
+  try {
+    account = await getAccountByRiotId(gameName, tagLine);
+  } catch (error) {
+    if (error.status === 404) {
+      await interaction.editReply(
+        nya(`'${riotId}' 소환사를 찾을 수 없습니다. (오류 코드: STATS-002)`),
+      );
+      return;
+    }
+
+    console.error(error);
+    await interaction.editReply(
+      nya("전적을 불러오는 중 오류가 발생했습니다. (오류 코드: STATS-003)"),
+    );
+    return;
+  }
+
+  try {
+    const [summoner, leagueEntries, matchIds] = await Promise.all([
+      getSummonerByPuuid(account.puuid),
+      getLeagueEntriesByPuuid(account.puuid),
+      getMatchIdsByPuuid(account.puuid, 5),
+    ]);
+
+    if (matchIds.length === 0) {
+      await interaction.editReply(
+        nya(
+          `'${riotId}'님은 전적이 비공개라서 표시할 수 없습니다.`,
+        ),
+      );
+      return;
+    }
+
+    const matches = await Promise.all(matchIds.map((id) => getMatchById(id)));
+
+    const soloEntry = leagueEntries.find((entry) => entry.queueType === "RANKED_SOLO_5x5");
+    const rankText = soloEntry
+      ? `${soloEntry.tier} ${soloEntry.rank} (${soloEntry.leaguePoints}LP, ${soloEntry.wins}승 ${soloEntry.losses}패)`
+      : "랭크 정보 없음";
+
+    const matchLines = matches.map((match) => {
+      const participant = match.info.participants.find((p) => p.puuid === account.puuid);
+      const queueName = QUEUE_NAMES[match.info.queueId] ?? `큐 ${match.info.queueId}`;
+      const resultText = participant.win ? "승리" : "패배";
+
+      return nya(
+        `${queueName} | ${participant.championName} | ${participant.kills}/${participant.deaths}/${participant.assists} | ${resultText} | ${formatDuration(match.info.gameDuration)}`,
+      );
+    });
+
+    const embed = new EmbedBuilder()
+      .setTitle(`${account.gameName}#${account.tagLine}`)
+      .addFields(
+        { name: "소환사 레벨", value: `${summoner.summonerLevel}` },
+        { name: "솔로랭크", value: rankText },
+        { name: "최근 전적", value: matchLines.join("\n") },
+      )
+      .setColor(0xe1aa74);
+
+    await interaction.editReply({ content: null, embeds: [embed] });
+  } catch (error) {
+    console.error(error);
+    await interaction.editReply(
+      nya("전적을 불러오는 중 오류가 발생했습니다. (오류 코드: STATS-003)"),
+    );
+  }
 }
 
 async function handleBlackjackAction(interaction) {
@@ -715,6 +851,11 @@ async function showMessageModal(interaction, setup) {
 }
 
 async function handleModalSubmit(interaction) {
+  if (interaction.customId === STATS_MODAL_PREFIX) {
+    await handleLolStatsModal(interaction);
+    return;
+  }
+
   if (interaction.customId.startsWith(COIN_DEV_MODAL_PREFIX)) {
     const direction = interaction.customId.slice(COIN_DEV_MODAL_PREFIX.length);
     await handleDevGrantModal(interaction, direction);
