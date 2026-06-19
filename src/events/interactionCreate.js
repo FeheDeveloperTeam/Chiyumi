@@ -36,11 +36,16 @@ const {
   getMatchIdsByPuuid,
   getMatchById,
 } = require("../utils/riot");
+const {
+  createSession: createStatsSession,
+  getSession: getStatsSession,
+} = require("../utils/statsSession");
 
 const COIN_ACTION_PREFIX = "coin-action:";
 const BJ_ACTION_PREFIX = "bj-action:";
 const STATS_ACTION_PREFIX = "stats-action:";
 const STATS_MODAL_PREFIX = "stats-modal:";
+const STATS_DETAIL_PREFIX = "stats-detail:";
 const VERIFY_BUTTON_PREFIX = "verify:";
 const VERIFY_ACTION_PREFIX = "verify-action:";
 const VERIFY_ACTION_MODAL_PREFIX = "verify-action-modal:";
@@ -359,6 +364,11 @@ async function handleButton(interaction) {
     return;
   }
 
+  if (interaction.customId.startsWith(STATS_DETAIL_PREFIX)) {
+    await handleStatsDetailButton(interaction);
+    return;
+  }
+
   if (interaction.customId.startsWith(VERIFY_ACTION_PREFIX)) {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
       await interaction.reply({
@@ -605,13 +615,13 @@ async function handleLolStatsModal(interaction) {
       ? `${soloEntry.tier} ${soloEntry.rank} (${soloEntry.leaguePoints}LP, ${soloEntry.wins}승 ${soloEntry.losses}패)`
       : "랭크 정보 없음";
 
-    const matchLines = matches.map((match) => {
+    const matchLines = matches.map((match, index) => {
       const participant = match.info.participants.find((p) => p.puuid === account.puuid);
       const queueName = QUEUE_NAMES[match.info.queueId] ?? `큐 ${match.info.queueId}`;
       const resultText = participant.win ? "승리" : "패배";
 
       return nya(
-        `${queueName} | ${participant.championName} | ${participant.kills}/${participant.deaths}/${participant.assists} | ${resultText} | ${formatDuration(match.info.gameDuration)}`,
+        `${index + 1}경기 | ${queueName} | ${participant.championName} | ${participant.kills}/${participant.deaths}/${participant.assists} | ${resultText} | ${formatDuration(match.info.gameDuration)}`,
       );
     });
 
@@ -624,13 +634,82 @@ async function handleLolStatsModal(interaction) {
       )
       .setColor(0xe1aa74);
 
-    await interaction.editReply({ content: null, embeds: [embed] });
+    const sessionId = createStatsSession({ puuid: account.puuid, matches });
+    const detailRow = new ActionRowBuilder().addComponents(
+      matches.map((_, index) =>
+        new ButtonBuilder()
+          .setCustomId(`${STATS_DETAIL_PREFIX}${sessionId}:${index}`)
+          .setLabel(`${index + 1}경기 더보기`)
+          .setStyle(ButtonStyle.Secondary),
+      ),
+    );
+
+    await interaction.editReply({ content: null, embeds: [embed], components: [detailRow] });
   } catch (error) {
     console.error(error);
     await interaction.editReply(
       nya("전적을 불러오는 중 오류가 발생했습니다. (오류 코드: STATS-003)"),
     );
   }
+}
+
+function buildTeamFieldText(participants) {
+  return participants
+    .map((p) => `${p.win ? "🔵" : "⚪"} ${p.championName} (${p.kills}/${p.deaths}/${p.assists})`)
+    .join("\n");
+}
+
+async function handleStatsDetailButton(interaction) {
+  const [sessionId, indexText] = interaction.customId
+    .slice(STATS_DETAIL_PREFIX.length)
+    .split(":");
+  const session = getStatsSession(sessionId);
+
+  if (!session) {
+    await interaction.reply({
+      content: nya("전적 정보가 만료되었습니다. 다시 검색해주세요. (오류 코드: STATS-004)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const match = session.matches[Number(indexText)];
+
+  if (!match) {
+    await interaction.reply({
+      content: nya("해당 경기를 찾을 수 없습니다. (오류 코드: STATS-005)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const participant = match.info.participants.find((p) => p.puuid === session.puuid);
+  const teamOne = match.info.participants.filter((p) => p.teamId === 100);
+  const teamTwo = match.info.participants.filter((p) => p.teamId === 200);
+  const queueName = QUEUE_NAMES[match.info.queueId] ?? `큐 ${match.info.queueId}`;
+
+  const embed = new EmbedBuilder()
+    .setTitle(`${participant.championName} - ${participant.win ? "승리" : "패배"}`)
+    .setDescription(
+      nya(`${queueName} | ${formatDuration(match.info.gameDuration)}`),
+    )
+    .addFields(
+      {
+        name: "전투 지표",
+        value: nya(
+          `킬/데스/어시스트: ${participant.kills}/${participant.deaths}/${participant.assists}\n` +
+            `골드: ${participant.goldEarned}\n` +
+            `CS: ${participant.totalMinionsKilled + participant.neutralMinionsKilled}\n` +
+            `챔피언 대상 피해량: ${participant.totalDamageDealtToChampions}\n` +
+            `시야 점수: ${participant.visionScore}`,
+        ),
+      },
+      { name: "팀 1", value: buildTeamFieldText(teamOne) },
+      { name: "팀 2", value: buildTeamFieldText(teamTwo) },
+    )
+    .setColor(0xe1aa74);
+
+  await interaction.reply({ embeds: [embed], ephemeral: true });
 }
 
 async function handleBlackjackAction(interaction) {
