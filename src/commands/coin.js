@@ -28,7 +28,7 @@ module.exports = {
 
     const devButton = new ButtonBuilder()
       .setCustomId("coin-action:dev")
-      .setLabel("개발자: 코인 지급/차감")
+      .setLabel("개발자 전용")
       .setStyle(ButtonStyle.Danger);
 
     const row = new ActionRowBuilder().addComponents(

@@ -43,7 +43,8 @@ const ANNOUNCE_MODAL_PREFIX = "announce-modal:";
 const LOG_ACTION_PREFIX = "log-action:";
 const LOG_TOGGLE_PREFIX = "log-toggle:";
 const LOG_CHANNEL_SELECT_ID = "log-channel-select";
-const COIN_DEV_MODAL_ID = "coin-dev-modal";
+const COIN_DEV_ACTION_PREFIX = "coin-dev-action:";
+const COIN_DEV_MODAL_PREFIX = "coin-dev-modal:";
 const DEFAULT_VERIFY_MESSAGE = nya("아래 버튼을 눌러 서버 인증을 완료하세요.");
 
 function hasManageGuild(interaction) {
@@ -303,10 +304,39 @@ async function handleButton(interaction) {
         return;
       }
 
-      await showDevGrantModal(interaction);
+      const grantButton = new ButtonBuilder()
+        .setCustomId(`${COIN_DEV_ACTION_PREFIX}grant`)
+        .setLabel("코인 지급")
+        .setStyle(ButtonStyle.Success);
+
+      const deductButton = new ButtonBuilder()
+        .setCustomId(`${COIN_DEV_ACTION_PREFIX}deduct`)
+        .setLabel("코인 차감")
+        .setStyle(ButtonStyle.Danger);
+
+      const row = new ActionRowBuilder().addComponents(grantButton, deductButton);
+
+      await interaction.update({
+        content: nya("개발자 전용 메뉴입니다. 어떤 작업을 할까요?"),
+        components: [row],
+      });
       return;
     }
 
+    return;
+  }
+
+  if (interaction.customId.startsWith(COIN_DEV_ACTION_PREFIX)) {
+    if (!isDeveloper(interaction.user.id)) {
+      await interaction.reply({
+        content: nya("이 버튼은 개발자만 사용할 수 있습니다. (오류 코드: DEV-001)"),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const direction = interaction.customId.slice(COIN_DEV_ACTION_PREFIX.length);
+    await showDevGrantModal(interaction, direction);
     return;
   }
 
@@ -398,10 +428,12 @@ async function handleButton(interaction) {
   }
 }
 
-async function showDevGrantModal(interaction) {
+async function showDevGrantModal(interaction, direction) {
+  const isGrant = direction === "grant";
+
   const modal = new ModalBuilder()
-    .setCustomId(COIN_DEV_MODAL_ID)
-    .setTitle("코인 지급/차감");
+    .setCustomId(`${COIN_DEV_MODAL_PREFIX}${direction}`)
+    .setTitle(isGrant ? "코인 지급" : "코인 차감");
 
   const userIdInput = new TextInputBuilder()
     .setCustomId("user_id")
@@ -411,9 +443,9 @@ async function showDevGrantModal(interaction) {
 
   const amountInput = new TextInputBuilder()
     .setCustomId("amount")
-    .setLabel("금액 (지급은 양수, 차감은 음수)")
+    .setLabel(isGrant ? "지급할 금액" : "차감할 금액")
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder("예: 100 또는 -100")
+    .setPlaceholder("예: 100")
     .setRequired(true);
 
   modal.addComponents(
@@ -424,7 +456,7 @@ async function showDevGrantModal(interaction) {
   await interaction.showModal(modal);
 }
 
-async function handleDevGrantModal(interaction) {
+async function handleDevGrantModal(interaction, direction) {
   if (!isDeveloper(interaction.user.id)) {
     await interaction.reply({
       content: nya("이 기능은 개발자만 사용할 수 있습니다. (오류 코드: DEV-001)"),
@@ -435,7 +467,7 @@ async function handleDevGrantModal(interaction) {
 
   const targetUserId = interaction.fields.getTextInputValue("user_id").trim();
   const amountText = interaction.fields.getTextInputValue("amount").trim();
-  const amount = Number(amountText);
+  const rawAmount = Number(amountText);
 
   if (!/^\d{15,20}$/.test(targetUserId)) {
     await interaction.reply({
@@ -445,7 +477,7 @@ async function handleDevGrantModal(interaction) {
     return;
   }
 
-  if (!Number.isInteger(amount) || amount === 0) {
+  if (!Number.isInteger(rawAmount) || rawAmount <= 0) {
     await interaction.reply({
       content: nya("올바른 금액이 아닙니다. (오류 코드: DEV-003)"),
       ephemeral: true,
@@ -453,8 +485,9 @@ async function handleDevGrantModal(interaction) {
     return;
   }
 
+  const amount = direction === "deduct" ? -rawAmount : rawAmount;
   const newBalance = addBalance(targetUserId, amount);
-  const actionText = amount > 0 ? "지급" : "차감";
+  const actionText = direction === "deduct" ? "차감" : "지급";
 
   await interaction.reply({
     content: nya(
@@ -682,8 +715,9 @@ async function showMessageModal(interaction, setup) {
 }
 
 async function handleModalSubmit(interaction) {
-  if (interaction.customId === COIN_DEV_MODAL_ID) {
-    await handleDevGrantModal(interaction);
+  if (interaction.customId.startsWith(COIN_DEV_MODAL_PREFIX)) {
+    const direction = interaction.customId.slice(COIN_DEV_MODAL_PREFIX.length);
+    await handleDevGrantModal(interaction, direction);
     return;
   }
 
