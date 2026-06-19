@@ -7,21 +7,22 @@ const {
   TextInputBuilder,
   TextInputStyle,
 } = require("discord.js");
+const { nya } = require("../utils/nya");
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("announce")
     .setNameLocalizations({ ko: "공지" })
     .setDescription("Send an announcement embed to a channel")
-    .setDescriptionLocalizations({ ko: "지정한 채널에 공지를 보냅니다" })
+    .setDescriptionLocalizations({ ko: nya("지정한 채널에 공지를 보냅니다") })
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .setDMPermission(false)
     .addChannelOption((option) =>
       option
         .setName("channel")
         .setNameLocalizations({ ko: "채널" })
-        .setDescription("공지를 보낼 채널")
-        .setDescriptionLocalizations({ ko: "공지를 보낼 채널" })
+        .setDescription(nya("공지를 보낼 채널"))
+        .setDescriptionLocalizations({ ko: nya("공지를 보낼 채널") })
         .addChannelTypes(ChannelType.GuildText)
         .setRequired(true),
     )
@@ -30,7 +31,7 @@ module.exports = {
         .setName("mention")
         .setNameLocalizations({ ko: "멘션" })
         .setDescription("Whether to ping @everyone or @here")
-        .setDescriptionLocalizations({ ko: "에브리핑 또는 히어핑 여부" })
+        .setDescriptionLocalizations({ ko: nya("에브리핑 또는 히어핑 여부") })
         .addChoices(
           { name: "없음", value: "none" },
           { name: "에브리핑 (@everyone)", value: "everyone" },

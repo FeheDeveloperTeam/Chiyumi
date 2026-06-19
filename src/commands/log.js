@@ -50,7 +50,7 @@ module.exports = {
     .setName("log")
     .setNameLocalizations({ ko: "로그" })
     .setDescription("Configure moderation logging")
-    .setDescriptionLocalizations({ ko: "로그 설정을 관리합니다" })
+    .setDescriptionLocalizations({ ko: nya("로그 설정을 관리합니다") })
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .setDMPermission(false),
 

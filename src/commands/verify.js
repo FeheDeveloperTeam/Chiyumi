@@ -13,7 +13,7 @@ module.exports = {
     .setNameLocalizations({ ko: "인증" })
     .setDescription("Manage verification button messages.")
     .setDescriptionLocalizations({
-      ko: "인증 버튼 메시지를 관리합니다",
+      ko: nya("인증 버튼 메시지를 관리합니다"),
     })
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
     .setDMPermission(false),

@@ -9,16 +9,16 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("numberguess")
     .setNameLocalizations({ ko: "숫자맞추기" })
-    .setDescription("1부터 10까지 숫자를 맞춰 치유미코인을 겁니다")
+    .setDescription(nya("1부터 10까지 숫자를 맞춰 치유미코인을 겁니다"))
     .setDescriptionLocalizations({
-      ko: "1부터 10까지 숫자를 맞춰 치유미코인을 겁니다",
+      ko: nya("1부터 10까지 숫자를 맞춰 치유미코인을 겁니다"),
     })
     .addIntegerOption((option) =>
       option
         .setName("guess")
         .setNameLocalizations({ ko: "예상숫자" })
-        .setDescription("1부터 10 사이의 숫자를 예상하세요")
-        .setDescriptionLocalizations({ ko: "1부터 10 사이의 숫자를 예상하세요" })
+        .setDescription(nya("1부터 10 사이의 숫자를 예상하세요"))
+        .setDescriptionLocalizations({ ko: nya("1부터 10 사이의 숫자를 예상하세요") })
         .setRequired(true)
         .setMinValue(1)
         .setMaxValue(MAX_NUMBER),
@@ -27,8 +27,8 @@ module.exports = {
       option
         .setName("bet")
         .setNameLocalizations({ ko: "베팅금액" })
-        .setDescription("베팅할 치유미코인 금액입니다")
-        .setDescriptionLocalizations({ ko: "베팅할 치유미코인 금액입니다" })
+        .setDescription(nya("베팅할 치유미코인 금액입니다"))
+        .setDescriptionLocalizations({ ko: nya("베팅할 치유미코인 금액입니다") })
         .setRequired(true)
         .setMinValue(1),
     ),

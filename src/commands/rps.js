@@ -14,17 +14,17 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("rps")
     .setNameLocalizations({ ko: "가위바위보" })
-    .setDescription("치유미코인을 걸고 가위바위보를 합니다")
+    .setDescription(nya("치유미코인을 걸고 가위바위보를 합니다"))
     .setDescriptionLocalizations({
-      ko: "치유미코인을 걸고 가위바위보를 합니다",
+      ko: nya("치유미코인을 걸고 가위바위보를 합니다"),
     })
     .addStringOption((option) =>
       option
         .setName("choice")
         .setNameLocalizations({ ko: "선택" })
-        .setDescription("가위, 바위, 보 중 하나를 선택하세요.")
+        .setDescription(nya("가위, 바위, 보 중 하나를 선택하세요."))
         .setDescriptionLocalizations({
-          ko: "가위, 바위, 보 중 하나를 선택하세요.",
+          ko: nya("가위, 바위, 보 중 하나를 선택하세요."),
         })
         .setRequired(true)
         .addChoices(
@@ -37,8 +37,8 @@ module.exports = {
       option
         .setName("bet")
         .setNameLocalizations({ ko: "베팅금액" })
-        .setDescription("베팅할 치유미코인 금액입니다.")
-        .setDescriptionLocalizations({ ko: "베팅할 치유미코인 금액입니다." })
+        .setDescription(nya("베팅할 치유미코인 금액입니다."))
+        .setDescriptionLocalizations({ ko: nya("베팅할 치유미코인 금액입니다.") })
         .setRequired(true)
         .setMinValue(1),
     ),

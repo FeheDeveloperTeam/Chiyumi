@@ -46,14 +46,14 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("blackjack")
     .setNameLocalizations({ ko: "블랙잭" })
-    .setDescription("치유미코인을 걸고 블랙잭을 합니다")
-    .setDescriptionLocalizations({ ko: "치유미코인을 걸고 블랙잭을 합니다" })
+    .setDescription(nya("치유미코인을 걸고 블랙잭을 합니다"))
+    .setDescriptionLocalizations({ ko: nya("치유미코인을 걸고 블랙잭을 합니다") })
     .addIntegerOption((option) =>
       option
         .setName("bet")
         .setNameLocalizations({ ko: "베팅금액" })
-        .setDescription("베팅할 치유미코인 금액입니다")
-        .setDescriptionLocalizations({ ko: "베팅할 치유미코인 금액입니다" })
+        .setDescription(nya("베팅할 치유미코인 금액입니다"))
+        .setDescriptionLocalizations({ ko: nya("베팅할 치유미코인 금액입니다") })
         .setRequired(true)
         .setMinValue(1),
     ),

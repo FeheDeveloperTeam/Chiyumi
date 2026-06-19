@@ -11,16 +11,16 @@ module.exports = {
     .setName("ban")
     .setNameLocalizations({ ko: "밴" })
     .setDescription("Ban a user from the server")
-    .setDescriptionLocalizations({ ko: "서버에서 사용자를 차단합니다" })
+    .setDescriptionLocalizations({ ko: nya("서버에서 사용자를 차단합니다") })
     .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
     .setDMPermission(false)
     .addUserOption((option) =>
       option
         .setName("user")
         .setNameLocalizations({ ko: "사용자" })
-        .setDescription("차단할 사용자(멘션 또는 사용자 ID)")
+        .setDescription(nya("차단할 사용자(멘션 또는 사용자 ID)"))
         .setDescriptionLocalizations({
-          ko: "차단할 사용자(멘션 또는 사용자 ID)",
+          ko: nya("차단할 사용자(멘션 또는 사용자 ID)"),
         })
         .setRequired(true),
     )
@@ -28,8 +28,8 @@ module.exports = {
       option
         .setName("reason")
         .setNameLocalizations({ ko: "이유" })
-        .setDescription("차단 이유")
-        .setDescriptionLocalizations({ ko: "차단 이유" })
+        .setDescription(nya("차단 이유"))
+        .setDescriptionLocalizations({ ko: nya("차단 이유") })
         .setMaxLength(512),
     ),
 

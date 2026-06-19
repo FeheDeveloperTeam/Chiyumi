@@ -6,14 +6,14 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("oddeven")
     .setNameLocalizations({ ko: "홀짝" })
-    .setDescription("치유미코인을 걸고 홀짝을 맞춥니다")
-    .setDescriptionLocalizations({ ko: "치유미코인을 걸고 홀짝을 맞춥니다" })
+    .setDescription(nya("치유미코인을 걸고 홀짝을 맞춥니다"))
+    .setDescriptionLocalizations({ ko: nya("치유미코인을 걸고 홀짝을 맞춥니다") })
     .addStringOption((option) =>
       option
         .setName("choice")
         .setNameLocalizations({ ko: "선택" })
-        .setDescription("홀 또는 짝을 선택하세요")
-        .setDescriptionLocalizations({ ko: "홀 또는 짝을 선택하세요" })
+        .setDescription(nya("홀 또는 짝을 선택하세요"))
+        .setDescriptionLocalizations({ ko: nya("홀 또는 짝을 선택하세요") })
         .setRequired(true)
         .addChoices(
           { name: "홀", value: "odd" },
@@ -24,8 +24,8 @@ module.exports = {
       option
         .setName("bet")
         .setNameLocalizations({ ko: "베팅금액" })
-        .setDescription("베팅할 치유미코인 금액입니다")
-        .setDescriptionLocalizations({ ko: "베팅할 치유미코인 금액입니다" })
+        .setDescription(nya("베팅할 치유미코인 금액입니다"))
+        .setDescriptionLocalizations({ ko: nya("베팅할 치유미코인 금액입니다") })
         .setRequired(true)
         .setMinValue(1),
     ),

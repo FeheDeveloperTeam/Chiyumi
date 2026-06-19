@@ -11,23 +11,23 @@ module.exports = {
     .setName("kick")
     .setNameLocalizations({ ko: "킥" })
     .setDescription("Kick a member from the server")
-    .setDescriptionLocalizations({ ko: "서버에서 사용자를 추방합니다" })
+    .setDescriptionLocalizations({ ko: nya("서버에서 사용자를 추방합니다") })
     .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers)
     .setDMPermission(false)
     .addUserOption((option) =>
       option
         .setName("user")
         .setNameLocalizations({ ko: "사용자" })
-        .setDescription("추방할 사용자")
-        .setDescriptionLocalizations({ ko: "추방할 사용자" })
+        .setDescription(nya("추방할 사용자"))
+        .setDescriptionLocalizations({ ko: nya("추방할 사용자") })
         .setRequired(true),
     )
     .addStringOption((option) =>
       option
         .setName("reason")
         .setNameLocalizations({ ko: "이유" })
-        .setDescription("추방 이유")
-        .setDescriptionLocalizations({ ko: "추방 이유" })
+        .setDescription(nya("추방 이유"))
+        .setDescriptionLocalizations({ ko: nya("추방 이유") })
         .setMaxLength(512),
     ),
 
