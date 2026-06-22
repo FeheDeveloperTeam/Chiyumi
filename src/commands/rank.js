@@ -42,11 +42,11 @@ module.exports = {
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId("rank-action:chat")
-          .setLabel("이 서버 채팅 순위")
+          .setLabel("채팅 순위")
           .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
           .setCustomId("rank-action:voice")
-          .setLabel("이 서버 음성 통화 순위")
+          .setLabel("음성 통화 순위")
           .setStyle(ButtonStyle.Primary),
       );
 

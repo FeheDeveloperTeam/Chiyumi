@@ -118,6 +118,58 @@ function formatVoiceDuration(ms) {
 }
 
 const RANK_ACTION_PREFIX = "rank-action:";
+const RANK_PAGE_PREFIX = "rank-page:";
+const RANK_PAGE_SIZE = 5;
+
+function buildRankPage(guild, type, page) {
+  const memberIds = [...guild.members.cache.values()]
+    .filter((member) => !member.user.bot)
+    .map((member) => member.id);
+
+  const data = type === "chat" ? getAllXp() : getAllVoiceTimes();
+  const entries = memberIds
+    .map((id) => ({ id, value: data[id] ?? 0 }))
+    .sort((a, b) => b.value - a.value);
+
+  const totalPages = Math.max(1, Math.ceil(entries.length / RANK_PAGE_SIZE));
+  const currentPage = Math.min(Math.max(page, 0), totalPages - 1);
+  const pageEntries = entries.slice(
+    currentPage * RANK_PAGE_SIZE,
+    currentPage * RANK_PAGE_SIZE + RANK_PAGE_SIZE,
+  );
+
+  const lines = pageEntries.map((entry, index) => {
+    const rank = currentPage * RANK_PAGE_SIZE + index + 1;
+
+    if (type === "chat") {
+      const { level } = levelFromXp(entry.value);
+      return `${rank}. <@${entry.id}> - 레벨 ${level} (${entry.value} XP)`;
+    }
+
+    return `${rank}. <@${entry.id}> - ${formatVoiceDuration(entry.value)}`;
+  });
+
+  const embed = new EmbedBuilder()
+    .setTitle(`${guild.name} ${type === "chat" ? "채팅 순위" : "음성 통화 순위"}`)
+    .setDescription(lines.join("\n") || nya("아직 데이터가 없습니다"))
+    .setFooter({ text: `${currentPage + 1} / ${totalPages} 페이지` })
+    .setColor(0xe1aa74);
+
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`${RANK_PAGE_PREFIX}${type}:${currentPage - 1}`)
+      .setLabel("◀")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(currentPage === 0),
+    new ButtonBuilder()
+      .setCustomId(`${RANK_PAGE_PREFIX}${type}:${currentPage + 1}`)
+      .setLabel("▶")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(currentPage >= totalPages - 1),
+  );
+
+  return { embed, row };
+}
 
 async function handleRankLeaderboard(interaction) {
   if (!interaction.inGuild()) {
@@ -131,49 +183,22 @@ async function handleRankLeaderboard(interaction) {
   const type = interaction.customId.slice(RANK_ACTION_PREFIX.length);
   await interaction.deferReply({ ephemeral: true });
 
-  const memberIds = [...interaction.guild.members.cache.values()]
-    .filter((member) => !member.user.bot)
-    .map((member) => member.id);
+  const { embed, row } = buildRankPage(interaction.guild, type, 0);
+  await interaction.editReply({ embeds: [embed], components: [row] });
+}
 
-  if (type === "chat") {
-    const xpData = getAllXp();
-    const entries = memberIds
-      .map((id) => ({ id, xp: xpData[id] ?? 0 }))
-      .sort((a, b) => b.xp - a.xp)
-      .slice(0, 10);
-
-    const lines = entries.map((entry, index) => {
-      const { level } = levelFromXp(entry.xp);
-      return `${index + 1}. <@${entry.id}> - 레벨 ${level} (${entry.xp} XP)`;
+async function handleRankPageButton(interaction) {
+  if (!interaction.inGuild()) {
+    await interaction.reply({
+      content: nya("서버에서만 사용할 수 있는 버튼입니다. (오류 코드: GUILD-001)"),
+      ephemeral: true,
     });
-
-    const embed = new EmbedBuilder()
-      .setTitle(`${interaction.guild.name} 채팅 순위`)
-      .setDescription(lines.join("\n") || nya("아직 데이터가 없습니다"))
-      .setColor(0xe1aa74);
-
-    await interaction.editReply({ embeds: [embed] });
     return;
   }
 
-  if (type === "voice") {
-    const voiceData = getAllVoiceTimes();
-    const entries = memberIds
-      .map((id) => ({ id, ms: voiceData[id] ?? 0 }))
-      .sort((a, b) => b.ms - a.ms)
-      .slice(0, 10);
-
-    const lines = entries.map(
-      (entry, index) => `${index + 1}. <@${entry.id}> - ${formatVoiceDuration(entry.ms)}`,
-    );
-
-    const embed = new EmbedBuilder()
-      .setTitle(`${interaction.guild.name} 음성 통화 순위`)
-      .setDescription(lines.join("\n") || nya("아직 데이터가 없습니다"))
-      .setColor(0xe1aa74);
-
-    await interaction.editReply({ embeds: [embed] });
-  }
+  const [type, pageText] = interaction.customId.slice(RANK_PAGE_PREFIX.length).split(":");
+  const { embed, row } = buildRankPage(interaction.guild, type, Number(pageText));
+  await interaction.update({ embeds: [embed], components: [row] });
 }
 
 async function promptConsent(interaction) {
@@ -216,11 +241,12 @@ module.exports = {
     if (interaction.isButton()) {
       if (interaction.customId === CONSENT_AGREE_ID) {
         agree(interaction.user.id);
-        await interaction.reply({
+        await interaction.update({
           content: nya(
             "동의해주셔서 감사합니다! 이제 명령어를 다시 입력하면 바로 이용할 수 있습니다",
           ),
-          ephemeral: true,
+          embeds: [],
+          components: [],
         });
         return;
       }
@@ -443,9 +469,10 @@ async function handleButton(interaction) {
 
     if (action === "check") {
       const balance = getBalance(interaction.user.id);
-      await interaction.reply({
+      await interaction.update({
         content: nya(`${interaction.user}님의 치유미코인 보유량: ${balance}개`),
-        ephemeral: true,
+        embeds: [],
+        components: [],
       });
       return;
     }
@@ -463,11 +490,12 @@ async function handleButton(interaction) {
         return;
       }
 
-      await interaction.reply({
+      await interaction.update({
         content: nya(
           `오늘의 치유미코인 ${result.amount}개를 지급받았습니다! 현재 보유량: ${result.balance}개`,
         ),
-        ephemeral: true,
+        embeds: [],
+        components: [],
       });
       return;
     }
@@ -529,6 +557,11 @@ async function handleButton(interaction) {
 
   if (interaction.customId.startsWith(STATS_DETAIL_PREFIX)) {
     await handleStatsDetailButton(interaction);
+    return;
+  }
+
+  if (interaction.customId.startsWith(RANK_PAGE_PREFIX)) {
+    await handleRankPageButton(interaction);
     return;
   }
 
@@ -698,11 +731,11 @@ async function handleDevGrantModal(interaction, direction) {
   const newBalance = addBalance(targetUserId, amount);
   const actionText = direction === "deduct" ? "차감" : "지급";
 
-  await interaction.reply({
+  await interaction.update({
     content: nya(
       `<@${targetUserId}>님에게 ${Math.abs(amount)} 치유미코인을 ${actionText}했습니다. 현재 보유량: ${newBalance}개`,
     ),
-    ephemeral: true,
+    components: [],
   });
 }
 
@@ -999,17 +1032,19 @@ async function handleInquiryModal(interaction, type) {
 
     await channel.send({ embeds: [embed] });
 
-    await interaction.reply({
+    await interaction.update({
       content: nya(
         "문의가 정상적으로 접수되었습니다. 서버 이름과 주소가 만료되지 않는 링크여야 정상 확인이 가능합니다",
       ),
-      ephemeral: true,
+      embeds: [],
+      components: [],
     });
   } catch (error) {
     console.error(error);
-    await interaction.reply({
+    await interaction.update({
       content: nya("문의를 전달하지 못했습니다. 잠시 후 다시 시도해주세요. (오류 코드: INQUIRY-001)"),
-      ephemeral: true,
+      embeds: [],
+      components: [],
     });
   }
 }
@@ -1387,10 +1422,9 @@ async function replyWithRoleSelect(interaction, customId) {
 
   const row = new ActionRowBuilder().addComponents(roleSelect);
 
-  await interaction.reply({
+  await interaction.update({
     content: nya("인증 버튼 설정을 시작합니다. 먼저 지급할 역할을 선택하세요."),
     components: [row],
-    ephemeral: true,
   });
 }
 
@@ -1417,27 +1451,27 @@ async function deleteVerifyMessage(interaction, messageId) {
     const message = await interaction.channel.messages.fetch(messageId);
 
     if (message.author.id !== interaction.client.user.id) {
-      await interaction.reply({
+      await interaction.update({
         content: nya(
           "이 봇이 만든 메시지만 삭제할 수 있습니다. (오류 코드: VERIFY-004)",
         ),
-        ephemeral: true,
+        components: [],
       });
       return;
     }
 
     await message.delete();
-    await interaction.reply({
+    await interaction.update({
       content: nya("인증 메시지를 삭제했습니다."),
-      ephemeral: true,
+      components: [],
     });
   } catch (error) {
     console.error(error);
-    await interaction.reply({
+    await interaction.update({
       content: nya(
         "메시지를 삭제하지 못했습니다. 메시지 ID와 채널이 맞는지 확인해주세요. (오류 코드: VERIFY-001)",
       ),
-      ephemeral: true,
+      components: [],
     });
   }
 }
@@ -1568,21 +1602,21 @@ async function saveVerifyMessage(interaction, setup, message) {
   const role = interaction.guild.roles.cache.get(setup.roleId);
 
   if (!role) {
-    await interaction.reply({
+    await interaction.update({
       content: nya(
         "인증 역할을 찾을 수 없습니다. 다시 설정해주세요. (오류 코드: ROLE-005)",
       ),
-      ephemeral: true,
+      components: [],
     });
     return;
   }
 
   if (!role.editable) {
-    await interaction.reply({
+    await interaction.update({
       content: nya(
         "이 역할은 봇이 지급할 수 없습니다. 봇 역할을 해당 역할보다 위로 올려주세요. (오류 코드: ROLE-006)",
       ),
-      ephemeral: true,
+      components: [],
     });
     return;
   }
@@ -1604,11 +1638,11 @@ async function saveVerifyMessage(interaction, setup, message) {
     components: [row],
   });
 
-  await interaction.reply({
+  await interaction.update({
     content: nya(
       `${role} 역할을 지급하는 인증 버튼을 생성했습니다. 메시지 ID: ${createdMessage.id}`,
     ),
-    ephemeral: true,
+    components: [],
   });
 }
 
@@ -1617,11 +1651,11 @@ async function editVerifyMessage(interaction, messageId, message, row, role) {
     const targetMessage = await interaction.channel.messages.fetch(messageId);
 
     if (targetMessage.author.id !== interaction.client.user.id) {
-      await interaction.reply({
+      await interaction.update({
         content: nya(
           "이 봇이 만든 메시지만 수정할 수 있습니다. (오류 코드: VERIFY-002)",
         ),
-        ephemeral: true,
+        components: [],
       });
       return;
     }
@@ -1631,17 +1665,17 @@ async function editVerifyMessage(interaction, messageId, message, row, role) {
       components: [row],
     });
 
-    await interaction.reply({
+    await interaction.update({
       content: nya(`${role} 역할을 지급하는 인증 메시지를 수정했습니다.`),
-      ephemeral: true,
+      components: [],
     });
   } catch (error) {
     console.error(error);
-    await interaction.reply({
+    await interaction.update({
       content: nya(
         "메시지를 수정하지 못했습니다. 메시지 ID와 채널이 맞는지 확인해주세요. (오류 코드: VERIFY-003)",
       ),
-      ephemeral: true,
+      components: [],
     });
   }
 }
