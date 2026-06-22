@@ -23,6 +23,7 @@ const {
 const { buildLogContent, buildLogRows } = require("../commands/log");
 const { buildCensorContent, buildCensorRow } = require("../commands/censor");
 const { isDeveloper } = require("../utils/devUser");
+const { hasAgreed, agree } = require("../utils/consent");
 const {
   drawCard,
   handTotal,
@@ -83,6 +84,9 @@ const LOG_CHANNEL_SELECT_ID = "log-channel-select";
 const COIN_DEV_ACTION_PREFIX = "coin-dev-action:";
 const COIN_DEV_MODAL_PREFIX = "coin-dev-modal:";
 const DEFAULT_VERIFY_MESSAGE = nya("아래 버튼을 눌러 서버 인증을 완료하세요.");
+const CONSENT_AGREE_ID = "consent-action:agree";
+const TERMS_URL = "https://fehedeveloperteam.github.io/Chiyumi/terms.html";
+const PRIVACY_URL = "https://fehedeveloperteam.github.io/Chiyumi/privacy.html";
 
 function hasManageGuild(interaction) {
   return Boolean(interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild));
@@ -102,10 +106,50 @@ function extractMessageId(input) {
   return matches ? matches[matches.length - 1] : input;
 }
 
+async function promptConsent(interaction) {
+  const embed = new EmbedBuilder()
+    .setTitle("이용약관 동의")
+    .setDescription(
+      nya(
+        "치유미를 이용하려면 먼저 이용약관과 개인정보 처리방침에 동의해야 합니다. 아래 동의하기 버튼을 누르면 약관에 동의한 것으로 간주됩니다",
+      ),
+    )
+    .addFields(
+      { name: "이용약관", value: TERMS_URL },
+      { name: "개인정보 처리방침", value: PRIVACY_URL },
+    )
+    .setColor(0xe1aa74);
+
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(CONSENT_AGREE_ID)
+      .setLabel("동의하기")
+      .setStyle(ButtonStyle.Primary),
+  );
+
+  await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+}
+
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction) {
+    if (interaction.isChatInputCommand() && !hasAgreed(interaction.user.id)) {
+      await promptConsent(interaction);
+      return;
+    }
+
     if (interaction.isButton()) {
+      if (interaction.customId === CONSENT_AGREE_ID) {
+        agree(interaction.user.id);
+        await interaction.reply({
+          content: nya(
+            "동의해주셔서 감사합니다! 이제 명령어를 다시 입력하면 바로 이용할 수 있습니다",
+          ),
+          ephemeral: true,
+        });
+        return;
+      }
+
       await handleButton(interaction);
       return;
     }
