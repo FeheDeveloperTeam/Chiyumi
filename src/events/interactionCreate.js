@@ -26,7 +26,10 @@ const {
   getWelcomeMessage,
 } = require("../utils/guildConfig");
 const { buildLogContent, buildLogRows } = require("../commands/log");
-const { buildCensorContent, buildCensorRow } = require("../commands/censor");
+const {
+  buildFilterEmbed: buildCensorFilterEmbed,
+  buildFilterRow: buildCensorFilterRow,
+} = require("../commands/censor");
 const { buildWelcomeEmbed, buildWelcomeRows } = require("../commands/welcome");
 const { getCommandsByCategory, buildCategoryEmbed } = require("../commands/help");
 const { isDeveloper } = require("../utils/devUser");
@@ -548,7 +551,10 @@ async function handleButton(interaction) {
     return;
   }
 
-  if (interaction.customId === "censor-action:toggle") {
+  if (
+    interaction.customId === "censor-action:profanity" ||
+    interaction.customId === "censor-action:spam"
+  ) {
     if (!hasManageGuild(interaction)) {
       await interaction.reply({
         content: nya(
@@ -559,12 +565,33 @@ async function handleButton(interaction) {
       return;
     }
 
-    const enabled = getLogOptions(interaction.guild.id).profanityFilter;
-    setLogOption(interaction.guild.id, "profanityFilter", !enabled);
+    const key = interaction.customId === "censor-action:profanity" ? "profanityFilter" : "spamFilter";
 
     await interaction.update({
-      content: buildCensorContent(interaction.guild.id),
-      components: [buildCensorRow(interaction.guild.id)],
+      embeds: [buildCensorFilterEmbed(interaction.guild.id, key)],
+      components: [buildCensorFilterRow(interaction.guild.id, key)],
+    });
+    return;
+  }
+
+  if (interaction.customId.startsWith("censor-toggle:")) {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({
+        content: nya(
+          "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
+        ),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const key = interaction.customId.slice("censor-toggle:".length);
+    const enabled = getLogOptions(interaction.guild.id)[key];
+    setLogOption(interaction.guild.id, key, !enabled);
+
+    await interaction.update({
+      embeds: [buildCensorFilterEmbed(interaction.guild.id, key)],
+      components: [buildCensorFilterRow(interaction.guild.id, key)],
     });
     return;
   }

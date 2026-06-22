@@ -1,6 +1,7 @@
 const { Events, EmbedBuilder } = require("discord.js");
 const { nya } = require("../utils/nya");
 const { containsProfanity } = require("../utils/profanityFilter");
+const { isSpam } = require("../utils/spamFilter");
 const { getLogOptions, sendLog } = require("../utils/guildConfig");
 const { grantActivityReward, levelFromXp } = require("../utils/levels");
 const { addBalance } = require("../utils/credits");
@@ -55,6 +56,33 @@ async function handleProfanity(message) {
   await sendLog(message.guild, embed);
 }
 
+async function handleSpam(message) {
+  await message.delete().catch(() => {});
+
+  const warning = await message.channel
+    .send(nya(`${message.author} 도배가 감지되어 메시지를 지웠습니다`))
+    .catch(() => null);
+
+  if (warning) {
+    setTimeout(() => warning.delete().catch(() => {}), 5000);
+  }
+
+  const embed = new EmbedBuilder()
+    .setTitle("도배 검열")
+    .addFields(
+      { name: "작성자", value: `${message.author}` },
+      { name: "채널", value: `${message.channel}` },
+      {
+        name: "내용",
+        value: message.content?.slice(0, 1000) || "(내용을 알 수 없음)",
+      },
+    )
+    .setColor(0xed4245)
+    .setTimestamp();
+
+  await sendLog(message.guild, embed);
+}
+
 module.exports = {
   name: Events.MessageCreate,
   async execute(message) {
@@ -66,6 +94,15 @@ module.exports = {
       containsProfanity(message.content)
     ) {
       await handleProfanity(message);
+      return;
+    }
+
+    if (
+      message.guild &&
+      getLogOptions(message.guild.id).spamFilter &&
+      isSpam(message.author.id, message.content)
+    ) {
+      await handleSpam(message);
       return;
     }
 
