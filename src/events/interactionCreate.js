@@ -125,6 +125,11 @@ async function promptConsent(interaction) {
       .setCustomId(CONSENT_AGREE_ID)
       .setLabel("동의하기")
       .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setLabel("이용약관").setStyle(ButtonStyle.Link).setURL(TERMS_URL),
+    new ButtonBuilder()
+      .setLabel("개인정보 처리방침")
+      .setStyle(ButtonStyle.Link)
+      .setURL(PRIVACY_URL),
   );
 
   await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
