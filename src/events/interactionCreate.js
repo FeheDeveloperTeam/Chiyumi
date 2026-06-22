@@ -24,6 +24,9 @@ const {
   setWelcomeOption,
   setWelcomeMessage,
   getWelcomeMessage,
+  setLevelUpChannel,
+  getLevelUpMessage,
+  setLevelUpMessage,
 } = require("../utils/guildConfig");
 const { buildLogContent, buildLogRows } = require("../commands/log");
 const {
@@ -32,6 +35,7 @@ const {
 } = require("../commands/censor");
 const { buildWelcomeEmbed, buildWelcomeRows } = require("../commands/welcome");
 const { getCommandsByCategory, buildCategoryEmbed } = require("../commands/help");
+const { buildLevelUpEmbed, buildLevelUpRow } = require("../commands/rank");
 const { isDeveloper } = require("../utils/devUser");
 const { hasAgreed, agree } = require("../utils/consent");
 const { getAllXp, levelFromXp } = require("../utils/levels");
@@ -134,6 +138,9 @@ function formatVoiceDuration(ms) {
 const RANK_ACTION_PREFIX = "rank-action:";
 const RANK_PAGE_PREFIX = "rank-page:";
 const RANK_PAGE_SIZE = 5;
+const RANK_LEVELUP_ACTION_PREFIX = "rank-levelup-action:";
+const RANK_LEVELUP_CHANNEL_SELECT_ID = "rank-levelup-channel-select";
+const RANK_LEVELUP_MODAL_ID = "rank-levelup-modal";
 
 function buildRankPage(guild, type, page) {
   const memberIds = [...guild.members.cache.values()]
@@ -199,6 +206,82 @@ async function handleRankLeaderboard(interaction) {
 
   const { embed, row } = buildRankPage(interaction.guild, type, 0);
   await interaction.editReply({ embeds: [embed], components: [row] });
+}
+
+async function handleLevelUpSettingsButton(interaction) {
+  if (!interaction.inGuild()) {
+    await interaction.reply({
+      content: nya("서버에서만 사용할 수 있는 버튼입니다. (오류 코드: GUILD-001)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  if (!hasManageGuild(interaction)) {
+    await interaction.reply({
+      content: nya(
+        "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
+      ),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  await interaction.reply({
+    embeds: [buildLevelUpEmbed(interaction.guild.id)],
+    components: [buildLevelUpRow()],
+    ephemeral: true,
+  });
+}
+
+async function handleLevelUpActionButton(interaction) {
+  if (!hasManageGuild(interaction)) {
+    await interaction.reply({
+      content: nya(
+        "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
+      ),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const action = interaction.customId.slice(RANK_LEVELUP_ACTION_PREFIX.length);
+
+  if (action === "channel") {
+    const channelSelect = new ChannelSelectMenuBuilder()
+      .setCustomId(RANK_LEVELUP_CHANNEL_SELECT_ID)
+      .setPlaceholder("레벨업 알림을 받을 채널을 선택하세요")
+      .addChannelTypes(ChannelType.GuildText)
+      .setMinValues(1)
+      .setMaxValues(1);
+
+    const row = new ActionRowBuilder().addComponents(channelSelect);
+
+    await interaction.update({
+      content: nya("레벨업 알림을 받을 채널을 선택하세요."),
+      embeds: [],
+      components: [row],
+    });
+    return;
+  }
+
+  if (action === "message") {
+    const modal = new ModalBuilder()
+      .setCustomId(RANK_LEVELUP_MODAL_ID)
+      .setTitle("레벨업 알림 문구 설정");
+
+    const messageInput = new TextInputBuilder()
+      .setCustomId("message")
+      .setLabel("{유저}, {레벨} 치환 가능")
+      .setStyle(TextInputStyle.Paragraph)
+      .setValue(getLevelUpMessage(interaction.guild.id))
+      .setRequired(true)
+      .setMaxLength(1000);
+
+    modal.addComponents(new ActionRowBuilder().addComponents(messageInput));
+
+    await interaction.showModal(modal);
+  }
 }
 
 async function handleRankPageButton(interaction) {
@@ -392,6 +475,28 @@ async function handleStringSelect(interaction) {
 }
 
 async function handleChannelSelect(interaction) {
+  if (interaction.customId === RANK_LEVELUP_CHANNEL_SELECT_ID) {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({
+        content: nya(
+          "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
+        ),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const channelId = interaction.values[0];
+    setLevelUpChannel(interaction.guild.id, channelId);
+
+    await interaction.update({
+      content: null,
+      embeds: [buildLevelUpEmbed(interaction.guild.id)],
+      components: [buildLevelUpRow()],
+    });
+    return;
+  }
+
   if (interaction.customId === WELCOME_CHANNEL_SELECT_ID) {
     if (!hasManageGuild(interaction)) {
       await interaction.reply({
@@ -703,7 +808,19 @@ async function handleButton(interaction) {
   }
 
   if (interaction.customId.startsWith(RANK_ACTION_PREFIX)) {
+    const rankActionType = interaction.customId.slice(RANK_ACTION_PREFIX.length);
+
+    if (rankActionType === "levelup") {
+      await handleLevelUpSettingsButton(interaction);
+      return;
+    }
+
     await handleRankLeaderboard(interaction);
+    return;
+  }
+
+  if (interaction.customId.startsWith(RANK_LEVELUP_ACTION_PREFIX)) {
+    await handleLevelUpActionButton(interaction);
     return;
   }
 
@@ -1712,6 +1829,17 @@ async function showMessageModal(interaction, setup) {
 }
 
 async function handleModalSubmit(interaction) {
+  if (interaction.customId === RANK_LEVELUP_MODAL_ID) {
+    const message = interaction.fields.getTextInputValue("message").trim();
+    setLevelUpMessage(interaction.guild.id, message);
+
+    await interaction.update({
+      embeds: [buildLevelUpEmbed(interaction.guild.id)],
+      components: [buildLevelUpRow()],
+    });
+    return;
+  }
+
   if (interaction.customId.startsWith(WELCOME_MODAL_PREFIX)) {
     const type = interaction.customId.slice(WELCOME_MODAL_PREFIX.length);
     await handleWelcomeMessageModal(interaction, type);

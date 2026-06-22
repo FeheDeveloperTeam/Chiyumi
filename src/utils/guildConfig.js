@@ -120,6 +120,30 @@ function getWelcomeMessage(guildId, type) {
   return configs[guildId]?.welcomeMessages?.[type] ?? defaultMessage;
 }
 
+const DEFAULT_LEVELUP_MESSAGE = "{유저}님이 레벨이 올라서 이제 {레벨}레벨이다";
+
+function setLevelUpChannel(guildId, channelId) {
+  const configs = loadAll();
+  configs[guildId] = { ...(configs[guildId] ?? {}), levelUpChannelId: channelId };
+  saveAll(configs);
+}
+
+function getLevelUpChannelId(guildId) {
+  const configs = loadAll();
+  return configs[guildId]?.levelUpChannelId ?? null;
+}
+
+function setLevelUpMessage(guildId, message) {
+  const configs = loadAll();
+  configs[guildId] = { ...(configs[guildId] ?? {}), levelUpMessage: message };
+  saveAll(configs);
+}
+
+function getLevelUpMessage(guildId) {
+  const configs = loadAll();
+  return configs[guildId]?.levelUpMessage ?? DEFAULT_LEVELUP_MESSAGE;
+}
+
 module.exports = {
   setLogChannel,
   getLogChannelId,
@@ -134,4 +158,9 @@ module.exports = {
   getWelcomeMessage,
   DEFAULT_JOIN_MESSAGE,
   DEFAULT_LEAVE_MESSAGE,
+  setLevelUpChannel,
+  getLevelUpChannelId,
+  setLevelUpMessage,
+  getLevelUpMessage,
+  DEFAULT_LEVELUP_MESSAGE,
 };
