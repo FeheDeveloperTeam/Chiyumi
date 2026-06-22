@@ -682,6 +682,15 @@ const POSITION_LABELS = {
 };
 const POSITION_ORDER = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"];
 
+function formatParticipantName(participant) {
+  if (participant.riotIdGameName) {
+    const tagLine = participant.riotIdTagline ? `#${participant.riotIdTagline}` : "";
+    return `${participant.riotIdGameName}${tagLine}`;
+  }
+
+  return participant.summonerName || "알 수 없음";
+}
+
 function buildMatchupText(participants) {
   const byPosition = new Map();
 
@@ -697,7 +706,11 @@ function buildMatchupText(participants) {
 
     if (!blue || !red) return null;
 
-    return `${POSITION_LABELS[position]}: ${blue.championName} (${blue.kills}/${blue.deaths}/${blue.assists}) vs ${red.championName} (${red.kills}/${red.deaths}/${red.assists})`;
+    return (
+      `${POSITION_LABELS[position]}: ${blue.championName} (${formatParticipantName(blue)}) ` +
+      `${blue.kills}/${blue.deaths}/${blue.assists} vs ` +
+      `${red.championName} (${formatParticipantName(red)}) ${red.kills}/${red.deaths}/${red.assists}`
+    );
   }).filter(Boolean);
 
   return lines.length > 0 ? lines.join("\n") : "매치업 정보 없음";
