@@ -29,6 +29,7 @@ function buildCensorRow(guildId) {
 }
 
 module.exports = {
+  category: "관리",
   data: new SlashCommandBuilder()
     .setName("censor")
     .setNameLocalizations({ ko: "욕설검열" })

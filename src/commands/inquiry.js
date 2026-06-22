@@ -8,6 +8,7 @@ const {
 const { nya } = require("../utils/nya");
 
 module.exports = {
+  category: "유틸리티",
   data: new SlashCommandBuilder()
     .setName("inquiry")
     .setNameLocalizations({ ko: "문의" })

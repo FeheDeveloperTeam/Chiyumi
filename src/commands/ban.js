@@ -7,6 +7,7 @@ const { nya } = require("../utils/nya");
 const { sendLog } = require("../utils/guildConfig");
 
 module.exports = {
+  category: "관리",
   data: new SlashCommandBuilder()
     .setName("ban")
     .setNameLocalizations({ ko: "밴" })

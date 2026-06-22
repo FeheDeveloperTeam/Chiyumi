@@ -8,6 +8,7 @@ const {
 const { nya } = require("../utils/nya");
 
 module.exports = {
+  category: "관리",
   data: new SlashCommandBuilder()
     .setName("verify")
     .setNameLocalizations({ ko: "인증" })

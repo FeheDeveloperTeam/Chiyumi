@@ -11,6 +11,7 @@ const { getBalance } = require("../utils/credits");
 const { buildRankCardImage } = require("../utils/rankCard");
 
 module.exports = {
+  category: "정보",
   data: new SlashCommandBuilder()
     .setName("rank")
     .setNameLocalizations({ ko: "순위" })

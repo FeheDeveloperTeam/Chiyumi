@@ -8,6 +8,7 @@ const {
 const { nya } = require("../utils/nya");
 
 module.exports = {
+  category: "게임",
   data: new SlashCommandBuilder()
     .setName("gamble")
     .setNameLocalizations({ ko: "도박" })

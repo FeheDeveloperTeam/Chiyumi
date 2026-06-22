@@ -28,6 +28,7 @@ const {
 const { buildLogContent, buildLogRows } = require("../commands/log");
 const { buildCensorContent, buildCensorRow } = require("../commands/censor");
 const { buildWelcomeContent, buildWelcomeRows } = require("../commands/welcome");
+const { getCommandsByCategory, buildCategoryEmbed } = require("../commands/help");
 const { isDeveloper } = require("../utils/devUser");
 const { hasAgreed, agree } = require("../utils/consent");
 const { getAllXp, levelFromXp } = require("../utils/levels");
@@ -275,6 +276,11 @@ module.exports = {
       return;
     }
 
+    if (interaction.isStringSelectMenu()) {
+      await handleStringSelect(interaction);
+      return;
+    }
+
     if (interaction.isModalSubmit()) {
       await handleModalSubmit(interaction);
       return;
@@ -367,6 +373,18 @@ async function handleRoleSelect(interaction) {
       `${role} 역할을 인증 역할로 선택했습니다. 인증 메시지를 어떻게 만들까요?`,
     ),
     components: [row],
+  });
+}
+
+async function handleStringSelect(interaction) {
+  if (interaction.customId !== "help-category-select") return;
+
+  const category = interaction.values[0];
+  const grouped = getCommandsByCategory(interaction.client);
+  const commands = grouped.get(category) ?? [];
+
+  await interaction.update({
+    embeds: [buildCategoryEmbed(category, commands)],
   });
 }
 

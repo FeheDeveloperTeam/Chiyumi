@@ -7,6 +7,7 @@ const {
 const { nya } = require("../utils/nya");
 
 module.exports = {
+  category: "경제",
   data: new SlashCommandBuilder()
     .setName("coin")
     .setNameLocalizations({ ko: "코인" })

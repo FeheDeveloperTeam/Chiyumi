@@ -2,6 +2,7 @@ const { SlashCommandBuilder } = require("discord.js");
 const { nya } = require("../utils/nya");
 
 module.exports = {
+  category: "유틸리티",
   data: new SlashCommandBuilder()
     .setName("ping")
     .setNameLocalizations({ ko: "핑" })

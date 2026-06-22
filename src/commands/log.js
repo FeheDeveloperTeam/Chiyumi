@@ -47,6 +47,7 @@ function buildLogRows(guildId) {
 }
 
 module.exports = {
+  category: "관리",
   data: new SlashCommandBuilder()
     .setName("log")
     .setNameLocalizations({ ko: "로그" })

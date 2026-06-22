@@ -61,6 +61,7 @@ function buildWelcomeRows(guildId) {
 }
 
 module.exports = {
+  category: "관리",
   data: new SlashCommandBuilder()
     .setName("welcome")
     .setNameLocalizations({ ko: "입퇴장" })

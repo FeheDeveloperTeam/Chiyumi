@@ -2,6 +2,7 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle, SlashCommandBuilder } = re
 const { nya } = require("../utils/nya");
 
 module.exports = {
+  category: "정보",
   data: new SlashCommandBuilder()
     .setName("stats")
     .setNameLocalizations({ ko: "전적검색" })
