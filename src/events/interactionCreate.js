@@ -27,7 +27,7 @@ const {
 } = require("../utils/guildConfig");
 const { buildLogContent, buildLogRows } = require("../commands/log");
 const { buildCensorContent, buildCensorRow } = require("../commands/censor");
-const { buildWelcomeContent, buildWelcomeRows } = require("../commands/welcome");
+const { buildWelcomeEmbed, buildWelcomeRows } = require("../commands/welcome");
 const { getCommandsByCategory, buildCategoryEmbed } = require("../commands/help");
 const { isDeveloper } = require("../utils/devUser");
 const { hasAgreed, agree } = require("../utils/consent");
@@ -404,7 +404,7 @@ async function handleChannelSelect(interaction) {
     setWelcomeChannel(interaction.guild.id, channelId);
 
     await interaction.update({
-      content: buildWelcomeContent(interaction.guild.id),
+      embeds: [buildWelcomeEmbed(interaction.guild.id)],
       components: buildWelcomeRows(interaction.guild.id),
     });
     return;
@@ -542,7 +542,7 @@ async function handleButton(interaction) {
     setWelcomeOption(interaction.guild.id, key, !options[key]);
 
     await interaction.update({
-      content: buildWelcomeContent(interaction.guild.id),
+      embeds: [buildWelcomeEmbed(interaction.guild.id)],
       components: buildWelcomeRows(interaction.guild.id),
     });
     return;
@@ -1103,7 +1103,7 @@ async function handleWelcomeMessageModal(interaction, type) {
   setWelcomeMessage(interaction.guild.id, type, message);
 
   await interaction.update({
-    content: buildWelcomeContent(interaction.guild.id),
+    embeds: [buildWelcomeEmbed(interaction.guild.id)],
     components: buildWelcomeRows(interaction.guild.id),
   });
 }

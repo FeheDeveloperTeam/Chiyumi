@@ -2,6 +2,7 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  EmbedBuilder,
   PermissionFlagsBits,
   SlashCommandBuilder,
 } = require("discord.js");
@@ -12,18 +13,26 @@ const {
   getWelcomeMessage,
 } = require("../utils/guildConfig");
 
-function buildWelcomeContent(guildId) {
+function buildWelcomeEmbed(guildId) {
   const channelId = getWelcomeChannelId(guildId);
   const channelText = channelId ? `<#${channelId}>` : "설정 안 됨";
   const options = getWelcomeOptions(guildId);
 
-  return nya(
-    `현재 입퇴장 채널: ${channelText}\n` +
-      `입장 알림: ${options.joinEnabled ? "켜짐" : "꺼짐"} / 퇴장 알림: ${options.leaveEnabled ? "켜짐" : "꺼짐"}\n` +
-      `입장 문구: ${getWelcomeMessage(guildId, "join")}\n` +
-      `퇴장 문구: ${getWelcomeMessage(guildId, "leave")}\n` +
-      `아래 버튼으로 채널, 문구, 알림 여부를 설정하세요. ({유저}, {서버} 치환 가능)`,
-  );
+  return new EmbedBuilder()
+    .setTitle("입퇴장 알림 설정")
+    .setDescription(
+      nya("아래 버튼으로 채널, 문구, 알림 여부를 설정하세요 ({유저}, {서버} 치환 가능)"),
+    )
+    .addFields(
+      { name: "채널", value: channelText },
+      {
+        name: "알림 상태",
+        value: `입장: ${options.joinEnabled ? "켜짐" : "꺼짐"} / 퇴장: ${options.leaveEnabled ? "켜짐" : "꺼짐"}`,
+      },
+      { name: "입장 문구", value: getWelcomeMessage(guildId, "join") },
+      { name: "퇴장 문구", value: getWelcomeMessage(guildId, "leave") },
+    )
+    .setColor(0xe1aa74);
 }
 
 function buildWelcomeRows(guildId) {
@@ -67,19 +76,19 @@ module.exports = {
     .setNameLocalizations({ ko: "입퇴장" })
     .setDescription("Configure join/leave announcement messages")
     .setDescriptionLocalizations({
-      ko: nya("입장/퇴장 알림 채널과 문구를 설정합니다 ({유저}, {서버} 치환 가능)"),
+      ko: nya("입장 및 퇴장 알림 메시지를 설정합니다"),
     })
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .setDMPermission(false),
 
   async execute(interaction) {
     await interaction.reply({
-      content: buildWelcomeContent(interaction.guild.id),
+      embeds: [buildWelcomeEmbed(interaction.guild.id)],
       components: buildWelcomeRows(interaction.guild.id),
       ephemeral: true,
     });
   },
 
-  buildWelcomeContent,
+  buildWelcomeEmbed,
   buildWelcomeRows,
 };
