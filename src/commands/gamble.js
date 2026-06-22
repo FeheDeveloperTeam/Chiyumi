@@ -50,6 +50,6 @@ module.exports = {
         .setStyle(ButtonStyle.Primary),
     );
 
-    await interaction.reply({ embeds: [embed], components: [row] });
+    await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
   },
 };
