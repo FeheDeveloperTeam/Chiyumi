@@ -7,7 +7,6 @@ const { requireEnv } = require("./utils/env");
 
 const token = requireEnv("DISCORD_TOKEN");
 const clientId = requireEnv("DISCORD_CLIENT_ID");
-const guildId = requireEnv("DISCORD_GUILD_ID");
 
 const commands = [];
 const commandsPath = path.join(__dirname, "commands");
@@ -30,12 +29,6 @@ const rest = new REST().setToken(token);
 (async () => {
   try {
     console.log(`${commands.length}개의 슬래시 명령어를 등록합니다.`);
-
-    const guildData = await rest.put(
-      Routes.applicationGuildCommands(clientId, guildId),
-      { body: commands },
-    );
-    console.log(`길드 전용 ${guildData.length}개의 슬래시 명령어 등록 완료.`);
 
     const globalData = await rest.put(Routes.applicationCommands(clientId), {
       body: commands,
