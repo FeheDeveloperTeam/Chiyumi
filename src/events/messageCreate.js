@@ -2,6 +2,8 @@ const { Events, EmbedBuilder } = require("discord.js");
 const { nya } = require("../utils/nya");
 const { containsProfanity } = require("../utils/profanityFilter");
 const { getLogOptions, sendLog } = require("../utils/guildConfig");
+const { grantActivityReward, levelFromXp } = require("../utils/levels");
+const { addBalance } = require("../utils/credits");
 
 const CALL_NAME_PATTERN = /^유미야[,!~]?\s*(.*)$/s;
 
@@ -65,6 +67,23 @@ module.exports = {
     ) {
       await handleProfanity(message);
       return;
+    }
+
+    if (message.guild) {
+      const reward = grantActivityReward(message.author.id);
+
+      if (reward) {
+        addBalance(message.author.id, reward.coinsGained);
+
+        const previousLevel = levelFromXp(reward.totalXp - reward.xpGained).level;
+        const newLevel = levelFromXp(reward.totalXp).level;
+
+        if (newLevel > previousLevel) {
+          await message.channel
+            .send(nya(`${message.author} 레벨이 올라서 이제 ${newLevel}레벨이다`))
+            .catch(() => {});
+        }
+      }
     }
 
     const match = message.content.match(CALL_NAME_PATTERN);
