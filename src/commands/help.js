@@ -38,7 +38,7 @@ function buildCategoryEmbed(category, commands) {
 
   return new EmbedBuilder()
     .setTitle(`도움말 - ${category}`)
-    .setDescription(nya(lines.join("\n")))
+    .setDescription(lines.join("\n"))
     .setColor(0xe1aa74);
 }
 
