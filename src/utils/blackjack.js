@@ -1,4 +1,5 @@
 const crypto = require("node:crypto");
+const { EmbedBuilder } = require("discord.js");
 
 const RANKS = [
   "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A",
@@ -64,6 +65,39 @@ function deleteSession(id) {
   sessions.delete(id);
 }
 
+function buildHandText(cards, hideSecond = false) {
+  if (hideSecond) {
+    return `${cardLabel(cards[0])} 🂠`;
+  }
+  return cards.map(cardLabel).join(" ");
+}
+
+function buildBjEmbed(session, { revealDealer = false, result = null } = {}) {
+  const playerTotal = handTotal(session.playerCards);
+  const embed = new EmbedBuilder()
+    .setTitle("블랙잭")
+    .addFields(
+      {
+        name: `내 카드 (${playerTotal})`,
+        value: buildHandText(session.playerCards),
+      },
+      {
+        name: revealDealer
+          ? `딜러 카드 (${handTotal(session.dealerCards)})`
+          : "딜러 카드",
+        value: buildHandText(session.dealerCards, !revealDealer),
+      },
+    )
+    .setColor(0xe1aa74)
+    .setFooter({ text: `베팅: ${session.bet} 치유미코인` });
+
+  if (result) {
+    embed.setDescription(result);
+  }
+
+  return embed;
+}
+
 module.exports = {
   drawCard,
   cardLabel,
@@ -72,4 +106,5 @@ module.exports = {
   createSession,
   getSession,
   deleteSession,
+  buildBjEmbed,
 };

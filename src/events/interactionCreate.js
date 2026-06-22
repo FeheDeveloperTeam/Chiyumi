@@ -22,13 +22,16 @@ const {
 } = require("../utils/guildConfig");
 const { buildLogContent, buildLogRows } = require("../commands/log");
 const { isDeveloper } = require("../utils/devUser");
-const { buildBjEmbed } = require("../commands/blackjack");
 const {
   drawCard,
   handTotal,
+  isBlackjack,
+  createSession: createBjSession,
   getSession: getBjSession,
   deleteSession: deleteBjSession,
+  buildBjEmbed,
 } = require("../utils/blackjack");
+const { wait: slotWait, buildReelText: buildSlotReelText, spin: spinSlot } = require("../utils/slot");
 const {
   getAccountByRiotId,
   getSummonerByPuuid,
@@ -46,6 +49,14 @@ const BJ_ACTION_PREFIX = "bj-action:";
 const STATS_ACTION_PREFIX = "stats-action:";
 const STATS_MODAL_PREFIX = "stats-modal:";
 const STATS_DETAIL_PREFIX = "stats-detail:";
+const GAMBLE_ACTION_PREFIX = "gamble-action:";
+const GAMBLE_MODAL_PREFIX = "gamble-modal:";
+const GAMBLE_TITLES = {
+  slot: "슬롯머신",
+  oddeven: "홀짝",
+  numberguess: "숫자맞추기",
+  blackjack: "블랙잭",
+};
 const VERIFY_BUTTON_PREFIX = "verify:";
 const VERIFY_ACTION_PREFIX = "verify-action:";
 const VERIFY_ACTION_MODAL_PREFIX = "verify-action-modal:";
@@ -366,6 +377,12 @@ async function handleButton(interaction) {
 
   if (interaction.customId.startsWith(STATS_DETAIL_PREFIX)) {
     await handleStatsDetailButton(interaction);
+    return;
+  }
+
+  if (interaction.customId.startsWith(GAMBLE_ACTION_PREFIX)) {
+    const game = interaction.customId.slice(GAMBLE_ACTION_PREFIX.length);
+    await showGambleModal(interaction, game);
     return;
   }
 
@@ -712,6 +729,230 @@ async function handleStatsDetailButton(interaction) {
   await interaction.reply({ embeds: [embed], ephemeral: true });
 }
 
+async function showGambleModal(interaction, game) {
+  const modal = new ModalBuilder()
+    .setCustomId(`${GAMBLE_MODAL_PREFIX}${game}`)
+    .setTitle(GAMBLE_TITLES[game] ?? "도박");
+
+  const rows = [];
+
+  if (game === "oddeven") {
+    const choiceInput = new TextInputBuilder()
+      .setCustomId("choice")
+      .setLabel("홀 또는 짝을 입력하세요")
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder("홀 또는 짝")
+      .setRequired(true);
+    rows.push(new ActionRowBuilder().addComponents(choiceInput));
+  }
+
+  if (game === "numberguess") {
+    const guessInput = new TextInputBuilder()
+      .setCustomId("guess")
+      .setLabel("1부터 10 사이의 숫자를 입력하세요")
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder("예: 7")
+      .setRequired(true);
+    rows.push(new ActionRowBuilder().addComponents(guessInput));
+  }
+
+  const betInput = new TextInputBuilder()
+    .setCustomId("bet")
+    .setLabel("베팅할 치유미코인 금액")
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder("예: 100")
+    .setRequired(true);
+  rows.push(new ActionRowBuilder().addComponents(betInput));
+
+  modal.addComponents(...rows);
+
+  await interaction.showModal(modal);
+}
+
+async function handleGambleModal(interaction, game) {
+  const betText = interaction.fields.getTextInputValue("bet").trim();
+  const bet = Number(betText);
+
+  if (!Number.isInteger(bet) || bet <= 0) {
+    await interaction.reply({
+      content: nya("올바른 베팅 금액이 아닙니다. (오류 코드: GAMBLE-001)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const userId = interaction.user.id;
+  const balance = getBalance(userId);
+
+  if (bet > balance) {
+    await interaction.reply({
+      content: nya(
+        `보유한 치유미코인(${balance}개)보다 많은 금액을 베팅할 수 없습니다. (오류 코드: GAMBLE-002)`,
+      ),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  if (game === "slot") {
+    await playSlotGame(interaction, userId, bet);
+    return;
+  }
+
+  if (game === "oddeven") {
+    await playOddEvenGame(interaction, userId, bet);
+    return;
+  }
+
+  if (game === "numberguess") {
+    await playNumberGuessGame(interaction, userId, bet);
+    return;
+  }
+
+  if (game === "blackjack") {
+    await playBlackjackGame(interaction, userId, bet);
+    return;
+  }
+}
+
+async function playSlotGame(interaction, userId, bet) {
+  const { reels, resultText, multiplier } = spinSlot();
+  const delta = multiplier ? bet * multiplier : -bet;
+
+  const buildEmbed = (revealedCount, resultValue = null) => {
+    const embed = new EmbedBuilder()
+      .setTitle("슬롯머신")
+      .setDescription(`🎰 ${buildSlotReelText(reels, revealedCount)}`)
+      .setColor(0xe1aa74);
+
+    if (resultValue) {
+      embed.addFields({ name: "결과", value: resultValue });
+    }
+
+    return embed;
+  };
+
+  await interaction.reply({ embeds: [buildEmbed(0)] });
+
+  for (let revealed = 1; revealed <= reels.length; revealed += 1) {
+    await slotWait(800);
+    await interaction.editReply({ embeds: [buildEmbed(revealed)] });
+  }
+
+  const newBalance = addBalance(userId, delta);
+  const deltaText = delta > 0 ? `+${delta}` : `${delta}`;
+  const multiplierText = multiplier ? ` (${multiplier}배)` : "";
+
+  await slotWait(800);
+  await interaction.editReply({
+    embeds: [
+      buildEmbed(
+        reels.length,
+        nya(
+          `${resultText}${multiplierText}! ${deltaText} 치유미코인 (현재 보유: ${newBalance}개)`,
+        ),
+      ),
+    ],
+  });
+}
+
+async function playOddEvenGame(interaction, userId, bet) {
+  const choiceRaw = interaction.fields.getTextInputValue("choice").trim();
+  const choice = choiceRaw === "홀" ? "odd" : choiceRaw === "짝" ? "even" : null;
+
+  if (!choice) {
+    await interaction.reply({
+      content: nya("홀 또는 짝 중 하나를 입력해주세요. (오류 코드: GAMBLE-003)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const number = Math.floor(Math.random() * 100) + 1;
+  const isOdd = number % 2 === 1;
+  const won = (choice === "odd" && isOdd) || (choice === "even" && !isOdd);
+  const delta = won ? bet : -bet;
+  const newBalance = addBalance(userId, delta);
+  const deltaText = delta > 0 ? `+${delta}` : `${delta}`;
+  const resultLabel = isOdd ? "홀" : "짝";
+
+  const embed = new EmbedBuilder()
+    .setTitle("홀짝")
+    .setDescription(nya(`숫자: ${number} (${resultLabel}) → ${won ? "승리" : "패배"}!`))
+    .addFields({
+      name: "결과",
+      value: nya(`${deltaText} 치유미코인 (현재 보유: ${newBalance}개)`),
+    })
+    .setColor(0xe1aa74);
+
+  await interaction.reply({ embeds: [embed] });
+}
+
+async function playNumberGuessGame(interaction, userId, bet) {
+  const guessText = interaction.fields.getTextInputValue("guess").trim();
+  const guess = Number(guessText);
+
+  if (!Number.isInteger(guess) || guess < 1 || guess > 10) {
+    await interaction.reply({
+      content: nya("1부터 10 사이의 숫자를 입력해주세요. (오류 코드: GAMBLE-004)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const answer = Math.floor(Math.random() * 10) + 1;
+  const won = guess === answer;
+  const delta = won ? bet * 9 : -bet;
+  const newBalance = addBalance(userId, delta);
+  const deltaText = delta > 0 ? `+${delta}` : `${delta}`;
+
+  const embed = new EmbedBuilder()
+    .setTitle("숫자맞추기")
+    .setDescription(nya(`정답: ${answer} → ${won ? "정답입니다" : "틀렸습니다"}!`))
+    .addFields({
+      name: "결과",
+      value: nya(`${deltaText} 치유미코인 (현재 보유: ${newBalance}개)`),
+    })
+    .setColor(0xe1aa74);
+
+  await interaction.reply({ embeds: [embed] });
+}
+
+async function playBlackjackGame(interaction, userId, bet) {
+  const { id, session } = createBjSession(userId, bet);
+
+  if (isBlackjack(session.playerCards)) {
+    const dealerBlackjack = isBlackjack(session.dealerCards);
+    const delta = dealerBlackjack ? 0 : Math.floor(bet * 1.5);
+    const newBalance = addBalance(userId, delta);
+    const resultText = dealerBlackjack
+      ? `둘 다 블랙잭! 비겼습니다. 현재 보유: ${newBalance}개`
+      : `블랙잭! ${delta} 치유미코인을 획득했습니다. 현재 보유: ${newBalance}개`;
+
+    await interaction.reply({
+      embeds: [buildBjEmbed(session, { revealDealer: true, result: nya(resultText) })],
+    });
+    return;
+  }
+
+  const hitButton = new ButtonBuilder()
+    .setCustomId(`bj-action:${id}:hit`)
+    .setLabel("히트")
+    .setStyle(ButtonStyle.Primary);
+
+  const standButton = new ButtonBuilder()
+    .setCustomId(`bj-action:${id}:stand`)
+    .setLabel("스탠드")
+    .setStyle(ButtonStyle.Secondary);
+
+  const row = new ActionRowBuilder().addComponents(hitButton, standButton);
+
+  await interaction.reply({
+    embeds: [buildBjEmbed(session)],
+    components: [row],
+  });
+}
+
 async function handleBlackjackAction(interaction) {
   const [sessionId, action] = interaction.customId
     .slice(BJ_ACTION_PREFIX.length)
@@ -930,6 +1171,12 @@ async function showMessageModal(interaction, setup) {
 }
 
 async function handleModalSubmit(interaction) {
+  if (interaction.customId.startsWith(GAMBLE_MODAL_PREFIX)) {
+    const game = interaction.customId.slice(GAMBLE_MODAL_PREFIX.length);
+    await handleGambleModal(interaction, game);
+    return;
+  }
+
   if (interaction.customId === STATS_MODAL_PREFIX) {
     await handleLolStatsModal(interaction);
     return;
