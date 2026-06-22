@@ -14,7 +14,16 @@ const OPTION_DEFS = [
   { key: "voiceJoin", label: "음성 채널 입장" },
   { key: "voiceLeave", label: "음성 채널 퇴장" },
   { key: "profanityFilter", label: "욕설 검열" },
+  { key: "spamFilter", label: "도배 검열" },
 ];
+
+function chunk(array, size) {
+  const result = [];
+  for (let i = 0; i < array.length; i += size) {
+    result.push(array.slice(i, i + size));
+  }
+  return result;
+}
 
 function buildLogContent(guildId) {
   const channelId = getLogChannelId(guildId);
@@ -40,10 +49,11 @@ function buildLogRows(guildId) {
       .setStyle(options[key] ? ButtonStyle.Success : ButtonStyle.Secondary),
   );
 
-  return [
-    new ActionRowBuilder().addComponents(channelButton),
-    new ActionRowBuilder().addComponents(...toggleButtons),
-  ];
+  const toggleRows = chunk(toggleButtons, 5).map((group) =>
+    new ActionRowBuilder().addComponents(...group),
+  );
+
+  return [new ActionRowBuilder().addComponents(channelButton), ...toggleRows];
 }
 
 module.exports = {
