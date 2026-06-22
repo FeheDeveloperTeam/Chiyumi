@@ -19,9 +19,15 @@ const {
   setLogChannel,
   getLogOptions,
   setLogOption,
+  setWelcomeChannel,
+  getWelcomeOptions,
+  setWelcomeOption,
+  setWelcomeMessage,
+  getWelcomeMessage,
 } = require("../utils/guildConfig");
 const { buildLogContent, buildLogRows } = require("../commands/log");
 const { buildCensorContent, buildCensorRow } = require("../commands/censor");
+const { buildWelcomeContent, buildWelcomeRows } = require("../commands/welcome");
 const { isDeveloper } = require("../utils/devUser");
 const { hasAgreed, agree } = require("../utils/consent");
 const { getAllXp, levelFromXp } = require("../utils/levels");
@@ -83,6 +89,10 @@ const ANNOUNCE_MODAL_PREFIX = "announce-modal:";
 const LOG_ACTION_PREFIX = "log-action:";
 const LOG_TOGGLE_PREFIX = "log-toggle:";
 const LOG_CHANNEL_SELECT_ID = "log-channel-select";
+const WELCOME_ACTION_PREFIX = "welcome-action:";
+const WELCOME_TOGGLE_PREFIX = "welcome-toggle:";
+const WELCOME_CHANNEL_SELECT_ID = "welcome-channel-select";
+const WELCOME_MODAL_PREFIX = "welcome-modal:";
 const COIN_DEV_ACTION_PREFIX = "coin-dev-action:";
 const COIN_DEV_MODAL_PREFIX = "coin-dev-modal:";
 const DEFAULT_VERIFY_MESSAGE = nya("아래 버튼을 눌러 서버 인증을 완료하세요.");
@@ -361,6 +371,27 @@ async function handleRoleSelect(interaction) {
 }
 
 async function handleChannelSelect(interaction) {
+  if (interaction.customId === WELCOME_CHANNEL_SELECT_ID) {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({
+        content: nya(
+          "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
+        ),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const channelId = interaction.values[0];
+    setWelcomeChannel(interaction.guild.id, channelId);
+
+    await interaction.update({
+      content: buildWelcomeContent(interaction.guild.id),
+      components: buildWelcomeRows(interaction.guild.id),
+    });
+    return;
+  }
+
   if (interaction.customId !== LOG_CHANNEL_SELECT_ID) return;
 
   if (!hasManageGuild(interaction)) {
@@ -434,6 +465,67 @@ async function handleButton(interaction) {
     await interaction.update({
       content: buildLogContent(interaction.guild.id),
       components: buildLogRows(interaction.guild.id),
+    });
+    return;
+  }
+
+  if (interaction.customId.startsWith(WELCOME_ACTION_PREFIX)) {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({
+        content: nya(
+          "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
+        ),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const action = interaction.customId.slice(WELCOME_ACTION_PREFIX.length);
+
+    if (action === "channel") {
+      const channelSelect = new ChannelSelectMenuBuilder()
+        .setCustomId(WELCOME_CHANNEL_SELECT_ID)
+        .setPlaceholder("입퇴장 알림을 받을 채널을 선택하세요")
+        .addChannelTypes(ChannelType.GuildText)
+        .setMinValues(1)
+        .setMaxValues(1);
+
+      const row = new ActionRowBuilder().addComponents(channelSelect);
+
+      await interaction.update({
+        content: nya("입퇴장 알림을 받을 채널을 선택하세요."),
+        components: [row],
+      });
+      return;
+    }
+
+    if (action === "join-message" || action === "leave-message") {
+      const type = action === "join-message" ? "join" : "leave";
+      await showWelcomeMessageModal(interaction, type);
+      return;
+    }
+
+    return;
+  }
+
+  if (interaction.customId.startsWith(WELCOME_TOGGLE_PREFIX)) {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({
+        content: nya(
+          "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
+        ),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const key = interaction.customId.slice(WELCOME_TOGGLE_PREFIX.length);
+    const options = getWelcomeOptions(interaction.guild.id);
+    setWelcomeOption(interaction.guild.id, key, !options[key]);
+
+    await interaction.update({
+      content: buildWelcomeContent(interaction.guild.id),
+      components: buildWelcomeRows(interaction.guild.id),
     });
     return;
   }
@@ -968,6 +1060,34 @@ async function handleStatsDetailButton(interaction) {
     .setColor(0xe1aa74);
 
   await interaction.reply({ embeds: [embed] });
+}
+
+async function showWelcomeMessageModal(interaction, type) {
+  const modal = new ModalBuilder()
+    .setCustomId(`${WELCOME_MODAL_PREFIX}${type}`)
+    .setTitle(type === "join" ? "입장 문구 설정" : "퇴장 문구 설정");
+
+  const messageInput = new TextInputBuilder()
+    .setCustomId("message")
+    .setLabel("{유저}, {서버} 치환 가능")
+    .setStyle(TextInputStyle.Paragraph)
+    .setValue(getWelcomeMessage(interaction.guild.id, type))
+    .setRequired(true)
+    .setMaxLength(1000);
+
+  modal.addComponents(new ActionRowBuilder().addComponents(messageInput));
+
+  await interaction.showModal(modal);
+}
+
+async function handleWelcomeMessageModal(interaction, type) {
+  const message = interaction.fields.getTextInputValue("message").trim();
+  setWelcomeMessage(interaction.guild.id, type, message);
+
+  await interaction.update({
+    content: buildWelcomeContent(interaction.guild.id),
+    components: buildWelcomeRows(interaction.guild.id),
+  });
 }
 
 async function showInquiryModal(interaction, type) {
@@ -1547,6 +1667,12 @@ async function showMessageModal(interaction, setup) {
 }
 
 async function handleModalSubmit(interaction) {
+  if (interaction.customId.startsWith(WELCOME_MODAL_PREFIX)) {
+    const type = interaction.customId.slice(WELCOME_MODAL_PREFIX.length);
+    await handleWelcomeMessageModal(interaction, type);
+    return;
+  }
+
   if (interaction.customId.startsWith(INQUIRY_MODAL_PREFIX)) {
     const type = interaction.customId.slice(INQUIRY_MODAL_PREFIX.length);
     await handleInquiryModal(interaction, type);

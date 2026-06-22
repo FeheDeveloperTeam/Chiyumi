@@ -62,10 +62,75 @@ async function sendLog(guild, embed) {
   await channel.send({ embeds: [embed] }).catch(() => {});
 }
 
+const DEFAULT_WELCOME_OPTIONS = {
+  joinEnabled: false,
+  leaveEnabled: false,
+};
+
+const DEFAULT_JOIN_MESSAGE = "{유저}님이 {서버}에 입장했습니다";
+const DEFAULT_LEAVE_MESSAGE = "{유저}님이 {서버}에서 퇴장했습니다";
+
+function setWelcomeChannel(guildId, channelId) {
+  const configs = loadAll();
+  configs[guildId] = { ...(configs[guildId] ?? {}), welcomeChannelId: channelId };
+  saveAll(configs);
+}
+
+function getWelcomeChannelId(guildId) {
+  const configs = loadAll();
+  return configs[guildId]?.welcomeChannelId ?? null;
+}
+
+function getWelcomeOptions(guildId) {
+  const configs = loadAll();
+  return { ...DEFAULT_WELCOME_OPTIONS, ...(configs[guildId]?.welcomeOptions ?? {}) };
+}
+
+function setWelcomeOption(guildId, key, enabled) {
+  const configs = loadAll();
+  const current = configs[guildId] ?? {};
+  configs[guildId] = {
+    ...current,
+    welcomeOptions: {
+      ...DEFAULT_WELCOME_OPTIONS,
+      ...(current.welcomeOptions ?? {}),
+      [key]: enabled,
+    },
+  };
+  saveAll(configs);
+}
+
+function setWelcomeMessage(guildId, type, message) {
+  const configs = loadAll();
+  const current = configs[guildId] ?? {};
+  configs[guildId] = {
+    ...current,
+    welcomeMessages: {
+      ...(current.welcomeMessages ?? {}),
+      [type]: message,
+    },
+  };
+  saveAll(configs);
+}
+
+function getWelcomeMessage(guildId, type) {
+  const configs = loadAll();
+  const defaultMessage = type === "join" ? DEFAULT_JOIN_MESSAGE : DEFAULT_LEAVE_MESSAGE;
+  return configs[guildId]?.welcomeMessages?.[type] ?? defaultMessage;
+}
+
 module.exports = {
   setLogChannel,
   getLogChannelId,
   sendLog,
   getLogOptions,
   setLogOption,
+  setWelcomeChannel,
+  getWelcomeChannelId,
+  getWelcomeOptions,
+  setWelcomeOption,
+  setWelcomeMessage,
+  getWelcomeMessage,
+  DEFAULT_JOIN_MESSAGE,
+  DEFAULT_LEAVE_MESSAGE,
 };
