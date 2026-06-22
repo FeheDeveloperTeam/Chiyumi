@@ -23,6 +23,7 @@ module.exports = {
         { name: "홀짝", value: nya("숫자의 홀/짝을 맞춥니다") },
         { name: "숫자맞추기", value: nya("1부터 10 사이의 숫자를 맞춥니다") },
         { name: "블랙잭", value: nya("딜러와 카드 합을 비교합니다") },
+        { name: "가위바위보", value: nya("치유미와 가위바위보로 승부를 겝니다") },
       )
       .setColor(0xe1aa74);
 
@@ -42,6 +43,10 @@ module.exports = {
       new ButtonBuilder()
         .setCustomId("gamble-action:blackjack")
         .setLabel("블랙잭")
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId("gamble-action:rps")
+        .setLabel("가위바위보")
         .setStyle(ButtonStyle.Primary),
     );
 

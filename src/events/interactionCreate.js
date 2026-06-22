@@ -56,7 +56,18 @@ const GAMBLE_TITLES = {
   oddeven: "홀짝",
   numberguess: "숫자맞추기",
   blackjack: "블랙잭",
+  rps: "가위바위보",
 };
+const RPS_CHOICES = ["가위", "바위", "보"];
+const RPS_BEATS = {
+  가위: "보",
+  바위: "가위",
+  보: "바위",
+};
+const INQUIRY_ACTION_PREFIX = "inquiry-action:";
+const INQUIRY_MODAL_PREFIX = "inquiry-modal:";
+const INQUIRY_CHANNEL_ID = "1518461357735936000";
+const INQUIRY_TITLES = { report: "신고", feedback: "피드백" };
 const VERIFY_BUTTON_PREFIX = "verify:";
 const VERIFY_ACTION_PREFIX = "verify-action:";
 const VERIFY_ACTION_MODAL_PREFIX = "verify-action-modal:";
@@ -386,6 +397,12 @@ async function handleButton(interaction) {
     return;
   }
 
+  if (interaction.customId.startsWith(INQUIRY_ACTION_PREFIX)) {
+    const type = interaction.customId.slice(INQUIRY_ACTION_PREFIX.length);
+    await showInquiryModal(interaction, type);
+    return;
+  }
+
   if (interaction.customId.startsWith(VERIFY_ACTION_PREFIX)) {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
       await interaction.reply({
@@ -660,7 +677,7 @@ async function handleLolStatsModal(interaction) {
         new ButtonBuilder()
           .setCustomId(`${STATS_DETAIL_PREFIX}${sessionId}:${index}`)
           .setLabel(`${index + 1}경기 더보기`)
-          .setStyle(ButtonStyle.Secondary),
+          .setStyle(ButtonStyle.Primary),
       ),
     );
 
@@ -774,6 +791,53 @@ async function handleStatsDetailButton(interaction) {
   await interaction.reply({ embeds: [embed] });
 }
 
+async function showInquiryModal(interaction, type) {
+  const modal = new ModalBuilder()
+    .setCustomId(`${INQUIRY_MODAL_PREFIX}${type}`)
+    .setTitle(INQUIRY_TITLES[type] ?? "문의");
+
+  const contentInput = new TextInputBuilder()
+    .setCustomId("content")
+    .setLabel(type === "report" ? "신고 내용을 입력하세요" : "피드백 내용을 입력하세요")
+    .setStyle(TextInputStyle.Paragraph)
+    .setRequired(true)
+    .setMaxLength(1800);
+
+  modal.addComponents(new ActionRowBuilder().addComponents(contentInput));
+
+  await interaction.showModal(modal);
+}
+
+async function handleInquiryModal(interaction, type) {
+  const content = interaction.fields.getTextInputValue("content").trim();
+
+  try {
+    const channel = await interaction.client.channels.fetch(INQUIRY_CHANNEL_ID);
+
+    const embed = new EmbedBuilder()
+      .setTitle(INQUIRY_TITLES[type] ?? "문의")
+      .addFields(
+        { name: "작성자", value: `${interaction.user} (${interaction.user.id})` },
+        { name: "내용", value: content },
+      )
+      .setColor(0xe1aa74)
+      .setTimestamp();
+
+    await channel.send({ embeds: [embed] });
+
+    await interaction.reply({
+      content: nya("문의가 정상적으로 접수되었습니다. 빠르게 확인할게요"),
+      ephemeral: true,
+    });
+  } catch (error) {
+    console.error(error);
+    await interaction.reply({
+      content: nya("문의를 전달하지 못했습니다. 잠시 후 다시 시도해주세요. (오류 코드: INQUIRY-001)"),
+      ephemeral: true,
+    });
+  }
+}
+
 async function showGambleModal(interaction, game) {
   const modal = new ModalBuilder()
     .setCustomId(`${GAMBLE_MODAL_PREFIX}${game}`)
@@ -799,6 +863,16 @@ async function showGambleModal(interaction, game) {
       .setPlaceholder("예: 7")
       .setRequired(true);
     rows.push(new ActionRowBuilder().addComponents(guessInput));
+  }
+
+  if (game === "rps") {
+    const choiceInput = new TextInputBuilder()
+      .setCustomId("choice")
+      .setLabel("가위, 바위, 보 중 하나를 입력하세요")
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder("가위, 바위, 보")
+      .setRequired(true);
+    rows.push(new ActionRowBuilder().addComponents(choiceInput));
   }
 
   const betInput = new TextInputBuilder()
@@ -856,6 +930,11 @@ async function handleGambleModal(interaction, game) {
 
   if (game === "blackjack") {
     await playBlackjackGame(interaction, userId, bet);
+    return;
+  }
+
+  if (game === "rps") {
+    await playRpsGame(interaction, userId, bet);
     return;
   }
 }
@@ -988,7 +1067,7 @@ async function playBlackjackGame(interaction, userId, bet) {
   const standButton = new ButtonBuilder()
     .setCustomId(`bj-action:${id}:stand`)
     .setLabel("스탠드")
-    .setStyle(ButtonStyle.Secondary);
+    .setStyle(ButtonStyle.Primary);
 
   const row = new ActionRowBuilder().addComponents(hitButton, standButton);
 
@@ -996,6 +1075,48 @@ async function playBlackjackGame(interaction, userId, bet) {
     embeds: [buildBjEmbed(session)],
     components: [row],
   });
+}
+
+async function playRpsGame(interaction, userId, bet) {
+  const choiceRaw = interaction.fields.getTextInputValue("choice").trim();
+
+  if (!RPS_CHOICES.includes(choiceRaw)) {
+    await interaction.reply({
+      content: nya("가위, 바위, 보 중 하나를 입력해주세요. (오류 코드: GAMBLE-005)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const botChoice = RPS_CHOICES[Math.floor(Math.random() * RPS_CHOICES.length)];
+
+  let resultText;
+  let delta;
+
+  if (choiceRaw === botChoice) {
+    resultText = "비겼습니다";
+    delta = 0;
+  } else if (RPS_BEATS[choiceRaw] === botChoice) {
+    resultText = "이겼습니다";
+    delta = bet;
+  } else {
+    resultText = "졌습니다";
+    delta = -bet;
+  }
+
+  const newBalance = addBalance(userId, delta);
+  const deltaText = delta > 0 ? `+${delta}` : delta < 0 ? `${delta}` : "±0";
+
+  const embed = new EmbedBuilder()
+    .setTitle("가위바위보")
+    .setDescription(nya(`나: ${choiceRaw} / 치유미: ${botChoice} → ${resultText}!`))
+    .addFields({
+      name: "결과",
+      value: nya(`${deltaText} 치유미코인 (현재 보유: ${newBalance}개)`),
+    })
+    .setColor(0xe1aa74);
+
+  await interaction.reply({ embeds: [embed] });
 }
 
 async function handleBlackjackAction(interaction) {
@@ -1216,6 +1337,12 @@ async function showMessageModal(interaction, setup) {
 }
 
 async function handleModalSubmit(interaction) {
+  if (interaction.customId.startsWith(INQUIRY_MODAL_PREFIX)) {
+    const type = interaction.customId.slice(INQUIRY_MODAL_PREFIX.length);
+    await handleInquiryModal(interaction, type);
+    return;
+  }
+
   if (interaction.customId.startsWith(GAMBLE_MODAL_PREFIX)) {
     const game = interaction.customId.slice(GAMBLE_MODAL_PREFIX.length);
     await handleGambleModal(interaction, game);
