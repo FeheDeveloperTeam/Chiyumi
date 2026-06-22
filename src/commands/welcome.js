@@ -66,7 +66,9 @@ module.exports = {
     .setName("welcome")
     .setNameLocalizations({ ko: "입퇴장" })
     .setDescription("Configure join/leave announcement messages")
-    .setDescriptionLocalizations({ ko: nya("입장 및 퇴장 알림 메시지를 설정합니다") })
+    .setDescriptionLocalizations({
+      ko: nya("입장/퇴장 알림 채널과 문구를 설정합니다 ({유저}, {서버} 치환 가능)"),
+    })
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .setDMPermission(false),
 

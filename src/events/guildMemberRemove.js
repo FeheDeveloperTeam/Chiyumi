@@ -1,4 +1,4 @@
-const { Events } = require("discord.js");
+const { Events, EmbedBuilder } = require("discord.js");
 const { getWelcomeChannelId, getWelcomeOptions, getWelcomeMessage } = require("../utils/guildConfig");
 const { formatWelcomeMessage } = require("../utils/welcomeFormat");
 
@@ -15,8 +15,15 @@ module.exports = {
     if (!channel) return;
 
     const template = getWelcomeMessage(member.guild.id, "leave");
-    const content = formatWelcomeMessage(template, { user: member.user, guild: member.guild });
+    const description = formatWelcomeMessage(template, { user: member.user, guild: member.guild });
 
-    await channel.send(content).catch(() => {});
+    const embed = new EmbedBuilder()
+      .setDescription(description)
+      .setThumbnail(member.user.displayAvatarURL())
+      .setColor(0xed4245)
+      .setFooter({ text: `현재 인원: ${member.guild.memberCount}명` })
+      .setTimestamp();
+
+    await channel.send({ embeds: [embed] }).catch(() => {});
   },
 };
