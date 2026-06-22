@@ -31,12 +31,16 @@ const rest = new REST().setToken(token);
   try {
     console.log(`${commands.length}개의 슬래시 명령어를 등록합니다.`);
 
-    const data = await rest.put(
+    const guildData = await rest.put(
       Routes.applicationGuildCommands(clientId, guildId),
       { body: commands },
     );
+    console.log(`길드 전용 ${guildData.length}개의 슬래시 명령어 등록 완료.`);
 
-    console.log(`${data.length}개의 슬래시 명령어 등록 완료.`);
+    const globalData = await rest.put(Routes.applicationCommands(clientId), {
+      body: commands,
+    });
+    console.log(`전역 ${globalData.length}개의 슬래시 명령어 등록 완료.`);
   } catch (error) {
     console.error(error);
   }
