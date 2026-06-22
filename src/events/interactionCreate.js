@@ -21,6 +21,7 @@ const {
   setLogOption,
 } = require("../utils/guildConfig");
 const { buildLogContent, buildLogRows } = require("../commands/log");
+const { buildCensorContent, buildCensorRow } = require("../commands/censor");
 const { isDeveloper } = require("../utils/devUser");
 const {
   drawCard,
@@ -288,6 +289,27 @@ async function handleButton(interaction) {
     await interaction.update({
       content: buildLogContent(interaction.guild.id),
       components: buildLogRows(interaction.guild.id),
+    });
+    return;
+  }
+
+  if (interaction.customId === "censor-action:toggle") {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({
+        content: nya(
+          "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
+        ),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const enabled = getLogOptions(interaction.guild.id).profanityFilter;
+    setLogOption(interaction.guild.id, "profanityFilter", !enabled);
+
+    await interaction.update({
+      content: buildCensorContent(interaction.guild.id),
+      components: [buildCensorRow(interaction.guild.id)],
     });
     return;
   }

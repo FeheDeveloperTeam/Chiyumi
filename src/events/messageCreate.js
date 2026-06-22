@@ -1,5 +1,7 @@
-const { Events } = require("discord.js");
+const { Events, EmbedBuilder } = require("discord.js");
 const { nya } = require("../utils/nya");
+const { containsProfanity } = require("../utils/profanityFilter");
+const { getLogOptions, sendLog } = require("../utils/guildConfig");
 
 const CALL_NAME_PATTERN = /^유미야[,!~]?\s*(.*)$/s;
 
@@ -24,10 +26,46 @@ function findReply(message) {
   return rule ? rule.reply : DEFAULT_REPLY;
 }
 
+async function handleProfanity(message) {
+  await message.delete().catch(() => {});
+
+  const warning = await message.channel
+    .send(nya(`${message.author} 욕설이 감지되어 메시지를 지웠습니다`))
+    .catch(() => null);
+
+  if (warning) {
+    setTimeout(() => warning.delete().catch(() => {}), 5000);
+  }
+
+  const embed = new EmbedBuilder()
+    .setTitle("욕설 검열")
+    .addFields(
+      { name: "작성자", value: `${message.author}` },
+      { name: "채널", value: `${message.channel}` },
+      {
+        name: "내용",
+        value: message.content?.slice(0, 1000) || "(내용을 알 수 없음)",
+      },
+    )
+    .setColor(0xed4245)
+    .setTimestamp();
+
+  await sendLog(message.guild, embed);
+}
+
 module.exports = {
   name: Events.MessageCreate,
   async execute(message) {
     if (message.author.bot) return;
+
+    if (
+      message.guild &&
+      getLogOptions(message.guild.id).profanityFilter &&
+      containsProfanity(message.content)
+    ) {
+      await handleProfanity(message);
+      return;
+    }
 
     const match = message.content.match(CALL_NAME_PATTERN);
     if (!match) return;

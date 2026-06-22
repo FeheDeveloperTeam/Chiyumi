@@ -13,6 +13,7 @@ const OPTION_DEFS = [
   { key: "messageEdit", label: "메시지 수정" },
   { key: "voiceJoin", label: "음성 채널 입장" },
   { key: "voiceLeave", label: "음성 채널 퇴장" },
+  { key: "profanityFilter", label: "욕설 검열" },
 ];
 
 function buildLogContent(guildId) {
