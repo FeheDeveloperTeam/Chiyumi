@@ -124,12 +124,17 @@ module.exports = {
 
           if (targetChannel) {
             const template = getLevelUpMessage(message.guild.id);
-            const content = formatLevelUpMessage(template, {
+            const description = formatLevelUpMessage(template, {
               user: message.author,
               level: newLevel,
             });
 
-            await targetChannel.send(content).catch(() => {});
+            const embed = new EmbedBuilder()
+              .setDescription(description)
+              .setThumbnail(message.author.displayAvatarURL())
+              .setColor(0xe1aa74);
+
+            await targetChannel.send({ embeds: [embed] }).catch(() => {});
           }
         }
       }
