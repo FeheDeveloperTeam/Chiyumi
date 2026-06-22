@@ -651,6 +651,9 @@ async function handleLolStatsModal(interaction) {
       )
       .setColor(0xe1aa74);
 
+    const emblemUrl = getTierEmblemUrl(soloEntry?.tier);
+    if (emblemUrl) embed.setThumbnail(emblemUrl);
+
     const sessionId = createStatsSession({ puuid: account.puuid, matches });
     const detailRow = new ActionRowBuilder().addComponents(
       matches.map((_, index) =>
@@ -670,10 +673,42 @@ async function handleLolStatsModal(interaction) {
   }
 }
 
-function buildTeamFieldText(participants) {
-  return participants
-    .map((p) => `${p.win ? "🔵" : "⚪"} ${p.championName} (${p.kills}/${p.deaths}/${p.assists})`)
-    .join("\n");
+const POSITION_LABELS = {
+  TOP: "탑",
+  JUNGLE: "정글",
+  MIDDLE: "미드",
+  BOTTOM: "원딜",
+  UTILITY: "지원",
+};
+const POSITION_ORDER = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"];
+
+function buildMatchupText(participants) {
+  const byPosition = new Map();
+
+  for (const p of participants) {
+    if (!byPosition.has(p.teamPosition)) byPosition.set(p.teamPosition, []);
+    byPosition.get(p.teamPosition).push(p);
+  }
+
+  const lines = POSITION_ORDER.map((position) => {
+    const pair = byPosition.get(position);
+    const blue = pair?.find((p) => p.teamId === 100);
+    const red = pair?.find((p) => p.teamId === 200);
+
+    if (!blue || !red) return null;
+
+    return `${POSITION_LABELS[position]}: ${blue.championName} (${blue.kills}/${blue.deaths}/${blue.assists}) vs ${red.championName} (${red.kills}/${red.deaths}/${red.assists})`;
+  }).filter(Boolean);
+
+  return lines.length > 0 ? lines.join("\n") : "매치업 정보 없음";
+}
+
+const TIER_EMBLEM_BASE_URL =
+  "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblems/emblem-";
+
+function getTierEmblemUrl(tier) {
+  if (!tier) return null;
+  return `${TIER_EMBLEM_BASE_URL}${tier.toLowerCase()}.png`;
 }
 
 async function handleStatsDetailButton(interaction) {
@@ -701,8 +736,6 @@ async function handleStatsDetailButton(interaction) {
   }
 
   const participant = match.info.participants.find((p) => p.puuid === session.puuid);
-  const teamOne = match.info.participants.filter((p) => p.teamId === 100);
-  const teamTwo = match.info.participants.filter((p) => p.teamId === 200);
   const queueName = QUEUE_NAMES[match.info.queueId] ?? `큐 ${match.info.queueId}`;
 
   const embed = new EmbedBuilder()
@@ -721,8 +754,7 @@ async function handleStatsDetailButton(interaction) {
             `시야 점수: ${participant.visionScore}`,
         ),
       },
-      { name: "팀 1", value: buildTeamFieldText(teamOne) },
-      { name: "팀 2", value: buildTeamFieldText(teamTwo) },
+      { name: "라인전 매치업", value: buildMatchupText(match.info.participants) },
     )
     .setColor(0xe1aa74);
 
