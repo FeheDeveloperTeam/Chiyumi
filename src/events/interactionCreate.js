@@ -67,7 +67,7 @@ const RPS_BEATS = {
 const INQUIRY_ACTION_PREFIX = "inquiry-action:";
 const INQUIRY_MODAL_PREFIX = "inquiry-modal:";
 const INQUIRY_CHANNEL_ID = "1518461357735936000";
-const INQUIRY_TITLES = { report: "신고", feedback: "피드백" };
+const INQUIRY_TITLES = { report: "신고", feedback: "피드백", bug: "버그 신고" };
 const VERIFY_BUTTON_PREFIX = "verify:";
 const VERIFY_ACTION_PREFIX = "verify-action:";
 const VERIFY_ACTION_MODAL_PREFIX = "verify-action-modal:";
@@ -796,19 +796,45 @@ async function showInquiryModal(interaction, type) {
     .setCustomId(`${INQUIRY_MODAL_PREFIX}${type}`)
     .setTitle(INQUIRY_TITLES[type] ?? "문의");
 
+  const serverNameInput = new TextInputBuilder()
+    .setCustomId("server_name")
+    .setLabel("서버 이름")
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder("예: 치유미 테스트 서버")
+    .setRequired(true);
+
+  const serverInviteInput = new TextInputBuilder()
+    .setCustomId("server_invite")
+    .setLabel("서버 주소 (만료되지 않는 초대 링크)")
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder("예: https://discord.gg/xxxxxxx")
+    .setRequired(true);
+
   const contentInput = new TextInputBuilder()
     .setCustomId("content")
-    .setLabel(type === "report" ? "신고 내용을 입력하세요" : "피드백 내용을 입력하세요")
+    .setLabel(
+      type === "report"
+        ? "신고 내용을 입력하세요"
+        : type === "bug"
+          ? "버그 내용을 입력하세요"
+          : "피드백 내용을 입력하세요",
+    )
     .setStyle(TextInputStyle.Paragraph)
     .setRequired(true)
     .setMaxLength(1800);
 
-  modal.addComponents(new ActionRowBuilder().addComponents(contentInput));
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(serverNameInput),
+    new ActionRowBuilder().addComponents(serverInviteInput),
+    new ActionRowBuilder().addComponents(contentInput),
+  );
 
   await interaction.showModal(modal);
 }
 
 async function handleInquiryModal(interaction, type) {
+  const serverName = interaction.fields.getTextInputValue("server_name").trim();
+  const serverInvite = interaction.fields.getTextInputValue("server_invite").trim();
   const content = interaction.fields.getTextInputValue("content").trim();
 
   try {
@@ -818,15 +844,19 @@ async function handleInquiryModal(interaction, type) {
       .setTitle(INQUIRY_TITLES[type] ?? "문의")
       .addFields(
         { name: "작성자", value: `${interaction.user} (${interaction.user.id})` },
+        { name: "서버 이름", value: serverName },
+        { name: "서버 주소", value: serverInvite },
         { name: "내용", value: content },
       )
-      .setColor(0xe1aa74)
+      .setColor(type === "report" ? 0xed4245 : 0xe1aa74)
       .setTimestamp();
 
     await channel.send({ embeds: [embed] });
 
     await interaction.reply({
-      content: nya("문의가 정상적으로 접수되었습니다. 빠르게 확인할게요"),
+      content: nya(
+        "문의가 정상적으로 접수되었습니다. 서버 이름과 주소가 만료되지 않는 링크여야 정상 확인이 가능합니다",
+      ),
       ephemeral: true,
     });
   } catch (error) {
