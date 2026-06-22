@@ -1,9 +1,8 @@
-const path = require("node:path");
 const { createCanvas, loadImage, GlobalFonts } = require("@napi-rs/canvas");
+const { boldBase64, regularBase64 } = require("../assets/fontData");
 
-const FONTS_DIR = path.join(__dirname, "..", "..", "assets", "fonts");
-GlobalFonts.registerFromPath(path.join(FONTS_DIR, "IBMPlexSansKR-Bold.ttf"), "Plex Bold");
-GlobalFonts.registerFromPath(path.join(FONTS_DIR, "IBMPlexSansKR-Regular.ttf"), "Plex Regular");
+GlobalFonts.register(Buffer.from(boldBase64, "base64"), "Plex Bold");
+GlobalFonts.register(Buffer.from(regularBase64, "base64"), "Plex Regular");
 
 const WIDTH = 900;
 const HEIGHT = 280;
