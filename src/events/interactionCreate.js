@@ -24,6 +24,8 @@ const { buildLogContent, buildLogRows } = require("../commands/log");
 const { buildCensorContent, buildCensorRow } = require("../commands/censor");
 const { isDeveloper } = require("../utils/devUser");
 const { hasAgreed, agree } = require("../utils/consent");
+const { getAllXp, levelFromXp } = require("../utils/levels");
+const { getAllVoiceTimes } = require("../utils/voiceTime");
 const {
   drawCard,
   handTotal,
@@ -104,6 +106,74 @@ function formatRemainingTime(ms) {
 function extractMessageId(input) {
   const matches = input.match(/\d{15,20}/g);
   return matches ? matches[matches.length - 1] : input;
+}
+
+function formatVoiceDuration(ms) {
+  const totalMinutes = Math.floor(ms / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours > 0) return `${hours}시간 ${minutes}분`;
+  return `${minutes}분`;
+}
+
+const RANK_ACTION_PREFIX = "rank-action:";
+
+async function handleRankLeaderboard(interaction) {
+  if (!interaction.inGuild()) {
+    await interaction.reply({
+      content: nya("서버에서만 사용할 수 있는 버튼입니다. (오류 코드: GUILD-001)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const type = interaction.customId.slice(RANK_ACTION_PREFIX.length);
+  await interaction.deferReply({ ephemeral: true });
+
+  const memberIds = [...interaction.guild.members.cache.values()]
+    .filter((member) => !member.user.bot)
+    .map((member) => member.id);
+
+  if (type === "chat") {
+    const xpData = getAllXp();
+    const entries = memberIds
+      .map((id) => ({ id, xp: xpData[id] ?? 0 }))
+      .sort((a, b) => b.xp - a.xp)
+      .slice(0, 10);
+
+    const lines = entries.map((entry, index) => {
+      const { level } = levelFromXp(entry.xp);
+      return `${index + 1}. <@${entry.id}> - 레벨 ${level} (${entry.xp} XP)`;
+    });
+
+    const embed = new EmbedBuilder()
+      .setTitle(`${interaction.guild.name} 채팅 순위`)
+      .setDescription(lines.join("\n") || nya("아직 데이터가 없습니다"))
+      .setColor(0xe1aa74);
+
+    await interaction.editReply({ embeds: [embed] });
+    return;
+  }
+
+  if (type === "voice") {
+    const voiceData = getAllVoiceTimes();
+    const entries = memberIds
+      .map((id) => ({ id, ms: voiceData[id] ?? 0 }))
+      .sort((a, b) => b.ms - a.ms)
+      .slice(0, 10);
+
+    const lines = entries.map(
+      (entry, index) => `${index + 1}. <@${entry.id}> - ${formatVoiceDuration(entry.ms)}`,
+    );
+
+    const embed = new EmbedBuilder()
+      .setTitle(`${interaction.guild.name} 음성 통화 순위`)
+      .setDescription(lines.join("\n") || nya("아직 데이터가 없습니다"))
+      .setColor(0xe1aa74);
+
+    await interaction.editReply({ embeds: [embed] });
+  }
 }
 
 async function promptConsent(interaction) {
@@ -459,6 +529,11 @@ async function handleButton(interaction) {
 
   if (interaction.customId.startsWith(STATS_DETAIL_PREFIX)) {
     await handleStatsDetailButton(interaction);
+    return;
+  }
+
+  if (interaction.customId.startsWith(RANK_ACTION_PREFIX)) {
+    await handleRankLeaderboard(interaction);
     return;
   }
 

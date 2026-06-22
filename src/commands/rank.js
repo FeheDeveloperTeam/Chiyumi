@@ -1,4 +1,10 @@
-const { AttachmentBuilder, SlashCommandBuilder } = require("discord.js");
+const {
+  ActionRowBuilder,
+  AttachmentBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  SlashCommandBuilder,
+} = require("discord.js");
 const { nya } = require("../utils/nya");
 const { getUserXp, levelFromXp, getRank } = require("../utils/levels");
 const { getBalance } = require("../utils/credits");
@@ -33,7 +39,18 @@ module.exports = {
       });
 
       const attachment = new AttachmentBuilder(buffer, { name: "rank.png" });
-      await interaction.editReply({ files: [attachment] });
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId("rank-action:chat")
+          .setLabel("이 서버 채팅 순위")
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId("rank-action:voice")
+          .setLabel("이 서버 음성 통화 순위")
+          .setStyle(ButtonStyle.Primary),
+      );
+
+      await interaction.editReply({ files: [attachment], components: [row] });
     } catch (error) {
       console.error(error);
       await interaction.editReply(

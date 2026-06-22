@@ -43,6 +43,13 @@ function getUserXp(userId) {
   return data[userId]?.xp ?? 0;
 }
 
+function getAllXp() {
+  const data = loadAll();
+  return Object.fromEntries(
+    Object.entries(data).map(([id, value]) => [id, value.xp ?? 0]),
+  );
+}
+
 function canGainXp(userId) {
   const last = lastGainedAt.get(userId) ?? 0;
   return Date.now() - last >= XP_COOLDOWN_MS;
@@ -84,6 +91,7 @@ function getRank(userId) {
 
 module.exports = {
   getUserXp,
+  getAllXp,
   grantActivityReward,
   levelFromXp,
   getRank,

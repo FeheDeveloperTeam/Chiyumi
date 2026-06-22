@@ -1,5 +1,6 @@
 const { Events, EmbedBuilder } = require("discord.js");
 const { sendLog, getLogOptions } = require("../utils/guildConfig");
+const { startSession, endSession } = require("../utils/voiceTime");
 
 module.exports = {
   name: Events.VoiceStateUpdate,
@@ -7,6 +8,14 @@ module.exports = {
     const guild = newState.guild;
     const options = getLogOptions(guild.id);
     const member = newState.member ?? oldState.member;
+
+    if (!member.user.bot) {
+      if (!oldState.channelId && newState.channelId) {
+        startSession(member.id);
+      } else if (oldState.channelId && !newState.channelId) {
+        endSession(member.id);
+      }
+    }
 
     if (!oldState.channelId && newState.channelId) {
       if (!options.voiceJoin) return;
