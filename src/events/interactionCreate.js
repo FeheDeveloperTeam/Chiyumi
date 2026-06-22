@@ -771,7 +771,7 @@ async function handleStatsDetailButton(interaction) {
     )
     .setColor(0xe1aa74);
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.reply({ embeds: [embed] });
 }
 
 async function showGambleModal(interaction, game) {
