@@ -13,7 +13,7 @@ const {
   TextInputStyle,
 } = require("discord.js");
 const { nya } = require("../utils/nya");
-const { getBalance, addBalance, claimDaily } = require("../utils/credits");
+const { getBalance, addBalance } = require("../utils/credits");
 const {
   sendLog,
   setLogChannel,
@@ -110,15 +110,6 @@ const PRIVACY_URL = "https://fehedeveloperteam.github.io/Chiyumi/privacy.html";
 
 function hasManageGuild(interaction) {
   return Boolean(interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild));
-}
-
-function formatRemainingTime(ms) {
-  const totalMinutes = Math.ceil(ms / 60000);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-
-  if (hours > 0) return `${hours}시간 ${minutes}분`;
-  return `${minutes}분`;
 }
 
 function extractMessageId(input) {
@@ -713,29 +704,6 @@ async function handleButton(interaction) {
       const balance = getBalance(interaction.user.id);
       await interaction.update({
         content: nya(`${interaction.user}님의 치유미코인 보유량: ${balance}개`),
-        embeds: [],
-        components: [],
-      });
-      return;
-    }
-
-    if (action === "claim") {
-      const result = claimDaily(interaction.user.id);
-
-      if (!result.success) {
-        await interaction.reply({
-          content: nya(
-            `이미 오늘의 지급을 받았습니다. ${formatRemainingTime(result.remainingMs)} 후에 다시 받을 수 있습니다. (오류 코드: COIN-001)`,
-          ),
-          ephemeral: true,
-        });
-        return;
-      }
-
-      await interaction.update({
-        content: nya(
-          `오늘의 치유미코인 ${result.amount}개를 지급받았습니다! 현재 보유량: ${result.balance}개`,
-        ),
         embeds: [],
         components: [],
       });

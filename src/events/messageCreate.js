@@ -2,10 +2,10 @@ const { Events, EmbedBuilder } = require("discord.js");
 const { nya } = require("../utils/nya");
 const { containsProfanity } = require("../utils/profanityFilter");
 const { isSpam } = require("../utils/spamFilter");
-const { getLogOptions, sendLog, getLevelUpChannelId, getLevelUpMessage } = require("../utils/guildConfig");
+const { getLogOptions, sendLog } = require("../utils/guildConfig");
 const { grantActivityReward, levelFromXp } = require("../utils/levels");
 const { addBalance } = require("../utils/credits");
-const { formatLevelUpMessage } = require("../utils/levelUpFormat");
+const { announceLevelUp } = require("../utils/levelUpAnnounce");
 
 const CALL_NAME_PATTERN = /^유미야[,!~]?\s*(.*)$/s;
 
@@ -117,25 +117,7 @@ module.exports = {
         const newLevel = levelFromXp(reward.totalXp).level;
 
         if (newLevel > previousLevel) {
-          const channelId = getLevelUpChannelId(message.guild.id);
-          const targetChannel = channelId
-            ? message.guild.channels.cache.get(channelId)
-            : message.channel;
-
-          if (targetChannel) {
-            const template = getLevelUpMessage(message.guild.id);
-            const description = formatLevelUpMessage(template, {
-              user: message.author,
-              level: newLevel,
-            });
-
-            const embed = new EmbedBuilder()
-              .setDescription(description)
-              .setThumbnail(message.author.displayAvatarURL())
-              .setColor(0xe1aa74);
-
-            await targetChannel.send({ embeds: [embed] }).catch(() => {});
-          }
+          await announceLevelUp(message.guild, message.author, message.channel, newLevel);
         }
       }
     }

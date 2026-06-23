@@ -92,6 +92,7 @@ function getRank(userId) {
 module.exports = {
   getUserXp,
   getAllXp,
+  addXp,
   grantActivityReward,
   levelFromXp,
   getRank,
