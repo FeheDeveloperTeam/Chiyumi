@@ -6,7 +6,19 @@ const DATA_FILE = path.join(DATA_DIR, "credits.json");
 const CLAIMS_FILE = path.join(DATA_DIR, "claims.json");
 const STARTING_BALANCE = 100;
 const DAILY_CLAIM_AMOUNT = 50;
-const DAILY_CLAIM_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const CLAIM_TIMEZONE = "Asia/Seoul";
+
+function getKstDateString(date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: CLAIM_TIMEZONE }).format(date);
+}
+
+function getMsUntilNextKstMidnight() {
+  const now = new Date();
+  const kstNow = new Date(now.toLocaleString("en-US", { timeZone: CLAIM_TIMEZONE }));
+  const nextMidnight = new Date(kstNow);
+  nextMidnight.setHours(24, 0, 0, 0);
+  return nextMidnight.getTime() - kstNow.getTime();
+}
 
 function loadAll() {
   if (!fs.existsSync(DATA_FILE)) return {};
@@ -54,15 +66,13 @@ function saveClaims(claims) {
 
 function claimDaily(userId) {
   const claims = loadClaims();
-  const lastClaim = claims[userId] ?? 0;
-  const now = Date.now();
-  const remaining = DAILY_CLAIM_INTERVAL_MS - (now - lastClaim);
+  const today = getKstDateString();
 
-  if (remaining > 0) {
-    return { success: false, remainingMs: remaining };
+  if (claims[userId] === today) {
+    return { success: false, remainingMs: getMsUntilNextKstMidnight() };
   }
 
-  claims[userId] = now;
+  claims[userId] = today;
   saveClaims(claims);
 
   const balance = addBalance(userId, DAILY_CLAIM_AMOUNT);
