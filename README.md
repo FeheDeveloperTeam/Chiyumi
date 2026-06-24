@@ -20,6 +20,12 @@ Chiyumi는 디스코드 서버 운영과 놀이 기능을 함께 제공하는 No
 - **핑** (`/핑`): 봇의 응답 속도 확인
 - 모든 명령어는 디스코드 슬래시 명령어로 제공되며, 처음 사용 시 이용약관/개인정보 처리방침 동의 절차를 거칩니다
 
+## 문서
+
+- [이용약관](https://fehedeveloperteam.github.io/Chiyumi/terms.html)
+- [개인정보 처리방침](https://fehedeveloperteam.github.io/Chiyumi/privacy.html)
+- [오류 코드 안내](https://fehedeveloperteam.github.io/Chiyumi/errors.html)
+
 ## 개발 정보
 
 - Node.js
@@ -29,3 +35,9 @@ Chiyumi는 디스코드 서버 운영과 놀이 기능을 함께 제공하는 No
 ## 안내
 
 이 저장소는 Chiyumi 봇의 개발 및 관리용 저장소입니다. 봇의 기능은 서버 운영 목적에 맞춰 계속 확장될 수 있습니다.
+
+## 저작권
+
+Copyright (c) 2026 FeheDeveloperTeam. All rights reserved.
+
+본 프로젝트는 오픈소스가 아니며, 소스 코드와 "치유미" 캐릭터(이름, 디자인, 일러스트 등)에 대한 저작권은 FeheDeveloperTeam에게 있습니다. 무단 복제·배포 및 캐릭터 트레이싱(모사)·2차 창작 배포는 금지되며, 위반 시 법적 조치를 받을 수 있습니다. 자세한 내용은 [LICENSE](LICENSE) 파일을 참고해주세요.

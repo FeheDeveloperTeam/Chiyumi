@@ -14,8 +14,8 @@
     "bot",
     "discord.js"
   ],
-  "author": "",
-  "license": "MIT",
+  "author": "FeheDeveloperTeam",
+  "license": "UNLICENSED",
   "dependencies": {
     "@napi-rs/canvas": "^1.0.0",
     "discord.js": "^14.15.3",

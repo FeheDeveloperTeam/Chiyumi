@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>치유미 오류 코드 안내</title>
+<style>
+  body { font-family: sans-serif; max-width: 900px; margin: 40px auto; line-height: 1.6; padding: 0 16px; }
+  h1 { font-size: 1.6em; }
+  h2 { font-size: 1.2em; margin-top: 1.5em; }
+  table { width: 100%; border-collapse: collapse; margin-top: 0.5em; }
+  th, td { text-align: left; border-bottom: 1px solid #ddd; padding: 8px 10px; }
+  th { background: #f5f0e8; }
+  code { background: #f0ebe2; padding: 2px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<h1>치유미 오류 코드 안내</h1>
+<p>최종 수정일: 2026-06-24</p>
+<p>치유미 사용 중 메시지 끝에 <code>(오류 코드: XXX-000)</code> 형태로 표시되는 코드의 의미를 정리한 페이지입니다. 문의 시 이 코드를 함께 알려주시면 더 빠르게 확인할 수 있습니다.</p>
+
+<h2>공통</h2>
+<table>
+  <tr><th>코드</th><th>의미</th></tr>
+  <tr><td><code>CMD-001</code></td><td>명령어 실행 중 예상치 못한 오류가 발생했습니다.</td></tr>
+  <tr><td><code>AUTH-001</code></td><td>해당 기능은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.</td></tr>
+  <tr><td><code>GUILD-001</code></td><td>서버 안에서만 사용할 수 있는 기능입니다(DM 등에서 시도).</td></tr>
+  <tr><td><code>DEV-001</code></td><td>개발자 전용 기능을 개발자가 아닌 사용자가 시도했습니다.</td></tr>
+  <tr><td><code>DEV-002</code></td><td>코인 지급/차감 시 입력한 사용자 ID 형식이 올바르지 않습니다.</td></tr>
+  <tr><td><code>DEV-003</code></td><td>코인 지급/차감 시 입력한 금액이 올바르지 않습니다.</td></tr>
+</table>
+
+<h2>인증 (/인증)</h2>
+<table>
+  <tr><th>코드</th><th>의미</th></tr>
+  <tr><td><code>ROLE-001</code></td><td>선택한 역할을 찾을 수 없습니다.</td></tr>
+  <tr><td><code>ROLE-002</code></td><td>봇이 지급할 수 없는 역할입니다(역할 순서 문제).</td></tr>
+  <tr><td><code>ROLE-003</code></td><td>인증 역할을 찾을 수 없습니다.</td></tr>
+  <tr><td><code>ROLE-004</code></td><td>역할 지급에 실패했습니다.</td></tr>
+  <tr><td><code>ROLE-005</code></td><td>인증 메시지 설정 중 역할을 찾을 수 없습니다.</td></tr>
+  <tr><td><code>ROLE-006</code></td><td>인증 메시지 설정 중 봇이 지급할 수 없는 역할입니다.</td></tr>
+  <tr><td><code>VERIFY-001</code></td><td>인증 메시지 삭제에 실패했습니다.</td></tr>
+  <tr><td><code>VERIFY-002</code></td><td>봇이 만든 메시지가 아니라서 수정할 수 없습니다.</td></tr>
+  <tr><td><code>VERIFY-003</code></td><td>인증 메시지 수정에 실패했습니다.</td></tr>
+  <tr><td><code>VERIFY-004</code></td><td>봇이 만든 메시지가 아니라서 삭제할 수 없습니다.</td></tr>
+</table>
+
+<h2>공지 (/공지)</h2>
+<table>
+  <tr><th>코드</th><th>의미</th></tr>
+  <tr><td><code>ANNOUNCE-001</code></td><td>공지를 보낼 채널을 찾을 수 없습니다.</td></tr>
+</table>
+
+<h2>밴 / 킥 (/밴, /킥)</h2>
+<table>
+  <tr><th>코드</th><th>의미</th></tr>
+  <tr><td><code>BAN-001</code></td><td>권한 또는 역할 순서 문제로 사용자를 차단할 수 없습니다.</td></tr>
+  <tr><td><code>BAN-002</code></td><td>사용자 차단에 실패했습니다.</td></tr>
+  <tr><td><code>KICK-001</code></td><td>추방할 사용자를 서버에서 찾을 수 없습니다.</td></tr>
+  <tr><td><code>KICK-002</code></td><td>권한 또는 역할 순서 문제로 사용자를 추방할 수 없습니다.</td></tr>
+  <tr><td><code>KICK-003</code></td><td>사용자 추방에 실패했습니다.</td></tr>
+</table>
+
+<h2>도박 / 출석 (/도박, /출석)</h2>
+<table>
+  <tr><th>코드</th><th>의미</th></tr>
+  <tr><td><code>GAMBLE-001</code></td><td>베팅 금액이 올바르지 않습니다.</td></tr>
+  <tr><td><code>GAMBLE-002</code></td><td>보유한 치유미코인보다 많은 금액을 베팅했습니다.</td></tr>
+  <tr><td><code>GAMBLE-003</code></td><td>홀짝 선택값이 올바르지 않습니다.</td></tr>
+  <tr><td><code>GAMBLE-004</code></td><td>숫자맞추기 입력값이 1~10 범위를 벗어났습니다.</td></tr>
+  <tr><td><code>GAMBLE-005</code></td><td>가위바위보 선택값이 올바르지 않습니다.</td></tr>
+  <tr><td><code>BJ-002</code></td><td>이미 종료된 블랙잭 게임입니다.</td></tr>
+  <tr><td><code>BJ-003</code></td><td>본인이 시작한 게임이 아닙니다.</td></tr>
+  <tr><td><code>ATTEND-001</code></td><td>오늘 이미 출석을 완료했습니다.</td></tr>
+</table>
+
+<h2>순위 (/순위)</h2>
+<table>
+  <tr><th>코드</th><th>의미</th></tr>
+  <tr><td><code>RANK-001</code></td><td>순위 카드 이미지를 만드는 중 오류가 발생했습니다.</td></tr>
+</table>
+
+<h2>전적검색 (/전적검색)</h2>
+<table>
+  <tr><th>코드</th><th>의미</th></tr>
+  <tr><td><code>STATS-001</code></td><td>닉네임#태그 형식이 올바르지 않습니다.</td></tr>
+  <tr><td><code>STATS-002</code></td><td>해당 소환사를 찾을 수 없습니다.</td></tr>
+  <tr><td><code>STATS-003</code></td><td>전적을 불러오는 중 오류가 발생했습니다.</td></tr>
+  <tr><td><code>STATS-004</code></td><td>전적 조회 세션이 만료되었습니다. 다시 검색해주세요.</td></tr>
+  <tr><td><code>STATS-005</code></td><td>해당 경기를 찾을 수 없습니다.</td></tr>
+</table>
+
+<h2>문의 (/문의)</h2>
+<table>
+  <tr><th>코드</th><th>의미</th></tr>
+  <tr><td><code>INQUIRY-001</code></td><td>문의 내용을 전달하지 못했습니다.</td></tr>
+</table>
+
+<h2>티켓 (/티켓)</h2>
+<table>
+  <tr><th>코드</th><th>의미</th></tr>
+  <tr><td><code>TICKET-001</code></td><td>티켓 채널이 설정되지 않았습니다.</td></tr>
+  <tr><td><code>TICKET-002</code></td><td>티켓 스레드 생성에 실패했습니다(봇 권한 확인 필요).</td></tr>
+  <tr><td><code>TICKET-003</code></td><td>스레드에 사용자를 추가하지 못했습니다.</td></tr>
+</table>
+
+<h2>문의</h2>
+<p>위 목록에 없는 오류 코드를 발견했거나 문의가 필요하면 <a href="mailto:fehe@fehe.dev">fehe@fehe.dev</a>로 연락해주세요.</p>
+</body>
+</html>
