@@ -355,8 +355,12 @@ async function handleTicketActionButton(interaction) {
 
     const row = new ActionRowBuilder().addComponents(createButton);
 
+    const postEmbed = new EmbedBuilder()
+      .setDescription(getTicketMessage(interaction.guild.id))
+      .setColor(0xe1aa74);
+
     await channel.send({
-      content: getTicketMessage(interaction.guild.id),
+      embeds: [postEmbed],
       components: [row],
     });
 
