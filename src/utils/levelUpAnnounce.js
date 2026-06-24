@@ -10,10 +10,7 @@ async function announceLevelUp(guild, user, defaultChannel, newLevel) {
   const template = getLevelUpMessage(guild.id);
   const description = formatLevelUpMessage(template, { user, level: newLevel });
 
-  const embed = new EmbedBuilder()
-    .setDescription(description)
-    .setThumbnail(user.displayAvatarURL())
-    .setColor(0xe1aa74);
+  const embed = new EmbedBuilder().setDescription(description).setColor(0xe1aa74);
 
   await targetChannel.send({ embeds: [embed] }).catch(() => {});
 }
