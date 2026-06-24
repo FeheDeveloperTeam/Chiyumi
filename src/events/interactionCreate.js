@@ -487,10 +487,6 @@ async function handleTicketManage(interaction) {
     const closedEmbed = new EmbedBuilder()
       .setTitle("티켓 닫힘")
       .setDescription(nya("티켓을 닫았습니다. 관리자를 제외한 모두 열람 권한에서 제외됐다"))
-      .addFields({
-        name: "관리자 전용 기능",
-        value: nya("아래 버튼들은 관리자만 사용할 수 있습니다"),
-      })
       .setColor(0xed4245);
 
     const closedRow = new ActionRowBuilder().addComponents(
