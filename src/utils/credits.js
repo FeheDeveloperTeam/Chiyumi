@@ -67,17 +67,21 @@ function saveClaims(claims) {
 function claimDaily(userId) {
   const claims = loadClaims();
   const today = getKstDateString();
+  const entry = claims[userId];
 
-  if (claims[userId] === today) {
+  if (entry?.date === today) {
     return { success: false, remainingMs: getMsUntilNextKstMidnight() };
   }
 
-  claims[userId] = today;
+  const yesterday = getKstDateString(new Date(Date.now() - 24 * 60 * 60 * 1000));
+  const streak = entry?.date === yesterday ? entry.streak + 1 : 1;
+
+  claims[userId] = { date: today, streak };
   saveClaims(claims);
 
   const balance = addBalance(userId, DAILY_CLAIM_AMOUNT);
 
-  return { success: true, amount: DAILY_CLAIM_AMOUNT, balance };
+  return { success: true, amount: DAILY_CLAIM_AMOUNT, balance, streak };
 }
 
 module.exports = {

@@ -43,11 +43,13 @@ module.exports = {
     const totalXp = addXp(userId, ATTENDANCE_XP_AMOUNT);
     const newLevel = levelFromXp(totalXp).level;
 
+    const streakText = result.streak >= 2 ? `\n${result.streak}일 연속이다` : "";
+
     const embed = new EmbedBuilder()
       .setTitle("출석 체크")
       .setDescription(
         nya(
-          `치유미코인 ${result.amount}개와 경험치 ${ATTENDANCE_XP_AMOUNT}을 받았습니다! 현재 보유: ${result.balance}개`,
+          `치유미코인 ${result.amount}개와 경험치 ${ATTENDANCE_XP_AMOUNT}을 받았습니다! 현재 보유: ${result.balance}개${streakText}`,
         ),
       )
       .setColor(0xe1aa74);
