@@ -2405,11 +2405,22 @@ async function handleAnnounceModal(interaction) {
   const mentionContent =
     mention === "everyone" ? "@everyone" : mention === "here" ? "@here" : undefined;
 
-  await channel.send({
-    content: mentionContent,
-    embeds: [embed],
-    allowedMentions: mentionContent ? { parse: ["everyone"] } : { parse: [] },
-  });
+  try {
+    await channel.send({
+      content: mentionContent,
+      embeds: [embed],
+      allowedMentions: mentionContent ? { parse: ["everyone"] } : { parse: [] },
+    });
+  } catch (error) {
+    console.error(error);
+    await interaction.reply({
+      content: nya(
+        `${channel}에 공지를 보내지 못했습니다. 봇에게 해당 채널의 메시지 보내기/임베드 권한이 있는지 확인해주세요. (오류 코드: ANNOUNCE-002)`,
+      ),
+      ephemeral: true,
+    });
+    return;
+  }
 
   await interaction.reply({
     content: nya(`${channel}에 공지를 보냈습니다.`),
