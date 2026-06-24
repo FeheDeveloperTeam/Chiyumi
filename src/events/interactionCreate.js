@@ -419,14 +419,6 @@ async function handleTicketCreate(interaction) {
         .setCustomId(`${TICKET_MANAGE_PREFIX}close`)
         .setLabel("닫기")
         .setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder()
-        .setCustomId(`${TICKET_MANAGE_PREFIX}export`)
-        .setLabel("대화 저장")
-        .setStyle(ButtonStyle.Primary),
-      new ButtonBuilder()
-        .setCustomId(`${TICKET_MANAGE_PREFIX}delete`)
-        .setLabel("삭제")
-        .setStyle(ButtonStyle.Danger),
     );
 
     await thread.send({ embeds: [embed], components: [manageRow] });
@@ -486,7 +478,28 @@ async function handleTicketManage(interaction) {
       }
     }
 
-    await thread.send(nya("티켓을 닫았습니다. 관리자를 제외한 모두 열람 권한에서 제외됐다"));
+    const closedEmbed = new EmbedBuilder()
+      .setTitle("티켓 닫힘")
+      .setDescription(nya("티켓을 닫았습니다. 관리자를 제외한 모두 열람 권한에서 제외됐다"))
+      .addFields({
+        name: "관리자 전용 기능",
+        value: nya("아래 버튼들은 관리자만 사용할 수 있습니다"),
+      })
+      .setColor(0xed4245);
+
+    const closedRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`${TICKET_MANAGE_PREFIX}export`)
+        .setLabel("대화 저장")
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(`${TICKET_MANAGE_PREFIX}delete`)
+        .setLabel("삭제")
+        .setStyle(ButtonStyle.Danger),
+    );
+
+    await thread.send({ embeds: [closedEmbed], components: [closedRow] });
+
     await thread.setLocked(true).catch(() => {});
     await thread.setArchived(true).catch(() => {});
 
@@ -495,8 +508,22 @@ async function handleTicketManage(interaction) {
   }
 
   if (action === "delete") {
-    await interaction.reply({ content: nya("티켓을 삭제합니다."), ephemeral: true });
-    await thread.delete().catch(() => {});
+    await interaction.reply({
+      content: nya("10초 후에 이 티켓 스레드가 삭제됩니다."),
+      ephemeral: true,
+    });
+
+    const deleteEmbed = new EmbedBuilder()
+      .setTitle("티켓 삭제")
+      .setDescription(nya("10초 후에 이 스레드가 삭제됩니다"))
+      .setColor(0xed4245);
+
+    await thread.send({ embeds: [deleteEmbed] });
+
+    setTimeout(() => {
+      thread.delete().catch(() => {});
+    }, 10000);
+
     return;
   }
 
