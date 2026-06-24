@@ -43,6 +43,8 @@ const { buildWelcomeEmbed, buildWelcomeRows } = require("../commands/welcome");
 const { getCommandsByCategory, buildCategoryEmbed } = require("../commands/help");
 const { buildLevelUpEmbed, buildLevelUpRow } = require("../commands/rank");
 const { buildTicketEmbed, buildTicketRow } = require("../commands/ticket");
+const { buildPetEmbed, buildPetRow } = require("../commands/pet");
+const { getAgeDays, getStage, performAction, ACTIONS } = require("../utils/pets");
 const { isDeveloper } = require("../utils/devUser");
 const { hasAgreed, agree } = require("../utils/consent");
 const { getAllXp, levelFromXp } = require("../utils/levels");
@@ -145,6 +147,7 @@ const TICKET_MODAL_ID = "ticket-modal";
 const TICKET_CREATE_ID = "ticket-create";
 const TICKET_MANAGE_PREFIX = "ticket-manage:";
 const TICKET_ADDUSER_SELECT_ID = "ticket-adduser-select";
+const PET_ACTION_PREFIX = "pet-action:";
 
 function buildRankPage(guild, type, page) {
   const memberIds = [...guild.members.cache.values()]
@@ -575,6 +578,49 @@ async function handleTicketAddUserSelect(interaction) {
       components: [],
     });
   }
+}
+
+async function handlePetAction(interaction) {
+  const [action, ownerId] = interaction.customId.slice(PET_ACTION_PREFIX.length).split(":");
+
+  if (interaction.user.id !== ownerId) {
+    await interaction.reply({
+      content: nya("이건 당신의 고양이가 아닙니다. 본인의 /키우기를 사용해주세요"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const result = performAction(ownerId, action);
+
+  if (result.alreadyDone) {
+    await interaction.reply({
+      content: nya(
+        `오늘은 이미 ${ACTIONS[action].label}를 했습니다. 내일 다시 해주세요. (오류 코드: PET-001)`,
+      ),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const ageDays = getAgeDays(result.pet);
+  const stage = getStage(ageDays);
+
+  const embed = new EmbedBuilder()
+    .setTitle(`${stage.emoji} ${interaction.user.username}님의 고양이`)
+    .setDescription(
+      nya(
+        `${result.success ? "✅" : "❌"} ${ACTIONS[action].label} → ${result.message}\n${stage.name} · ${ageDays}일째 함께하고 있다`,
+      ),
+    )
+    .addFields(
+      { name: "배고픔", value: `${result.pet.hunger}/100`, inline: true },
+      { name: "청결", value: `${result.pet.cleanliness}/100`, inline: true },
+      { name: "애정", value: `${result.pet.affection}/100`, inline: true },
+    )
+    .setColor(result.success ? 0xe1aa74 : 0xed4245);
+
+  await interaction.update({ embeds: [embed], components: [buildPetRow(ownerId)] });
 }
 
 async function handleRankPageButton(interaction) {
@@ -1171,6 +1217,11 @@ async function handleButton(interaction) {
 
   if (interaction.customId.startsWith(TICKET_MANAGE_PREFIX)) {
     await handleTicketManage(interaction);
+    return;
+  }
+
+  if (interaction.customId.startsWith(PET_ACTION_PREFIX)) {
+    await handlePetAction(interaction);
     return;
   }
 
