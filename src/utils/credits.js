@@ -41,6 +41,10 @@ function getBalance(userId) {
   return balances[userId];
 }
 
+function getAllBalances() {
+  return loadAll();
+}
+
 function addBalance(userId, delta) {
   const balances = loadAll();
 
@@ -86,6 +90,7 @@ function claimDaily(userId) {
 
 module.exports = {
   getBalance,
+  getAllBalances,
   addBalance,
   claimDaily,
   STARTING_BALANCE,

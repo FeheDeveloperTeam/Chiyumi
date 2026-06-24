@@ -15,7 +15,7 @@ const {
   UserSelectMenuBuilder,
 } = require("discord.js");
 const { nya } = require("../utils/nya");
-const { getBalance, addBalance } = require("../utils/credits");
+const { getBalance, getAllBalances, addBalance } = require("../utils/credits");
 const {
   sendLog,
   setLogChannel,
@@ -1039,6 +1039,29 @@ async function handleButton(interaction) {
       return;
     }
 
+    if (action === "rank") {
+      const balances = getAllBalances();
+      const top10 = Object.entries(balances)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+
+      const lines = top10.map(
+        ([userId, balance], index) => `${index + 1}. <@${userId}> - ${balance}개`,
+      );
+
+      const embed = new EmbedBuilder()
+        .setTitle("치유미코인 순위")
+        .setDescription(lines.join("\n") || nya("아직 데이터가 없습니다"))
+        .setColor(0xe1aa74);
+
+      await interaction.update({
+        content: null,
+        embeds: [embed],
+        components: [],
+      });
+      return;
+    }
+
     if (action === "dev") {
       if (!isDeveloper(interaction.user.id)) {
         await interaction.reply({
@@ -1058,7 +1081,16 @@ async function handleButton(interaction) {
         .setLabel("코인 차감")
         .setStyle(ButtonStyle.Danger);
 
-      const row = new ActionRowBuilder().addComponents(grantButton, deductButton);
+      const lookupButton = new ButtonBuilder()
+        .setCustomId(`${COIN_DEV_ACTION_PREFIX}lookup`)
+        .setLabel("다른 사용자 조회")
+        .setStyle(ButtonStyle.Primary);
+
+      const row = new ActionRowBuilder().addComponents(
+        grantButton,
+        deductButton,
+        lookupButton,
+      );
 
       await interaction.update({
         content: nya("개발자 전용 메뉴입니다. 어떤 작업을 할까요?"),
@@ -1080,6 +1112,12 @@ async function handleButton(interaction) {
     }
 
     const direction = interaction.customId.slice(COIN_DEV_ACTION_PREFIX.length);
+
+    if (direction === "lookup") {
+      await showDevLookupModal(interaction);
+      return;
+    }
+
     await showDevGrantModal(interaction, direction);
     return;
   }
@@ -1234,6 +1272,49 @@ async function handleButton(interaction) {
       ephemeral: true,
     });
   }
+}
+
+async function showDevLookupModal(interaction) {
+  const modal = new ModalBuilder()
+    .setCustomId(`${COIN_DEV_MODAL_PREFIX}lookup`)
+    .setTitle("다른 사용자 조회");
+
+  const userIdInput = new TextInputBuilder()
+    .setCustomId("user_id")
+    .setLabel("조회할 사용자 ID")
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true);
+
+  modal.addComponents(new ActionRowBuilder().addComponents(userIdInput));
+
+  await interaction.showModal(modal);
+}
+
+async function handleDevLookupModal(interaction) {
+  if (!isDeveloper(interaction.user.id)) {
+    await interaction.reply({
+      content: nya("이 기능은 개발자만 사용할 수 있습니다. (오류 코드: DEV-001)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const targetUserId = interaction.fields.getTextInputValue("user_id").trim();
+
+  if (!/^\d{15,20}$/.test(targetUserId)) {
+    await interaction.reply({
+      content: nya("올바른 사용자 ID가 아닙니다. (오류 코드: DEV-002)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const balance = getBalance(targetUserId);
+
+  await interaction.update({
+    content: nya(`<@${targetUserId}>님의 치유미코인 보유량: ${balance}개`),
+    components: [],
+  });
 }
 
 async function showDevGrantModal(interaction, direction) {
@@ -2188,6 +2269,12 @@ async function handleModalSubmit(interaction) {
 
   if (interaction.customId.startsWith(COIN_DEV_MODAL_PREFIX)) {
     const direction = interaction.customId.slice(COIN_DEV_MODAL_PREFIX.length);
+
+    if (direction === "lookup") {
+      await handleDevLookupModal(interaction);
+      return;
+    }
+
     await handleDevGrantModal(interaction, direction);
     return;
   }
