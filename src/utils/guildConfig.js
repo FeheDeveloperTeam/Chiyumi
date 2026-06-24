@@ -144,6 +144,30 @@ function getLevelUpMessage(guildId) {
   return configs[guildId]?.levelUpMessage ?? DEFAULT_LEVELUP_MESSAGE;
 }
 
+const DEFAULT_TICKET_MESSAGE = "문의사항이 있으면 아래 버튼을 눌러 티켓을 생성해주세요";
+
+function setTicketChannel(guildId, channelId) {
+  const configs = loadAll();
+  configs[guildId] = { ...(configs[guildId] ?? {}), ticketChannelId: channelId };
+  saveAll(configs);
+}
+
+function getTicketChannelId(guildId) {
+  const configs = loadAll();
+  return configs[guildId]?.ticketChannelId ?? null;
+}
+
+function setTicketMessage(guildId, message) {
+  const configs = loadAll();
+  configs[guildId] = { ...(configs[guildId] ?? {}), ticketMessage: message };
+  saveAll(configs);
+}
+
+function getTicketMessage(guildId) {
+  const configs = loadAll();
+  return configs[guildId]?.ticketMessage ?? DEFAULT_TICKET_MESSAGE;
+}
+
 module.exports = {
   setLogChannel,
   getLogChannelId,
@@ -163,4 +187,9 @@ module.exports = {
   setLevelUpMessage,
   getLevelUpMessage,
   DEFAULT_LEVELUP_MESSAGE,
+  setTicketChannel,
+  getTicketChannelId,
+  setTicketMessage,
+  getTicketMessage,
+  DEFAULT_TICKET_MESSAGE,
 };

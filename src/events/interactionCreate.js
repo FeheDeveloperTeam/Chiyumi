@@ -27,6 +27,10 @@ const {
   setLevelUpChannel,
   getLevelUpMessage,
   setLevelUpMessage,
+  setTicketChannel,
+  getTicketChannelId,
+  getTicketMessage,
+  setTicketMessage,
 } = require("../utils/guildConfig");
 const { buildLogContent, buildLogRows } = require("../commands/log");
 const {
@@ -36,6 +40,7 @@ const {
 const { buildWelcomeEmbed, buildWelcomeRows } = require("../commands/welcome");
 const { getCommandsByCategory, buildCategoryEmbed } = require("../commands/help");
 const { buildLevelUpEmbed, buildLevelUpRow } = require("../commands/rank");
+const { buildTicketEmbed, buildTicketRow } = require("../commands/ticket");
 const { isDeveloper } = require("../utils/devUser");
 const { hasAgreed, agree } = require("../utils/consent");
 const { getAllXp, levelFromXp } = require("../utils/levels");
@@ -132,6 +137,10 @@ const RANK_PAGE_SIZE = 5;
 const RANK_LEVELUP_ACTION_PREFIX = "rank-levelup-action:";
 const RANK_LEVELUP_CHANNEL_SELECT_ID = "rank-levelup-channel-select";
 const RANK_LEVELUP_MODAL_ID = "rank-levelup-modal";
+const TICKET_ACTION_PREFIX = "ticket-action:";
+const TICKET_CHANNEL_SELECT_ID = "ticket-channel-select";
+const TICKET_MODAL_ID = "ticket-modal";
+const TICKET_CREATE_ID = "ticket-create";
 
 function buildRankPage(guild, type, page) {
   const memberIds = [...guild.members.cache.values()]
@@ -272,6 +281,126 @@ async function handleLevelUpActionButton(interaction) {
     modal.addComponents(new ActionRowBuilder().addComponents(messageInput));
 
     await interaction.showModal(modal);
+  }
+}
+
+async function handleTicketActionButton(interaction) {
+  if (!hasManageGuild(interaction)) {
+    await interaction.reply({
+      content: nya(
+        "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
+      ),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const action = interaction.customId.slice(TICKET_ACTION_PREFIX.length);
+
+  if (action === "channel") {
+    const channelSelect = new ChannelSelectMenuBuilder()
+      .setCustomId(TICKET_CHANNEL_SELECT_ID)
+      .setPlaceholder("티켓 생성 버튼을 올릴 채널을 선택하세요")
+      .addChannelTypes(ChannelType.GuildText)
+      .setMinValues(1)
+      .setMaxValues(1);
+
+    const row = new ActionRowBuilder().addComponents(channelSelect);
+
+    await interaction.update({
+      content: nya("티켓 생성 버튼을 올릴 채널을 선택하세요."),
+      embeds: [],
+      components: [row],
+    });
+    return;
+  }
+
+  if (action === "message") {
+    const modal = new ModalBuilder().setCustomId(TICKET_MODAL_ID).setTitle("티켓 안내 문구 설정");
+
+    const messageInput = new TextInputBuilder()
+      .setCustomId("message")
+      .setLabel("티켓 채널에 표시할 안내 문구")
+      .setStyle(TextInputStyle.Paragraph)
+      .setValue(getTicketMessage(interaction.guild.id))
+      .setRequired(true)
+      .setMaxLength(1000);
+
+    modal.addComponents(new ActionRowBuilder().addComponents(messageInput));
+
+    await interaction.showModal(modal);
+    return;
+  }
+
+  if (action === "post") {
+    const channelId = getTicketChannelId(interaction.guild.id);
+    const channel = channelId ? interaction.guild.channels.cache.get(channelId) : null;
+
+    if (!channel) {
+      await interaction.reply({
+        content: nya("먼저 티켓 채널을 설정해주세요. (오류 코드: TICKET-001)"),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const createButton = new ButtonBuilder()
+      .setCustomId(TICKET_CREATE_ID)
+      .setLabel("티켓 생성")
+      .setStyle(ButtonStyle.Success);
+
+    const row = new ActionRowBuilder().addComponents(createButton);
+
+    await channel.send({
+      content: getTicketMessage(interaction.guild.id),
+      components: [row],
+    });
+
+    await interaction.reply({
+      content: nya(`${channel}에 티켓 생성 버튼을 올렸습니다.`),
+      ephemeral: true,
+    });
+  }
+}
+
+async function handleTicketCreate(interaction) {
+  if (!interaction.inGuild()) {
+    await interaction.reply({
+      content: nya("서버에서만 사용할 수 있는 버튼입니다. (오류 코드: GUILD-001)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  await interaction.deferReply({ ephemeral: true });
+
+  try {
+    const thread = await interaction.channel.threads.create({
+      name: `티켓-${interaction.user.username}`,
+      type: ChannelType.PrivateThread,
+      reason: `${interaction.user.tag}님의 티켓`,
+    });
+
+    await thread.members.add(interaction.user.id);
+
+    const admins = interaction.guild.members.cache.filter(
+      (member) => !member.user.bot && member.permissions.has(PermissionFlagsBits.ManageGuild),
+    );
+
+    for (const admin of admins.values()) {
+      await thread.members.add(admin.id).catch(() => {});
+    }
+
+    await thread.send(
+      nya(`${interaction.user}님이 티켓을 생성했습니다. 관리자가 곧 도와드릴 거다`),
+    );
+
+    await interaction.editReply(nya(`티켓이 생성되었습니다: ${thread}`));
+  } catch (error) {
+    console.error(error);
+    await interaction.editReply(
+      nya("티켓을 생성하지 못했습니다. 봇의 권한을 확인해주세요. (오류 코드: TICKET-002)"),
+    );
   }
 }
 
@@ -484,6 +613,28 @@ async function handleChannelSelect(interaction) {
       content: null,
       embeds: [buildLevelUpEmbed(interaction.guild.id)],
       components: [buildLevelUpRow()],
+    });
+    return;
+  }
+
+  if (interaction.customId === TICKET_CHANNEL_SELECT_ID) {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({
+        content: nya(
+          "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
+        ),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const channelId = interaction.values[0];
+    setTicketChannel(interaction.guild.id, channelId);
+
+    await interaction.update({
+      content: null,
+      embeds: [buildTicketEmbed(interaction.guild.id)],
+      components: [buildTicketRow()],
     });
     return;
   }
@@ -789,6 +940,16 @@ async function handleButton(interaction) {
 
   if (interaction.customId.startsWith(RANK_LEVELUP_ACTION_PREFIX)) {
     await handleLevelUpActionButton(interaction);
+    return;
+  }
+
+  if (interaction.customId.startsWith(TICKET_ACTION_PREFIX)) {
+    await handleTicketActionButton(interaction);
+    return;
+  }
+
+  if (interaction.customId === TICKET_CREATE_ID) {
+    await handleTicketCreate(interaction);
     return;
   }
 
@@ -1804,6 +1965,17 @@ async function handleModalSubmit(interaction) {
     await interaction.update({
       embeds: [buildLevelUpEmbed(interaction.guild.id)],
       components: [buildLevelUpRow()],
+    });
+    return;
+  }
+
+  if (interaction.customId === TICKET_MODAL_ID) {
+    const message = interaction.fields.getTextInputValue("message").trim();
+    setTicketMessage(interaction.guild.id, message);
+
+    await interaction.update({
+      embeds: [buildTicketEmbed(interaction.guild.id)],
+      components: [buildTicketRow()],
     });
     return;
   }
