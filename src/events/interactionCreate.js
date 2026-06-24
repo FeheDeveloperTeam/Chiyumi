@@ -1431,11 +1431,21 @@ async function handleLolStatsModal(interaction) {
     return;
   }
 
+  let resultMessage = null;
+
   if (interaction.message) {
-    await interaction.message.delete().catch(() => {});
+    await interaction.deferUpdate();
+    await interaction.deleteReply().catch(() => {});
+    resultMessage = await interaction.followUp({
+      content: nya("전적을 조회하고 있습니다..."),
+      ephemeral: true,
+    });
+  } else {
+    await interaction.deferReply({ ephemeral: true });
   }
 
-  await interaction.deferReply({ ephemeral: true });
+  const updateResult = (payload) =>
+    resultMessage ? resultMessage.edit(payload) : interaction.editReply(payload);
 
   let account;
 
@@ -1443,16 +1453,12 @@ async function handleLolStatsModal(interaction) {
     account = await getAccountByRiotId(gameName, tagLine);
   } catch (error) {
     if (error.status === 404) {
-      await interaction.editReply(
-        nya(`'${riotId}' 소환사를 찾을 수 없습니다. (오류 코드: STATS-002)`),
-      );
+      await updateResult(nya(`'${riotId}' 소환사를 찾을 수 없습니다. (오류 코드: STATS-002)`));
       return;
     }
 
     console.error(error);
-    await interaction.editReply(
-      nya("전적을 불러오는 중 오류가 발생했습니다. (오류 코드: STATS-003)"),
-    );
+    await updateResult(nya("전적을 불러오는 중 오류가 발생했습니다. (오류 코드: STATS-003)"));
     return;
   }
 
@@ -1464,11 +1470,7 @@ async function handleLolStatsModal(interaction) {
     ]);
 
     if (matchIds.length === 0) {
-      await interaction.editReply(
-        nya(
-          `'${riotId}'님은 전적이 비공개라서 표시할 수 없습니다.`,
-        ),
-      );
+      await updateResult(nya(`'${riotId}'님은 전적이 비공개라서 표시할 수 없습니다.`));
       return;
     }
 
@@ -1511,12 +1513,10 @@ async function handleLolStatsModal(interaction) {
       ),
     );
 
-    await interaction.editReply({ content: null, embeds: [embed], components: [detailRow] });
+    await updateResult({ content: null, embeds: [embed], components: [detailRow] });
   } catch (error) {
     console.error(error);
-    await interaction.editReply(
-      nya("전적을 불러오는 중 오류가 발생했습니다. (오류 코드: STATS-003)"),
-    );
+    await updateResult(nya("전적을 불러오는 중 오류가 발생했습니다. (오류 코드: STATS-003)"));
   }
 }
 
@@ -1804,7 +1804,8 @@ async function handleGambleModal(interaction, game) {
   }
 
   if (interaction.message) {
-    await interaction.message.delete().catch(() => {});
+    await interaction.deferUpdate();
+    await interaction.deleteReply().catch(() => {});
   }
 
   if (game === "slot") {
@@ -1854,11 +1855,11 @@ async function playSlotGame(interaction, userId, bet) {
     return embed;
   };
 
-  await interaction.reply({ embeds: [buildEmbed(0)] });
+  const message = await interaction.followUp({ embeds: [buildEmbed(0)] });
 
   for (let revealed = 1; revealed <= reels.length; revealed += 1) {
     await slotWait(800);
-    await interaction.editReply({ embeds: [buildEmbed(revealed)] });
+    await message.edit({ embeds: [buildEmbed(revealed)] });
   }
 
   const newBalance = addBalance(userId, delta);
@@ -1866,7 +1867,7 @@ async function playSlotGame(interaction, userId, bet) {
   const multiplierText = multiplier ? ` (${multiplier}배)` : "";
 
   await slotWait(800);
-  await interaction.editReply({
+  await message.edit({
     embeds: [
       buildEmbed(
         reels.length,
@@ -1883,7 +1884,7 @@ async function playOddEvenGame(interaction, userId, bet) {
   const choice = choiceRaw === "홀" ? "odd" : choiceRaw === "짝" ? "even" : null;
 
   if (!choice) {
-    await interaction.reply({
+    await interaction.followUp({
       content: nya("홀 또는 짝 중 하나를 입력해주세요. (오류 코드: GAMBLE-003)"),
       ephemeral: true,
     });
@@ -1911,7 +1912,7 @@ async function playOddEvenGame(interaction, userId, bet) {
     })
     .setColor(0xe1aa74);
 
-  await interaction.reply({ embeds: [embed] });
+  await interaction.followUp({ embeds: [embed] });
 }
 
 async function playNumberGuessGame(interaction, userId, bet) {
@@ -1919,7 +1920,7 @@ async function playNumberGuessGame(interaction, userId, bet) {
   const guess = Number(guessText);
 
   if (!Number.isInteger(guess) || guess < 1 || guess > 10) {
-    await interaction.reply({
+    await interaction.followUp({
       content: nya("1부터 10 사이의 숫자를 입력해주세요. (오류 코드: GAMBLE-004)"),
       ephemeral: true,
     });
@@ -1945,7 +1946,7 @@ async function playNumberGuessGame(interaction, userId, bet) {
     })
     .setColor(0xe1aa74);
 
-  await interaction.reply({ embeds: [embed] });
+  await interaction.followUp({ embeds: [embed] });
 }
 
 async function playBlackjackGame(interaction, userId, bet) {
@@ -1964,7 +1965,7 @@ async function playBlackjackGame(interaction, userId, bet) {
       ? `둘 다 블랙잭! 비겼습니다. 현재 보유: ${newBalance}개`
       : `블랙잭! ${delta} 치유미코인을 획득했습니다. 현재 보유: ${newBalance}개`;
 
-    await interaction.reply({
+    await interaction.followUp({
       embeds: [buildBjEmbed(session, { revealDealer: true, result: nya(resultText) })],
     });
     return;
@@ -1982,7 +1983,7 @@ async function playBlackjackGame(interaction, userId, bet) {
 
   const row = new ActionRowBuilder().addComponents(hitButton, standButton);
 
-  await interaction.reply({
+  await interaction.followUp({
     embeds: [buildBjEmbed(session)],
     components: [row],
   });
@@ -1992,7 +1993,7 @@ async function playRpsGame(interaction, userId, bet) {
   const choiceRaw = interaction.fields.getTextInputValue("choice").trim();
 
   if (!RPS_CHOICES.includes(choiceRaw)) {
-    await interaction.reply({
+    await interaction.followUp({
       content: nya("가위, 바위, 보 중 하나를 입력해주세요. (오류 코드: GAMBLE-005)"),
       ephemeral: true,
     });
@@ -2031,7 +2032,7 @@ async function playRpsGame(interaction, userId, bet) {
     })
     .setColor(0xe1aa74);
 
-  await interaction.reply({ embeds: [embed] });
+  await interaction.followUp({ embeds: [embed] });
 }
 
 async function handleBlackjackAction(interaction) {
