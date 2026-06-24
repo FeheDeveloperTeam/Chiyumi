@@ -1,8 +1,9 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { google } = require("googleapis");
+const { JWT } = require("google-auth-library");
 
 const DATA_DIR = path.join(__dirname, "..", "..", "data");
+const SHEETS_API_BASE = "https://sheets.googleapis.com/v4/spreadsheets";
 
 const SHEET_FILES = {
   코인: "credits.json",
@@ -52,59 +53,81 @@ function objectToRows(data) {
   return [header, ...rows];
 }
 
-function getAuth() {
+function getAuthClient() {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const key = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
 
   if (!email || !key) return null;
 
-  return new google.auth.JWT({
+  return new JWT({
     email,
     key: key.replace(/\\n/g, "\n"),
     scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
 }
 
-async function ensureSheetsExist(sheets, spreadsheetId, titles) {
-  const { data } = await sheets.spreadsheets.get({ spreadsheetId });
+async function sheetsRequest(authClient, url, options = {}) {
+  const { token } = await authClient.getAccessToken();
+
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`Sheets API ${response.status}: ${text}`);
+  }
+
+  return response.json();
+}
+
+async function ensureSheetsExist(authClient, spreadsheetId, titles) {
+  const data = await sheetsRequest(authClient, `${SHEETS_API_BASE}/${spreadsheetId}`);
   const existingTitles = new Set(data.sheets.map((sheet) => sheet.properties.title));
   const missing = titles.filter((title) => !existingTitles.has(title));
 
   if (missing.length === 0) return;
 
-  await sheets.spreadsheets.batchUpdate({
-    spreadsheetId,
-    requestBody: {
+  await sheetsRequest(authClient, `${SHEETS_API_BASE}/${spreadsheetId}:batchUpdate`, {
+    method: "POST",
+    body: JSON.stringify({
       requests: missing.map((title) => ({ addSheet: { properties: { title } } })),
-    },
+    }),
   });
 }
 
 async function syncDataToSheets() {
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
-  const auth = getAuth();
+  const authClient = getAuthClient();
 
-  if (!spreadsheetId || !auth) return;
+  if (!spreadsheetId || !authClient) return;
 
-  const sheets = google.sheets({ version: "v4", auth });
   const titles = Object.keys(SHEET_FILES);
-
-  await ensureSheetsExist(sheets, spreadsheetId, titles);
+  await ensureSheetsExist(authClient, spreadsheetId, titles);
 
   for (const [title, fileName] of Object.entries(SHEET_FILES)) {
     const rows = objectToRows(readJsonFile(fileName));
+    const range = encodeURIComponent(`'${title}'!A1:Z10000`);
 
-    await sheets.spreadsheets.values.clear({
-      spreadsheetId,
-      range: `'${title}'!A1:Z10000`,
+    await sheetsRequest(authClient, `${SHEETS_API_BASE}/${spreadsheetId}/values/${range}:clear`, {
+      method: "POST",
+      body: JSON.stringify({}),
     });
 
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: `'${title}'!A1`,
-      valueInputOption: "RAW",
-      requestBody: { values: rows },
-    });
+    const updateRange = encodeURIComponent(`'${title}'!A1`);
+    await sheetsRequest(
+      authClient,
+      `${SHEETS_API_BASE}/${spreadsheetId}/values/${updateRange}?valueInputOption=RAW`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ values: rows }),
+      },
+    );
   }
 }
 
