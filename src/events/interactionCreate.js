@@ -46,6 +46,8 @@ const { buildTicketEmbed, buildTicketRow } = require("../commands/ticket");
 const { buildPetEmbed, buildPetRow } = require("../commands/pet");
 const { getAgeDays, getStage, performAction, ACTIONS } = require("../utils/pets");
 const { isDeveloper } = require("../utils/devUser");
+const { isRestricted, getRestriction, restrictUser, unrestrictUser } = require("../utils/restrictions");
+const { buildDeveloperEmbed, buildDeveloperRow } = require("../commands/developer");
 const { hasAgreed, agree } = require("../utils/consent");
 const { getAllXp, levelFromXp } = require("../utils/levels");
 const { getAllVoiceTimes } = require("../utils/voiceTime");
@@ -148,6 +150,8 @@ const TICKET_CREATE_ID = "ticket-create";
 const TICKET_MANAGE_PREFIX = "ticket-manage:";
 const TICKET_ADDUSER_SELECT_ID = "ticket-adduser-select";
 const PET_ACTION_PREFIX = "pet-action:";
+const DEV_ACTION_PREFIX = "dev-action:";
+const DEV_MODAL_PREFIX = "dev-modal:";
 
 function buildRankPage(guild, type, page) {
   const memberIds = [...guild.members.cache.values()]
@@ -580,6 +584,111 @@ async function handleTicketAddUserSelect(interaction) {
   }
 }
 
+async function handleDevAction(interaction) {
+  if (!isDeveloper(interaction.user.id)) {
+    await interaction.reply({
+      content: nya("이 기능은 개발자만 사용할 수 있습니다. (오류 코드: DEV-001)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const action = interaction.customId.slice(DEV_ACTION_PREFIX.length);
+
+  const modal = new ModalBuilder()
+    .setCustomId(`${DEV_MODAL_PREFIX}${action}`)
+    .setTitle(
+      action === "restrict"
+        ? "이용제한"
+        : action === "unrestrict"
+          ? "이용제한 해제"
+          : "이용제한 확인",
+    );
+
+  const userIdInput = new TextInputBuilder()
+    .setCustomId("user_id")
+    .setLabel("대상 사용자 ID")
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true);
+
+  modal.addComponents(new ActionRowBuilder().addComponents(userIdInput));
+
+  if (action === "restrict") {
+    const reasonInput = new TextInputBuilder()
+      .setCustomId("reason")
+      .setLabel("이용제한 이유")
+      .setStyle(TextInputStyle.Paragraph)
+      .setRequired(false)
+      .setMaxLength(500);
+
+    modal.addComponents(new ActionRowBuilder().addComponents(reasonInput));
+  }
+
+  await interaction.showModal(modal);
+}
+
+async function handleDevModal(interaction, action) {
+  if (!isDeveloper(interaction.user.id)) {
+    await interaction.reply({
+      content: nya("이 기능은 개발자만 사용할 수 있습니다. (오류 코드: DEV-001)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const targetUserId = interaction.fields.getTextInputValue("user_id").trim();
+
+  if (!/^\d{15,20}$/.test(targetUserId)) {
+    await interaction.update({
+      content: nya("올바른 사용자 ID가 아닙니다. (오류 코드: DEV-002)"),
+      embeds: [],
+      components: [],
+    });
+    return;
+  }
+
+  if (action === "restrict") {
+    const reason = interaction.fields.getTextInputValue("reason").trim();
+    restrictUser(targetUserId, reason, interaction.user.id);
+
+    await interaction.update({
+      content: nya(`<@${targetUserId}>님의 이용을 제한했습니다. 사유: ${reason || "사유 없음"}`),
+      embeds: [],
+      components: [],
+    });
+    return;
+  }
+
+  if (action === "unrestrict") {
+    const existed = unrestrictUser(targetUserId);
+
+    await interaction.update({
+      content: nya(
+        existed
+          ? `<@${targetUserId}>님의 이용제한을 해제했습니다.`
+          : `<@${targetUserId}>님은 이용제한 상태가 아닙니다.`,
+      ),
+      embeds: [],
+      components: [],
+    });
+    return;
+  }
+
+  if (action === "check") {
+    const restriction = getRestriction(targetUserId);
+
+    await interaction.update({
+      content: restriction
+        ? nya(
+            `<@${targetUserId}>님은 이용제한 상태입니다.\n사유: ${restriction.reason}\n제한 시각: ${restriction.restrictedAt}`,
+          )
+        : nya(`<@${targetUserId}>님은 이용제한 상태가 아닙니다.`),
+      embeds: [],
+      components: [],
+    });
+  }
+}
+
 async function handlePetAction(interaction) {
   const [action, ownerId] = interaction.customId.slice(PET_ACTION_PREFIX.length).split(":");
 
@@ -669,6 +778,16 @@ async function promptConsent(interaction) {
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction) {
+    if (!isDeveloper(interaction.user.id) && isRestricted(interaction.user.id)) {
+      if (interaction.isRepliable()) {
+        await interaction.reply({
+          content: nya("이용이 제한된 사용자입니다. (오류 코드: DEV-004)"),
+          ephemeral: true,
+        }).catch(() => {});
+      }
+      return;
+    }
+
     if (interaction.isChatInputCommand() && !hasAgreed(interaction.user.id)) {
       await promptConsent(interaction);
       return;
@@ -1222,6 +1341,11 @@ async function handleButton(interaction) {
 
   if (interaction.customId.startsWith(PET_ACTION_PREFIX)) {
     await handlePetAction(interaction);
+    return;
+  }
+
+  if (interaction.customId.startsWith(DEV_ACTION_PREFIX)) {
+    await handleDevAction(interaction);
     return;
   }
 
@@ -2303,6 +2427,12 @@ async function showMessageModal(interaction, setup) {
 }
 
 async function handleModalSubmit(interaction) {
+  if (interaction.customId.startsWith(DEV_MODAL_PREFIX)) {
+    const action = interaction.customId.slice(DEV_MODAL_PREFIX.length);
+    await handleDevModal(interaction, action);
+    return;
+  }
+
   if (interaction.customId === RANK_LEVELUP_MODAL_ID) {
     const message = interaction.fields.getTextInputValue("message").trim();
     setLevelUpMessage(interaction.guild.id, message);

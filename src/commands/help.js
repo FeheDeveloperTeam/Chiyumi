@@ -6,7 +6,7 @@ const {
 } = require("discord.js");
 const { nya } = require("../utils/nya");
 
-const CATEGORY_ORDER = ["게임", "경제", "정보", "관리", "유틸리티", "기타"];
+const CATEGORY_ORDER = ["게임", "경제", "정보", "관리", "유틸리티", "개발자", "기타"];
 
 function getCommandsByCategory(client) {
   const grouped = new Map();
