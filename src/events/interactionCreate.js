@@ -1,5 +1,6 @@
 const {
   ActionRowBuilder,
+  AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
   ChannelSelectMenuBuilder,
@@ -11,6 +12,7 @@ const {
   RoleSelectMenuBuilder,
   TextInputBuilder,
   TextInputStyle,
+  UserSelectMenuBuilder,
 } = require("discord.js");
 const { nya } = require("../utils/nya");
 const { getBalance, addBalance } = require("../utils/credits");
@@ -141,6 +143,8 @@ const TICKET_ACTION_PREFIX = "ticket-action:";
 const TICKET_CHANNEL_SELECT_ID = "ticket-channel-select";
 const TICKET_MODAL_ID = "ticket-modal";
 const TICKET_CREATE_ID = "ticket-create";
+const TICKET_MANAGE_PREFIX = "ticket-manage:";
+const TICKET_ADDUSER_SELECT_ID = "ticket-adduser-select";
 
 function buildRankPage(guild, type, page) {
   const memberIds = [...guild.members.cache.values()]
@@ -391,9 +395,37 @@ async function handleTicketCreate(interaction) {
       await thread.members.add(admin.id).catch(() => {});
     }
 
-    await thread.send(
-      nya(`${interaction.user}님이 티켓을 생성했습니다. 관리자가 곧 도와드릴 거다`),
+    const embed = new EmbedBuilder()
+      .setTitle("티켓")
+      .setDescription(
+        nya(`${interaction.user}님이 티켓을 생성했습니다. 관리자가 곧 도와드릴 거다`),
+      )
+      .addFields({
+        name: "관리자 전용 기능",
+        value: nya("아래 버튼들은 관리자만 사용할 수 있습니다"),
+      })
+      .setColor(0xe1aa74);
+
+    const manageRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`${TICKET_MANAGE_PREFIX}adduser`)
+        .setLabel("사용자 추가")
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(`${TICKET_MANAGE_PREFIX}close`)
+        .setLabel("닫기")
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId(`${TICKET_MANAGE_PREFIX}export`)
+        .setLabel("대화 저장")
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(`${TICKET_MANAGE_PREFIX}delete`)
+        .setLabel("삭제")
+        .setStyle(ButtonStyle.Danger),
     );
+
+    await thread.send({ embeds: [embed], components: [manageRow] });
 
     await interaction.editReply(nya(`티켓이 생성되었습니다: ${thread}`));
   } catch (error) {
@@ -401,6 +433,128 @@ async function handleTicketCreate(interaction) {
     await interaction.editReply(
       nya("티켓을 생성하지 못했습니다. 봇의 권한을 확인해주세요. (오류 코드: TICKET-002)"),
     );
+  }
+}
+
+async function handleTicketManage(interaction) {
+  if (!hasManageGuild(interaction)) {
+    await interaction.reply({
+      content: nya("이 기능은 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const action = interaction.customId.slice(TICKET_MANAGE_PREFIX.length);
+  const thread = interaction.channel;
+
+  if (action === "adduser") {
+    const userSelect = new UserSelectMenuBuilder()
+      .setCustomId(TICKET_ADDUSER_SELECT_ID)
+      .setPlaceholder("스레드에 추가할 사용자를 선택하세요")
+      .setMinValues(1)
+      .setMaxValues(1);
+
+    const row = new ActionRowBuilder().addComponents(userSelect);
+
+    await interaction.reply({
+      content: nya("추가할 사용자를 선택하세요."),
+      components: [row],
+      ephemeral: true,
+    });
+    return;
+  }
+
+  if (action === "close") {
+    await interaction.deferReply({ ephemeral: true });
+
+    const members = await thread.members.fetch();
+
+    for (const member of members.values()) {
+      if (member.id === interaction.client.user.id) continue;
+
+      const guildMember =
+        interaction.guild.members.cache.get(member.id) ??
+        (await interaction.guild.members.fetch(member.id).catch(() => null));
+
+      if (!guildMember?.permissions.has(PermissionFlagsBits.ManageGuild)) {
+        await thread.members.remove(member.id).catch(() => {});
+      }
+    }
+
+    await thread.send(nya("티켓을 닫았습니다. 관리자를 제외한 모두 열람 권한에서 제외됐다"));
+    await thread.setLocked(true).catch(() => {});
+    await thread.setArchived(true).catch(() => {});
+
+    await interaction.editReply(nya("티켓을 닫았습니다."));
+    return;
+  }
+
+  if (action === "delete") {
+    await interaction.reply({ content: nya("티켓을 삭제합니다."), ephemeral: true });
+    await thread.delete().catch(() => {});
+    return;
+  }
+
+  if (action === "export") {
+    await interaction.deferReply({ ephemeral: true });
+
+    const lines = [];
+    let beforeId;
+    let iterations = 0;
+
+    while (iterations < 20) {
+      const batch = await thread.messages.fetch({
+        limit: 100,
+        ...(beforeId ? { before: beforeId } : {}),
+      });
+
+      if (batch.size === 0) break;
+
+      for (const message of batch.values()) {
+        const timestamp = new Date(message.createdTimestamp).toISOString();
+        lines.push(`[${timestamp}] ${message.author.tag}: ${message.content}`);
+      }
+
+      beforeId = batch.last().id;
+      iterations += 1;
+
+      if (batch.size < 100) break;
+    }
+
+    lines.reverse();
+
+    const buffer = Buffer.from(lines.join("\n"), "utf-8");
+    const attachment = new AttachmentBuilder(buffer, { name: `${thread.name}.txt` });
+
+    await thread.send({ content: nya("대화 내용을 txt로 저장했습니다."), files: [attachment] });
+    await interaction.editReply(nya("대화 내용을 txt로 저장했습니다."));
+  }
+}
+
+async function handleTicketAddUserSelect(interaction) {
+  if (!hasManageGuild(interaction)) {
+    await interaction.reply({
+      content: nya("이 기능은 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const userId = interaction.values[0];
+
+  try {
+    await interaction.channel.members.add(userId);
+    await interaction.update({
+      content: nya(`<@${userId}>님을 스레드에 추가했습니다.`),
+      components: [],
+    });
+  } catch (error) {
+    console.error(error);
+    await interaction.update({
+      content: nya("사용자를 추가하지 못했습니다. (오류 코드: TICKET-003)"),
+      components: [],
+    });
   }
 }
 
@@ -484,6 +638,11 @@ module.exports = {
 
     if (interaction.isStringSelectMenu()) {
       await handleStringSelect(interaction);
+      return;
+    }
+
+    if (interaction.isUserSelectMenu()) {
+      await handleTicketAddUserSelect(interaction);
       return;
     }
 
@@ -950,6 +1109,11 @@ async function handleButton(interaction) {
 
   if (interaction.customId === TICKET_CREATE_ID) {
     await handleTicketCreate(interaction);
+    return;
+  }
+
+  if (interaction.customId.startsWith(TICKET_MANAGE_PREFIX)) {
+    await handleTicketManage(interaction);
     return;
   }
 
