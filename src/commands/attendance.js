@@ -43,7 +43,7 @@ module.exports = {
     const totalXp = addXp(userId, ATTENDANCE_XP_AMOUNT);
     const newLevel = levelFromXp(totalXp).level;
 
-    const streakText = result.streak >= 2 ? `\n${result.streak}일 연속이다` : "";
+    const streakText = result.streak >= 2 ? `\n🔥 ${result.streak}일 연속이다` : "";
 
     const embed = new EmbedBuilder()
       .setTitle("출석 체크")
