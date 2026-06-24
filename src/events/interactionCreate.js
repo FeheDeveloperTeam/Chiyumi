@@ -404,16 +404,10 @@ async function handleTicketCreate(interaction) {
       .setDescription(
         nya(`${interaction.user}님이 티켓을 생성했습니다. 관리자가 곧 도와드릴 거다`),
       )
-      .addFields(
-        {
-          name: "사용자 추가",
-          value: nya("관리자만 사용할 수 있습니다"),
-        },
-        {
-          name: "티켓 닫기",
-          value: nya("누르면 운영자만 이 스레드를 볼 수 있거나 사용할 수 있게 됩니다"),
-        },
-      )
+      .addFields({
+        name: "티켓 닫기",
+        value: nya("누르면 운영자만 이 스레드를 볼 수 있거나 사용할 수 있게 됩니다"),
+      })
       .setColor(0xe1aa74);
 
     const manageRow = new ActionRowBuilder().addComponents(
@@ -442,7 +436,7 @@ async function handleTicketManage(interaction) {
   const action = interaction.customId.slice(TICKET_MANAGE_PREFIX.length);
   const thread = interaction.channel;
 
-  if (action !== "close" && !hasManageGuild(interaction)) {
+  if (action !== "close" && action !== "adduser" && !hasManageGuild(interaction)) {
     await interaction.reply({
       content: nya("이 기능은 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)"),
       ephemeral: true,
@@ -566,14 +560,6 @@ async function handleTicketManage(interaction) {
 }
 
 async function handleTicketAddUserSelect(interaction) {
-  if (!hasManageGuild(interaction)) {
-    await interaction.reply({
-      content: nya("이 기능은 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)"),
-      ephemeral: true,
-    });
-    return;
-  }
-
   const userId = interaction.values[0];
 
   try {
