@@ -44,7 +44,7 @@ const { getCommandsByCategory, buildCategoryEmbed } = require("../commands/help"
 const { buildLevelUpEmbed, buildLevelUpRow } = require("../commands/rank");
 const { buildTicketEmbed, buildTicketRow } = require("../commands/ticket");
 const { buildPetEmbed, buildPetRow } = require("../commands/pet");
-const { getAgeDays, getStage, performAction, ACTIONS } = require("../utils/pets");
+const { getAgeDays, getStage, getMoodText, performAction, setPetName, ACTIONS } = require("../utils/pets");
 const { isDeveloper } = require("../utils/devUser");
 const { isRestricted, getRestriction, restrictUser, unrestrictUser } = require("../utils/restrictions");
 const { buildDeveloperEmbed, buildDeveloperRow } = require("../commands/developer");
@@ -150,6 +150,7 @@ const TICKET_CREATE_ID = "ticket-create";
 const TICKET_MANAGE_PREFIX = "ticket-manage:";
 const TICKET_ADDUSER_SELECT_ID = "ticket-adduser-select";
 const PET_ACTION_PREFIX = "pet-action:";
+const PET_NAME_MODAL_PREFIX = "pet-name-modal:";
 const DEV_ACTION_PREFIX = "dev-action:";
 const DEV_MODAL_PREFIX = "dev-modal:";
 
@@ -700,6 +701,24 @@ async function handlePetAction(interaction) {
     return;
   }
 
+  if (action === "name") {
+    const modal = new ModalBuilder()
+      .setCustomId(`${PET_NAME_MODAL_PREFIX}${ownerId}`)
+      .setTitle("고양이 이름 설정");
+
+    const nameInput = new TextInputBuilder()
+      .setCustomId("name")
+      .setLabel("고양이의 이름")
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true)
+      .setMaxLength(20);
+
+    modal.addComponents(new ActionRowBuilder().addComponents(nameInput));
+
+    await interaction.showModal(modal);
+    return;
+  }
+
   const result = performAction(ownerId, action);
 
   if (result.alreadyDone) {
@@ -714,12 +733,15 @@ async function handlePetAction(interaction) {
 
   const ageDays = getAgeDays(result.pet);
   const stage = getStage(ageDays);
+  const displayName = result.pet.name
+    ? `${result.pet.name} (${interaction.user.username}님의 고양이)`
+    : `${interaction.user.username}님의 고양이`;
 
   const embed = new EmbedBuilder()
-    .setTitle(`${stage.emoji} ${interaction.user.username}님의 고양이`)
+    .setTitle(`${stage.emoji} ${displayName}`)
     .setDescription(
       nya(
-        `${result.success ? "✅" : "❌"} ${ACTIONS[action].label} → ${result.message}\n${stage.name} · ${ageDays}일째 함께하고 있다`,
+        `${result.success ? "✅" : "❌"} ${ACTIONS[action].label} → ${result.message}\n${stage.name} · ${ageDays}일째 함께하고 있다 · ${getMoodText(result.pet)}`,
       ),
     )
     .addFields(
@@ -2427,6 +2449,18 @@ async function showMessageModal(interaction, setup) {
 }
 
 async function handleModalSubmit(interaction) {
+  if (interaction.customId.startsWith(PET_NAME_MODAL_PREFIX)) {
+    const ownerId = interaction.customId.slice(PET_NAME_MODAL_PREFIX.length);
+    const name = interaction.fields.getTextInputValue("name").trim();
+    const pet = setPetName(ownerId, name);
+
+    await interaction.update({
+      embeds: [buildPetEmbed(pet, interaction.user.username)],
+      components: [buildPetRow(ownerId)],
+    });
+    return;
+  }
+
   if (interaction.customId.startsWith(DEV_MODAL_PREFIX)) {
     const action = interaction.customId.slice(DEV_MODAL_PREFIX.length);
     await handleDevModal(interaction, action);

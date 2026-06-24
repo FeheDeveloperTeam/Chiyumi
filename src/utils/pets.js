@@ -5,6 +5,7 @@ const DATA_DIR = path.join(__dirname, "..", "..", "data");
 const DATA_FILE = path.join(DATA_DIR, "pets.json");
 const TIMEZONE = "Asia/Seoul";
 const DEFAULT_STAT = 80;
+const DECAY_PER_DAY = 5;
 
 const STAGES = [
   { minDays: 3650, name: "전설의 고양이", emoji: "🐉" },
@@ -42,8 +43,20 @@ const ACTIONS = {
   },
 };
 
+const MOOD_STATS = [
+  { key: "hunger", label: "배가 고파 보인다" },
+  { key: "cleanliness", label: "꾀죄죄해 보인다" },
+  { key: "affection", label: "외로워 보인다" },
+];
+
 function getKstDateString(date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: TIMEZONE }).format(date);
+}
+
+function daysBetween(fromDateString, toDateString) {
+  const from = new Date(`${fromDateString}T00:00:00+09:00`);
+  const to = new Date(`${toDateString}T00:00:00+09:00`);
+  return Math.floor((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000));
 }
 
 function loadAll() {
@@ -56,11 +69,27 @@ function saveAll(pets) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(pets, null, 2));
 }
 
-function getOrCreatePet(userId) {
-  const pets = loadAll();
+function applyDecay(pet) {
+  const today = getKstDateString();
+  const lastDecayedAt = pet.lastDecayedAt ?? pet.adoptedAt;
+  const daysPassed = daysBetween(lastDecayedAt, today);
 
-  if (!pets[userId]) {
-    pets[userId] = {
+  if (daysPassed > 0) {
+    pet.hunger = Math.max(0, pet.hunger - daysPassed * DECAY_PER_DAY);
+    pet.cleanliness = Math.max(0, pet.cleanliness - daysPassed * DECAY_PER_DAY);
+    pet.affection = Math.max(0, pet.affection - daysPassed * DECAY_PER_DAY);
+    pet.lastDecayedAt = today;
+  }
+
+  return pet;
+}
+
+function ensurePet(pets, userId) {
+  let pet = pets[userId];
+
+  if (!pet) {
+    pet = {
+      name: null,
       adoptedAt: getKstDateString(),
       hunger: DEFAULT_STAT,
       cleanliness: DEFAULT_STAT,
@@ -68,11 +97,28 @@ function getOrCreatePet(userId) {
       lastFed: null,
       lastWashed: null,
       lastPlayed: null,
+      lastDecayedAt: getKstDateString(),
     };
-    saveAll(pets);
+    pets[userId] = pet;
   }
 
-  return pets[userId];
+  applyDecay(pet);
+  return pet;
+}
+
+function getOrCreatePet(userId) {
+  const pets = loadAll();
+  const pet = ensurePet(pets, userId);
+  saveAll(pets);
+  return pet;
+}
+
+function setPetName(userId, name) {
+  const pets = loadAll();
+  const pet = ensurePet(pets, userId);
+  pet.name = name;
+  saveAll(pets);
+  return pet;
 }
 
 function getAgeDays(pet) {
@@ -85,6 +131,18 @@ function getStage(ageDays) {
   return STAGES.find((stage) => ageDays >= stage.minDays);
 }
 
+function getMoodText(pet) {
+  const worst = MOOD_STATS.reduce((min, cur) => (pet[cur.key] < pet[min.key] ? cur : min));
+
+  if (pet[worst.key] < 30) return worst.label;
+
+  const average = (pet.hunger + pet.cleanliness + pet.affection) / 3;
+
+  if (average >= 80) return "행복해 보인다";
+  if (average >= 50) return "평온해 보인다";
+  return "기운이 없어 보인다";
+}
+
 function randomBetween(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -95,13 +153,13 @@ function pickRandom(array) {
 
 function performAction(userId, action) {
   const pets = loadAll();
-  const pet = pets[userId] ?? getOrCreatePet(userId);
-  pets[userId] = pet;
+  const pet = ensurePet(pets, userId);
 
   const today = getKstDateString();
   const lastKey = LAST_KEY[action];
 
   if (pet[lastKey] === today) {
+    saveAll(pets);
     return { alreadyDone: true, pet };
   }
 
@@ -124,7 +182,9 @@ function performAction(userId, action) {
 module.exports = {
   ACTIONS,
   getOrCreatePet,
+  setPetName,
   getAgeDays,
   getStage,
+  getMoodText,
   performAction,
 };

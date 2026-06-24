@@ -6,15 +6,16 @@ const {
   SlashCommandBuilder,
 } = require("discord.js");
 const { nya } = require("../utils/nya");
-const { getOrCreatePet, getAgeDays, getStage, ACTIONS } = require("../utils/pets");
+const { getOrCreatePet, getAgeDays, getStage, getMoodText, ACTIONS } = require("../utils/pets");
 
 function buildPetEmbed(pet, username) {
   const ageDays = getAgeDays(pet);
   const stage = getStage(ageDays);
+  const displayName = pet.name ? `${pet.name} (${username}님의 고양이)` : `${username}님의 고양이`;
 
   return new EmbedBuilder()
-    .setTitle(`${stage.emoji} ${username}님의 고양이`)
-    .setDescription(nya(`${stage.name} · ${ageDays}일째 함께하고 있다`))
+    .setTitle(`${stage.emoji} ${displayName}`)
+    .setDescription(nya(`${stage.name} · ${ageDays}일째 함께하고 있다 · ${getMoodText(pet)}`))
     .addFields(
       { name: "배고픔", value: `${pet.hunger}/100`, inline: true },
       { name: "청결", value: `${pet.cleanliness}/100`, inline: true },
@@ -37,6 +38,10 @@ function buildPetRow(ownerId) {
       .setCustomId(`pet-action:play:${ownerId}`)
       .setLabel(ACTIONS.play.label)
       .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(`pet-action:name:${ownerId}`)
+      .setLabel("이름 설정")
+      .setStyle(ButtonStyle.Secondary),
   );
 }
 
