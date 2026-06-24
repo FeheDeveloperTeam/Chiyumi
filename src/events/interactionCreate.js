@@ -1431,6 +1431,10 @@ async function handleLolStatsModal(interaction) {
     return;
   }
 
+  if (interaction.message) {
+    await interaction.message.delete().catch(() => {});
+  }
+
   await interaction.deferReply({ ephemeral: true });
 
   let account;
