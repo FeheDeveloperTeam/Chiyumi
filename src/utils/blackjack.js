@@ -45,11 +45,13 @@ function isBlackjack(cards) {
   return cards.length === 2 && handTotal(cards) === 21;
 }
 
-function createSession(userId, bet) {
+function createSession(userId, bet, username, avatarURL) {
   const id = crypto.randomUUID();
   const session = {
     userId,
     bet,
+    username,
+    avatarURL,
     playerCards: [drawCard(), drawCard()],
     dealerCards: [drawCard(), drawCard()],
   };
@@ -76,6 +78,7 @@ function buildBjEmbed(session, { revealDealer = false, result = null } = {}) {
   const playerTotal = handTotal(session.playerCards);
   const embed = new EmbedBuilder()
     .setTitle("블랙잭")
+    .setAuthor({ name: session.username, iconURL: session.avatarURL })
     .addFields(
       {
         name: `내 카드 (${playerTotal})`,

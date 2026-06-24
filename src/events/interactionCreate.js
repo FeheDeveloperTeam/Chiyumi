@@ -1799,6 +1799,10 @@ async function handleGambleModal(interaction, game) {
     return;
   }
 
+  if (interaction.message) {
+    await interaction.message.delete().catch(() => {});
+  }
+
   if (game === "slot") {
     await playSlotGame(interaction, userId, bet);
     return;
@@ -1832,6 +1836,10 @@ async function playSlotGame(interaction, userId, bet) {
   const buildEmbed = (revealedCount, resultValue = null) => {
     const embed = new EmbedBuilder()
       .setTitle("슬롯머신")
+      .setAuthor({
+        name: interaction.user.username,
+        iconURL: interaction.user.displayAvatarURL(),
+      })
       .setDescription(`🎰 ${buildSlotReelText(reels, revealedCount)}`)
       .setColor(0xe1aa74);
 
@@ -1888,6 +1896,10 @@ async function playOddEvenGame(interaction, userId, bet) {
 
   const embed = new EmbedBuilder()
     .setTitle("홀짝")
+    .setAuthor({
+      name: interaction.user.username,
+      iconURL: interaction.user.displayAvatarURL(),
+    })
     .setDescription(nya(`숫자: ${number} (${resultLabel}) → ${won ? "승리" : "패배"}!`))
     .addFields({
       name: "결과",
@@ -1918,6 +1930,10 @@ async function playNumberGuessGame(interaction, userId, bet) {
 
   const embed = new EmbedBuilder()
     .setTitle("숫자맞추기")
+    .setAuthor({
+      name: interaction.user.username,
+      iconURL: interaction.user.displayAvatarURL(),
+    })
     .setDescription(nya(`정답: ${answer} → ${won ? "정답입니다" : "틀렸습니다"}!`))
     .addFields({
       name: "결과",
@@ -1929,7 +1945,12 @@ async function playNumberGuessGame(interaction, userId, bet) {
 }
 
 async function playBlackjackGame(interaction, userId, bet) {
-  const { id, session } = createBjSession(userId, bet);
+  const { id, session } = createBjSession(
+    userId,
+    bet,
+    interaction.user.username,
+    interaction.user.displayAvatarURL(),
+  );
 
   if (isBlackjack(session.playerCards)) {
     const dealerBlackjack = isBlackjack(session.dealerCards);
@@ -1995,6 +2016,10 @@ async function playRpsGame(interaction, userId, bet) {
 
   const embed = new EmbedBuilder()
     .setTitle("가위바위보")
+    .setAuthor({
+      name: interaction.user.username,
+      iconURL: interaction.user.displayAvatarURL(),
+    })
     .setDescription(nya(`나: ${choiceRaw} / 치유미: ${botChoice} → ${resultText}!`))
     .addFields({
       name: "결과",
