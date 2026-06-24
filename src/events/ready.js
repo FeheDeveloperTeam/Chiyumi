@@ -1,5 +1,8 @@
 const { Events, ActivityType } = require("discord.js");
 const { nya } = require("../utils/nya");
+const { syncDataToSheets } = require("../utils/googleSheets");
+
+const SHEETS_SYNC_INTERVAL_MS = 15 * 60 * 1000;
 
 function updatePresence(client) {
   client.user.setPresence({
@@ -14,6 +17,14 @@ function updatePresence(client) {
   });
 }
 
+async function runSheetsSync() {
+  try {
+    await syncDataToSheets();
+  } catch (error) {
+    console.error("구글 시트 동기화 실패:", error);
+  }
+}
+
 module.exports = {
   name: Events.ClientReady,
   once: true,
@@ -22,5 +33,8 @@ module.exports = {
     updatePresence(client);
     client.on(Events.GuildCreate, () => updatePresence(client));
     client.on(Events.GuildDelete, () => updatePresence(client));
+
+    runSheetsSync();
+    setInterval(runSheetsSync, SHEETS_SYNC_INTERVAL_MS);
   },
 };
