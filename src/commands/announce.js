@@ -50,10 +50,10 @@ module.exports = {
 
     const titleInput = new TextInputBuilder()
       .setCustomId("title")
-      .setLabel("공지 제목")
+      .setLabel("공지 제목 (선택)")
       .setStyle(TextInputStyle.Short)
       .setMaxLength(256)
-      .setRequired(true);
+      .setRequired(false);
 
     const contentInput = new TextInputBuilder()
       .setCustomId("content")

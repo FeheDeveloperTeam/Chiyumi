@@ -2384,7 +2384,7 @@ async function handleAnnounceModal(interaction) {
     .slice(ANNOUNCE_MODAL_PREFIX.length)
     .split(":");
 
-  const title = interaction.fields.getTextInputValue("title");
+  const title = interaction.fields.getTextInputValue("title").trim();
   const content = interaction.fields.getTextInputValue("content");
 
   const channel = interaction.guild.channels.cache.get(channelId);
@@ -2397,11 +2397,8 @@ async function handleAnnounceModal(interaction) {
     return;
   }
 
-  const embed = new EmbedBuilder()
-    .setTitle(title)
-    .setDescription(content)
-    .setColor(0xe1aa74)
-    .setTimestamp();
+  const embed = new EmbedBuilder().setDescription(content).setColor(0xe1aa74).setTimestamp();
+  if (title) embed.setTitle(title);
 
   const mentionContent =
     mention === "everyone" ? "@everyone" : mention === "here" ? "@here" : undefined;
@@ -2433,7 +2430,7 @@ async function handleAnnounceModal(interaction) {
     .addFields(
       { name: "채널", value: `${channel}` },
       { name: "작성자", value: `${interaction.user}` },
-      { name: "제목", value: title },
+      { name: "제목", value: title || "(없음)" },
     )
     .setColor(0xe1aa74)
     .setTimestamp();
