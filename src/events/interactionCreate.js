@@ -156,7 +156,7 @@ const DEV_MODAL_PREFIX = "dev-modal:";
 
 function buildRankPage(guild, type, page) {
   const memberIds = [...guild.members.cache.values()]
-    .filter((member) => !member.user.bot)
+    .filter((member) => !member.user.bot && hasAgreed(member.id))
     .map((member) => member.id);
 
   const data = type === "chat" ? getAllXp() : getAllVoiceTimes();
@@ -216,6 +216,7 @@ async function handleRankLeaderboard(interaction) {
   const type = interaction.customId.slice(RANK_ACTION_PREFIX.length);
   await interaction.deferReply({ ephemeral: true });
 
+  await interaction.guild.members.fetch().catch(() => {});
   const { embed, row } = buildRankPage(interaction.guild, type, 0);
   await interaction.editReply({ embeds: [embed], components: [row] });
 }
