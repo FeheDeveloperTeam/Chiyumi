@@ -39,6 +39,10 @@ module.exports = {
         .setCustomId("inquiry-action:bug")
         .setLabel("버그 신고")
         .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setLabel("오류 코드 안내")
+        .setStyle(ButtonStyle.Link)
+        .setURL("https://fehedeveloperteam.github.io/Chiyumi/errors.html"),
     );
 
     await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
