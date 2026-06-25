@@ -108,7 +108,7 @@ module.exports = {
     }
 
     if (message.guild) {
-      const reward = grantActivityReward(message.author.id);
+      const reward = grantActivityReward(message.guild.id, message.author.id);
 
       if (reward) {
         addBalance(message.author.id, reward.coinsGained);

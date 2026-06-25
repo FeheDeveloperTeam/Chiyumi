@@ -27,6 +27,7 @@ module.exports = {
 
   async execute(interaction) {
     const userId = interaction.user.id;
+    const guildId = interaction.guild?.id ?? "global";
     const result = claimDaily(userId);
 
     if (!result.success) {
@@ -39,8 +40,8 @@ module.exports = {
       return;
     }
 
-    const previousLevel = levelFromXp(getUserXp(userId)).level;
-    const totalXp = addXp(userId, ATTENDANCE_XP_AMOUNT);
+    const previousLevel = levelFromXp(getUserXp(guildId, userId)).level;
+    const totalXp = addXp(guildId, userId, ATTENDANCE_XP_AMOUNT);
     const newLevel = levelFromXp(totalXp).level;
 
     const streakText = result.streak >= 2 ? `\n🔥 ${result.streak}일 연속이다` : "";

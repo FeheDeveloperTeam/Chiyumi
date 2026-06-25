@@ -53,9 +53,10 @@ module.exports = {
     await interaction.deferReply();
 
     const userId = interaction.user.id;
-    const xp = getUserXp(userId);
+    const guildId = interaction.guild?.id ?? "global";
+    const xp = getUserXp(guildId, userId);
     const { level, currentLevelXp, neededXp } = levelFromXp(xp);
-    const { position } = getRank(userId);
+    const { position } = getRank(guildId, userId);
     const coinBalance = getBalance(userId);
     const avatarUrl = interaction.user.displayAvatarURL({ extension: "png", size: 256 });
 

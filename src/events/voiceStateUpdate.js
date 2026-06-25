@@ -11,9 +11,9 @@ module.exports = {
 
     if (!member.user.bot) {
       if (!oldState.channelId && newState.channelId) {
-        startSession(member.id);
+        startSession(guild.id, member.id);
       } else if (oldState.channelId && !newState.channelId) {
-        endSession(member.id);
+        endSession(guild.id, member.id);
       }
     }
 

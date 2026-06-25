@@ -159,7 +159,7 @@ function buildRankPage(guild, type, page) {
     .filter((member) => !member.user.bot && hasAgreed(member.id))
     .map((member) => member.id);
 
-  const data = type === "chat" ? getAllXp() : getAllVoiceTimes();
+  const data = type === "chat" ? getAllXp(guild.id) : getAllVoiceTimes(guild.id);
   const entries = memberIds
     .map((id) => ({ id, value: data[id] ?? 0 }))
     .sort((a, b) => b.value - a.value);

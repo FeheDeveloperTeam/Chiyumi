@@ -16,29 +16,33 @@ function saveAll(data) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
 }
 
-function startSession(userId) {
-  activeSessions.set(userId, Date.now());
+function startSession(guildId, userId) {
+  activeSessions.set(`${guildId}:${userId}`, Date.now());
 }
 
-function endSession(userId) {
-  const startedAt = activeSessions.get(userId);
+function endSession(guildId, userId) {
+  const key = `${guildId}:${userId}`;
+  const startedAt = activeSessions.get(key);
   if (!startedAt) return;
 
-  activeSessions.delete(userId);
+  activeSessions.delete(key);
 
   const elapsed = Date.now() - startedAt;
   const data = loadAll();
-  data[userId] = (data[userId] ?? 0) + elapsed;
+  const guildData = data[guildId] ?? {};
+  guildData[userId] = (guildData[userId] ?? 0) + elapsed;
+  data[guildId] = guildData;
   saveAll(data);
 }
 
-function getVoiceTimeMs(userId) {
+function getVoiceTimeMs(guildId, userId) {
   const data = loadAll();
-  return data[userId] ?? 0;
+  return data[guildId]?.[userId] ?? 0;
 }
 
-function getAllVoiceTimes() {
-  return loadAll();
+function getAllVoiceTimes(guildId) {
+  const data = loadAll();
+  return data[guildId] ?? {};
 }
 
 module.exports = { startSession, endSession, getVoiceTimeMs, getAllVoiceTimes };

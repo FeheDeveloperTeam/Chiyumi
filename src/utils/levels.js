@@ -38,20 +38,21 @@ function levelFromXp(xp) {
   return { level, currentLevelXp: remaining, neededXp: xpForLevel(level) };
 }
 
-function getUserXp(userId) {
+function getUserXp(guildId, userId) {
   const data = loadAll();
-  return data[userId]?.xp ?? 0;
+  return data[guildId]?.[userId]?.xp ?? 0;
 }
 
-function getAllXp() {
+function getAllXp(guildId) {
   const data = loadAll();
   return Object.fromEntries(
-    Object.entries(data).map(([id, value]) => [id, value.xp ?? 0]),
+    Object.entries(data[guildId] ?? {}).map(([id, value]) => [id, value.xp ?? 0]),
   );
 }
 
-function canGainXp(userId) {
-  const last = lastGainedAt.get(userId) ?? 0;
+function canGainXp(guildId, userId) {
+  const key = `${guildId}:${userId}`;
+  const last = lastGainedAt.get(key) ?? 0;
   return Date.now() - last >= XP_COOLDOWN_MS;
 }
 
@@ -59,29 +60,31 @@ function randomBetween(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function addXp(userId, amount) {
+function addXp(guildId, userId, amount) {
   const data = loadAll();
-  const current = data[userId]?.xp ?? 0;
-  data[userId] = { xp: current + amount };
+  const guildData = data[guildId] ?? {};
+  const current = guildData[userId]?.xp ?? 0;
+  guildData[userId] = { xp: current + amount };
+  data[guildId] = guildData;
   saveAll(data);
-  return data[userId].xp;
+  return guildData[userId].xp;
 }
 
-function grantActivityReward(userId) {
-  if (!canGainXp(userId)) return null;
+function grantActivityReward(guildId, userId) {
+  if (!canGainXp(guildId, userId)) return null;
 
-  lastGainedAt.set(userId, Date.now());
+  lastGainedAt.set(`${guildId}:${userId}`, Date.now());
 
   const xpGained = randomBetween(XP_MIN, XP_MAX);
   const coinsGained = randomBetween(COIN_MIN, COIN_MAX);
-  const totalXp = addXp(userId, xpGained);
+  const totalXp = addXp(guildId, userId, xpGained);
 
   return { xpGained, coinsGained, totalXp };
 }
 
-function getRank(userId) {
+function getRank(guildId, userId) {
   const data = loadAll();
-  const entries = Object.entries(data)
+  const entries = Object.entries(data[guildId] ?? {})
     .map(([id, value]) => ({ id, xp: value.xp ?? 0 }))
     .sort((a, b) => b.xp - a.xp);
 
