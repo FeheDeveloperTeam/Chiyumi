@@ -441,6 +441,21 @@ async function handleTicketCreate(interaction) {
   }
 }
 
+async function removeNonAdmins(thread, guild, botUserId) {
+  const members = await thread.members.fetch();
+
+  for (const member of members.values()) {
+    if (member.id === botUserId) continue;
+
+    const guildMember =
+      guild.members.cache.get(member.id) ?? (await guild.members.fetch(member.id).catch(() => null));
+
+    if (!guildMember?.permissions.has(PermissionFlagsBits.ManageGuild)) {
+      await thread.members.remove(member.id).catch(() => {});
+    }
+  }
+}
+
 async function handleTicketManage(interaction) {
   const action = interaction.customId.slice(TICKET_MANAGE_PREFIX.length);
   const thread = interaction.channel;
@@ -473,19 +488,7 @@ async function handleTicketManage(interaction) {
   if (action === "close") {
     await interaction.deferReply({ ephemeral: true });
 
-    const members = await thread.members.fetch();
-
-    for (const member of members.values()) {
-      if (member.id === interaction.client.user.id) continue;
-
-      const guildMember =
-        interaction.guild.members.cache.get(member.id) ??
-        (await interaction.guild.members.fetch(member.id).catch(() => null));
-
-      if (!guildMember?.permissions.has(PermissionFlagsBits.ManageGuild)) {
-        await thread.members.remove(member.id).catch(() => {});
-      }
-    }
+    await removeNonAdmins(thread, interaction.guild, interaction.client.user.id);
 
     const closedEmbed = new EmbedBuilder()
       .setTitle("티켓 닫힘")
@@ -513,6 +516,8 @@ async function handleTicketManage(interaction) {
   }
 
   if (action === "delete") {
+    await removeNonAdmins(thread, interaction.guild, interaction.client.user.id);
+
     await interaction.reply({
       content: nya("10초 후에 이 티켓 스레드가 삭제됩니다."),
       ephemeral: true,
@@ -534,6 +539,7 @@ async function handleTicketManage(interaction) {
 
   if (action === "export") {
     await interaction.deferReply({ ephemeral: true });
+    await removeNonAdmins(thread, interaction.guild, interaction.client.user.id);
 
     const lines = [];
     let beforeId;
