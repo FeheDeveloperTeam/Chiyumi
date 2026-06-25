@@ -45,6 +45,17 @@ module.exports = {
         .setURL("https://fehedeveloperteam.github.io/Chiyumi/errors.html"),
     );
 
-    await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+    const linkRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setLabel("이용약관")
+        .setStyle(ButtonStyle.Link)
+        .setURL("https://fehedeveloperteam.github.io/Chiyumi/terms.html"),
+      new ButtonBuilder()
+        .setLabel("개인정보처리방침")
+        .setStyle(ButtonStyle.Link)
+        .setURL("https://fehedeveloperteam.github.io/Chiyumi/privacy.html"),
+    );
+
+    await interaction.reply({ embeds: [embed], components: [row, linkRow], ephemeral: true });
   },
 };
