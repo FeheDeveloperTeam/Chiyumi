@@ -450,7 +450,10 @@ async function removeNonAdmins(thread, guild, botUserId) {
     const guildMember =
       guild.members.cache.get(member.id) ?? (await guild.members.fetch(member.id).catch(() => null));
 
-    if (!guildMember?.permissions.has(PermissionFlagsBits.ManageGuild)) {
+    const isHumanAdmin =
+      guildMember && !guildMember.user.bot && guildMember.permissions.has(PermissionFlagsBits.ManageGuild);
+
+    if (!isHumanAdmin) {
       await thread.members.remove(member.id).catch(() => {});
     }
   }
@@ -576,6 +579,17 @@ async function handleTicketManage(interaction) {
 
 async function handleTicketAddUserSelect(interaction) {
   const userId = interaction.values[0];
+  const targetMember =
+    interaction.guild.members.cache.get(userId) ??
+    (await interaction.guild.members.fetch(userId).catch(() => null));
+
+  if (targetMember?.user.bot) {
+    await interaction.update({
+      content: nya("봇은 티켓 스레드에 추가할 수 없습니다. (오류 코드: TICKET-003)"),
+      components: [],
+    });
+    return;
+  }
 
   try {
     await interaction.channel.members.add(userId);
