@@ -16,6 +16,8 @@ const SHEET_FILES = {
   약관동의: "consent.json",
 };
 
+const GUILD_USER_MAP_FILES = new Set(["levels.json", "voiceTime.json"]);
+
 function readJsonFile(fileName) {
   const filePath = path.join(DATA_DIR, fileName);
   if (!fs.existsSync(filePath)) return {};
@@ -50,6 +52,20 @@ function objectToRows(data) {
 
   const header = ["id", "value"];
   const rows = entries.map(([id, value]) => [id, stringifyCell(value)]);
+  return [header, ...rows];
+}
+
+function guildUserMapToRows(data) {
+  const header = ["서버ID", "유저ID", "값"];
+  const rows = [];
+
+  for (const [guildId, users] of Object.entries(data)) {
+    for (const [userId, value] of Object.entries(users)) {
+      const flatValue = value && typeof value === "object" ? value.xp : value;
+      rows.push([guildId, userId, stringifyCell(flatValue)]);
+    }
+  }
+
   return [header, ...rows];
 }
 
@@ -111,7 +127,10 @@ async function syncDataToSheets() {
   await ensureSheetsExist(authClient, spreadsheetId, titles);
 
   for (const [title, fileName] of Object.entries(SHEET_FILES)) {
-    const rows = objectToRows(readJsonFile(fileName));
+    const data = readJsonFile(fileName);
+    const rows = GUILD_USER_MAP_FILES.has(fileName)
+      ? guildUserMapToRows(data)
+      : objectToRows(data);
     const range = encodeURIComponent(`'${title}'!A1:Z10000`);
 
     await sheetsRequest(authClient, `${SHEETS_API_BASE}/${spreadsheetId}/values/${range}:clear`, {
