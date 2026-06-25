@@ -823,8 +823,11 @@ module.exports = {
   async execute(interaction) {
     if (!isDeveloper(interaction.user.id) && isRestricted(interaction.user.id)) {
       if (interaction.isRepliable()) {
+        const restriction = getRestriction(interaction.user.id);
         await interaction.reply({
-          content: nya("이용이 제한된 사용자입니다. (오류 코드: DEV-004)"),
+          content: nya(
+            `이용이 제한된 사용자입니다. 제한 사유: ${restriction?.reason ?? "사유 없음"} (오류 코드: DEV-004)`,
+          ),
           ephemeral: true,
         }).catch(() => {});
       }
