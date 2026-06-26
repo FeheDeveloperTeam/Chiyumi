@@ -1,5 +1,6 @@
 const crypto = require("node:crypto");
 const { isValidWord, firstChar, lastChar, pickBotWord } = require("./wordchainWords");
+const { isRealWord } = require("./wordchainDict");
 
 const MIN_PARTY_SIZE = 2;
 const MAX_PARTY_SIZE = 8;
@@ -207,6 +208,11 @@ async function handleMessage(message) {
 
   if (game.usedWords.has(word)) {
     await message.reply("이미 사용된 단어입니다.").catch(() => {});
+    return true;
+  }
+
+  if (!(await isRealWord(word))) {
+    await message.reply("사전에 등록된 단어가 아닙니다. 다시 시도해주세요.").catch(() => {});
     return true;
   }
 

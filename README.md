@@ -34,7 +34,8 @@ Chiyumi는 디스코드 서버 운영과 놀이 기능을 함께 제공하는 No
 - Node.js
 - discord.js
 - @napi-rs/canvas (순위 카드 이미지 생성)
-- googleapis (구글 시트 데이터 백업/뷰어 동기화, `.env`에 `GOOGLE_SHEET_ID`/`GOOGLE_SERVICE_ACCOUNT_EMAIL`/`GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` 설정 시에만 동작)
+- google-auth-library (구글 시트 데이터 백업/뷰어 동기화, `.env`에 `GOOGLE_SHEET_ID`/`GOOGLE_SERVICE_ACCOUNT_EMAIL`/`GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` 설정 시에만 동작)
+- 국립국어원 우리말샘 Open API (끝말잇기 단어 사전 검증, `.env`에 `WORDCHAIN_DICT_API_KEY` 설정 시에만 동작, 미설정 시 끝말잇기 규칙만으로 검증)
 
 ## 안내
 
