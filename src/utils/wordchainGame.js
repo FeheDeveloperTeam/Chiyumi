@@ -8,6 +8,7 @@ const MAX_PARTY_SIZE = 8;
 const TURN_DURATION_MS = 20_000;
 const BOT_THINK_DELAY_MS = 1500;
 const THREAD_DELETE_DELAY_MS = 20_000;
+const RESULT_MESSAGE_DELETE_DELAY_MS = 20_000;
 const BOT_ID = "BOT";
 
 const parties = new Map();
@@ -101,10 +102,17 @@ async function updatePartyMessageWithResult(game, thread, rankingText) {
 
   const embed = new EmbedBuilder()
     .setTitle("끝말잇기 결과")
-    .setDescription(`게임이 종료되었습니다!\n\n🏆 최종 순위\n${rankingText}`)
+    .setDescription(
+      `게임이 종료되었습니다!\n\n🏆 최종 순위\n${rankingText}\n\n${RESULT_MESSAGE_DELETE_DELAY_MS / 1000}초 후 이 메시지는 삭제됩니다.`,
+    )
     .setColor(0x95a5a6);
 
   await message.edit({ embeds: [embed], components: [] }).catch(() => {});
+
+  setTimeout(() => {
+    message.delete().catch(() => {});
+    removeParty(party.partyId);
+  }, RESULT_MESSAGE_DELETE_DELAY_MS);
 }
 
 function getCurrentPlayerId(game) {
