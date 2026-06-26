@@ -7,6 +7,7 @@ const {
   ChannelType,
   EmbedBuilder,
   Events,
+  MessageType,
   ModalBuilder,
   PermissionFlagsBits,
   RoleSelectMenuBuilder,
@@ -829,6 +830,12 @@ async function handleWordChainStart(interaction) {
     type: ChannelType.PublicThread,
     reason: `${interaction.user.tag}님의 끝말잇기 파티`,
   });
+
+  const recentMessages = await channel.messages.fetch({ limit: 1 }).catch(() => null);
+  const threadStartMessage = recentMessages?.first();
+  if (threadStartMessage?.type === MessageType.ThreadCreated) {
+    await threadStartMessage.delete().catch(() => {});
+  }
 
   for (const memberId of party.members) {
     await thread.members.add(memberId).catch(() => {});

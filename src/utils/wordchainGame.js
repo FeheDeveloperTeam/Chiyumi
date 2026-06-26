@@ -1,4 +1,5 @@
 const crypto = require("node:crypto");
+const { EmbedBuilder } = require("discord.js");
 const { isValidWord, lastChar, matchesChainStart, pickBotWord } = require("./wordchainWords");
 const { isRealWord } = require("./wordchainDict");
 
@@ -69,6 +70,7 @@ function buildGame(party) {
   const order = shuffle([...party.members, BOT_ID]);
 
   return {
+    party,
     guildId: party.guildId,
     threadId: null,
     hostId: party.hostId,
@@ -78,8 +80,31 @@ function buildGame(party) {
     usedWords: new Set(),
     lastChar: null,
     timer: null,
+    eliminationOrder: [],
     ended: false,
   };
+}
+
+function formatPlayer(id) {
+  return id === BOT_ID ? "치유미" : `<@${id}>`;
+}
+
+async function updatePartyMessageWithResult(game, thread, rankingText) {
+  const party = game.party;
+  if (!party?.messageId) return;
+
+  const channel = thread.client.channels.cache.get(party.channelId);
+  if (!channel) return;
+
+  const message = await channel.messages.fetch(party.messageId).catch(() => null);
+  if (!message) return;
+
+  const embed = new EmbedBuilder()
+    .setTitle("끝말잇기 결과")
+    .setDescription(`게임이 종료되었습니다!\n\n🏆 최종 순위\n${rankingText}`)
+    .setColor(0x95a5a6);
+
+  await message.edit({ embeds: [embed], components: [] }).catch(() => {});
 }
 
 function getCurrentPlayerId(game) {
@@ -98,11 +123,17 @@ async function endGame(game, thread, winnerId) {
   clearTimeout(game.timer);
   games.delete(game.threadId);
 
-  const winnerText = winnerId === BOT_ID ? "치유미" : winnerId ? `<@${winnerId}>` : "아무도";
+  const ranking = [winnerId, ...[...game.eliminationOrder].reverse()].filter(Boolean);
+  const rankingText = ranking.map((id, index) => `${index + 1}위: ${formatPlayer(id)}`).join("\n");
+  const winnerText = winnerId ? formatPlayer(winnerId) : "아무도";
 
   await thread
-    .send(`게임 종료! 승자: ${winnerText}\n20초 후 이 스레드가 삭제됩니다.`)
+    .send(
+      `게임 종료! 승자: ${winnerText}\n\n🏆 최종 순위\n${rankingText}\n\n20초 후 이 스레드가 삭제됩니다.`,
+    )
     .catch(() => {});
+
+  await updatePartyMessageWithResult(game, thread, rankingText);
 
   setTimeout(() => {
     thread.delete().catch(() => {});
@@ -111,6 +142,7 @@ async function endGame(game, thread, winnerId) {
 
 async function eliminate(game, thread, userId, reasonText) {
   game.aliveIds.delete(userId);
+  game.eliminationOrder.push(userId);
 
   if (userId !== BOT_ID) {
     await thread.permissionOverwrites
@@ -118,8 +150,7 @@ async function eliminate(game, thread, userId, reasonText) {
       .catch(() => {});
   }
 
-  const mentionText = userId === BOT_ID ? "치유미" : `<@${userId}>`;
-  await thread.send(`${mentionText} 탈락! (${reasonText})`).catch(() => {});
+  await thread.send(`${formatPlayer(userId)} 탈락! (${reasonText})`).catch(() => {});
 
   if (game.aliveIds.size <= 1) {
     const winnerId = [...game.aliveIds][0] ?? null;
@@ -221,7 +252,7 @@ async function handleMessage(message) {
     ]);
 
     if (!isReal) {
-      await message.reply("사전에 등록된 단어가 아닙니다. 다시 시도해주세요.").catch(() => {});
+      await message.reply("잘못된 단어입니다. 사전에 없는 단어예요. 다시 시도해주세요.").catch(() => {});
       return true;
     }
 
