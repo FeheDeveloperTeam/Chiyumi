@@ -33,6 +33,8 @@ const {
   getTicketChannelId,
   getTicketMessage,
   setTicketMessage,
+  setWordChainChannel,
+  getWordChainChannelId,
 } = require("../utils/guildConfig");
 const { buildLogContent, buildLogRows } = require("../commands/log");
 const {
@@ -72,6 +74,17 @@ const {
   createSession: createStatsSession,
   getSession: getStatsSession,
 } = require("../utils/statsSession");
+const { buildWordChainEmbed, buildWordChainRow } = require("../commands/wordchain");
+const {
+  MIN_PARTY_SIZE: WORDCHAIN_MIN_SIZE,
+  MAX_PARTY_SIZE: WORDCHAIN_MAX_SIZE,
+  createParty: createWordChainParty,
+  getParty: getWordChainParty,
+  setPartyMessageId: setWordChainPartyMessageId,
+  joinParty: joinWordChainParty,
+  removeParty: removeWordChainParty,
+  startGame: startWordChainGame,
+} = require("../utils/wordchainGame");
 
 const COIN_ACTION_PREFIX = "coin-action:";
 const BJ_ACTION_PREFIX = "bj-action:";
@@ -148,6 +161,13 @@ const TICKET_CHANNEL_SELECT_ID = "ticket-channel-select";
 const TICKET_MODAL_ID = "ticket-modal";
 const TICKET_CREATE_ID = "ticket-create";
 const TICKET_MANAGE_PREFIX = "ticket-manage:";
+const WORDCHAIN_ACTION_PREFIX = "wordchain-action:";
+const WORDCHAIN_CHANNEL_SELECT_ID = "wordchain-channel-select";
+const WORDCHAIN_CREATE_ID = "wordchain-create";
+const WORDCHAIN_SIZE_MODAL_ID = "wordchain-size-modal";
+const WORDCHAIN_JOIN_PREFIX = "wordchain-join:";
+const WORDCHAIN_START_PREFIX = "wordchain-start:";
+const WORDCHAIN_DISBAND_PREFIX = "wordchain-disband:";
 const TICKET_ADDUSER_SELECT_ID = "ticket-adduser-select";
 const PET_ACTION_PREFIX = "pet-action:";
 const PET_NAME_MODAL_PREFIX = "pet-name-modal:";
@@ -607,6 +627,258 @@ async function handleTicketAddUserSelect(interaction) {
   }
 }
 
+function buildWordChainPartyEmbed(party) {
+  const memberMentions = party.members.map((id) => `<@${id}>`).join(", ");
+
+  const embed = new EmbedBuilder()
+    .setTitle("끝말잇기 파티 모집")
+    .setDescription(
+      nya(party.started ? "게임이 시작되었습니다!" : "참가하기 버튼을 눌러 파티에 참여하세요"),
+    )
+    .addFields(
+      { name: "방장", value: `<@${party.hostId}>`, inline: true },
+      { name: "인원", value: `${party.members.length}/${party.maxSize}`, inline: true },
+      { name: "참여자", value: memberMentions },
+    )
+    .setColor(party.started ? 0x95a5a6 : 0xe1aa74);
+
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`${WORDCHAIN_JOIN_PREFIX}${party.partyId}`)
+      .setLabel("참가하기")
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(party.started),
+    new ButtonBuilder()
+      .setCustomId(`${WORDCHAIN_START_PREFIX}${party.partyId}`)
+      .setLabel("게임 시작")
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(party.started),
+    new ButtonBuilder()
+      .setCustomId(`${WORDCHAIN_DISBAND_PREFIX}${party.partyId}`)
+      .setLabel("파티 해체")
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(party.started),
+  );
+
+  return { embed, row };
+}
+
+async function handleWordChainActionButton(interaction) {
+  if (!hasManageGuild(interaction)) {
+    await interaction.reply({
+      content: nya(
+        "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
+      ),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const action = interaction.customId.slice(WORDCHAIN_ACTION_PREFIX.length);
+
+  if (action === "channel") {
+    const channelSelect = new ChannelSelectMenuBuilder()
+      .setCustomId(WORDCHAIN_CHANNEL_SELECT_ID)
+      .setPlaceholder("파티 모집 버튼을 올릴 채널을 선택하세요")
+      .addChannelTypes(ChannelType.GuildText)
+      .setMinValues(1)
+      .setMaxValues(1);
+
+    const row = new ActionRowBuilder().addComponents(channelSelect);
+
+    await interaction.update({
+      content: nya("파티 모집 버튼을 올릴 채널을 선택하세요."),
+      embeds: [],
+      components: [row],
+    });
+    return;
+  }
+
+  if (action === "post") {
+    const channelId = getWordChainChannelId(interaction.guild.id);
+    const channel = channelId ? interaction.guild.channels.cache.get(channelId) : null;
+
+    if (!channel) {
+      await interaction.reply({
+        content: nya("먼저 끝말잇기 채널을 설정해주세요. (오류 코드: WORDCHAIN-001)"),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const createButton = new ButtonBuilder()
+      .setCustomId(WORDCHAIN_CREATE_ID)
+      .setLabel("파티 만들기")
+      .setStyle(ButtonStyle.Success);
+
+    const row = new ActionRowBuilder().addComponents(createButton);
+
+    const postEmbed = new EmbedBuilder()
+      .setDescription(nya("아래 버튼을 눌러 끝말잇기 파티를 만들어보세요!"))
+      .setColor(0xe1aa74);
+
+    await channel.send({ embeds: [postEmbed], components: [row] });
+
+    await interaction.reply({
+      content: nya(`${channel}에 파티 만들기 버튼을 올렸습니다.`),
+      ephemeral: true,
+    });
+  }
+}
+
+async function handleWordChainCreate(interaction) {
+  const modal = new ModalBuilder()
+    .setCustomId(WORDCHAIN_SIZE_MODAL_ID)
+    .setTitle("끝말잇기 파티 만들기");
+
+  const sizeInput = new TextInputBuilder()
+    .setCustomId("max_size")
+    .setLabel(`최대 인원 (${WORDCHAIN_MIN_SIZE}~${WORDCHAIN_MAX_SIZE})`)
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder("예: 4")
+    .setValue("4")
+    .setRequired(true)
+    .setMaxLength(1);
+
+  modal.addComponents(new ActionRowBuilder().addComponents(sizeInput));
+
+  await interaction.showModal(modal);
+}
+
+async function handleWordChainSizeModal(interaction) {
+  const sizeText = interaction.fields.getTextInputValue("max_size").trim();
+  const maxSize = Number(sizeText);
+
+  if (
+    !Number.isInteger(maxSize) ||
+    maxSize < WORDCHAIN_MIN_SIZE ||
+    maxSize > WORDCHAIN_MAX_SIZE
+  ) {
+    await interaction.reply({
+      content: nya(
+        `최대 인원은 ${WORDCHAIN_MIN_SIZE}~${WORDCHAIN_MAX_SIZE} 사이의 숫자여야 합니다. (오류 코드: WORDCHAIN-002)`,
+      ),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const party = createWordChainParty({
+    guildId: interaction.guild.id,
+    channelId: interaction.channel.id,
+    hostId: interaction.user.id,
+    maxSize,
+  });
+
+  const { embed, row } = buildWordChainPartyEmbed(party);
+
+  await interaction.reply({ embeds: [embed], components: [row] });
+  const message = await interaction.fetchReply();
+  setWordChainPartyMessageId(party.partyId, message.id);
+}
+
+async function handleWordChainJoin(interaction) {
+  const partyId = interaction.customId.slice(WORDCHAIN_JOIN_PREFIX.length);
+  const result = joinWordChainParty(partyId, interaction.user.id);
+
+  if (!result.ok) {
+    const messages = {
+      not_found: "해당 파티를 찾을 수 없습니다. (오류 코드: WORDCHAIN-003)",
+      started: "이미 시작된 파티입니다. (오류 코드: WORDCHAIN-004)",
+      already_joined: "이미 참여한 파티입니다. (오류 코드: WORDCHAIN-005)",
+      full: "파티 인원이 가득 찼습니다. (오류 코드: WORDCHAIN-006)",
+    };
+
+    await interaction.reply({
+      content: nya(messages[result.reason] ?? "참가할 수 없습니다."),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const { embed, row } = buildWordChainPartyEmbed(result.party);
+  await interaction.update({ embeds: [embed], components: [row] });
+}
+
+async function handleWordChainStart(interaction) {
+  const partyId = interaction.customId.slice(WORDCHAIN_START_PREFIX.length);
+  const party = getWordChainParty(partyId);
+
+  if (!party) {
+    await interaction.reply({
+      content: nya("해당 파티를 찾을 수 없습니다. (오류 코드: WORDCHAIN-003)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  if (interaction.user.id !== party.hostId) {
+    await interaction.reply({
+      content: nya("방장만 게임을 시작할 수 있습니다. (오류 코드: WORDCHAIN-007)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  await interaction.deferUpdate();
+
+  const channel = interaction.guild.channels.cache.get(party.channelId);
+
+  const thread = await channel.threads.create({
+    name: `끝말잇기-${interaction.user.username}`,
+    type: ChannelType.PublicThread,
+    reason: `${interaction.user.tag}님의 끝말잇기 파티`,
+  });
+
+  for (const memberId of party.members) {
+    await thread.members.add(memberId).catch(() => {});
+  }
+
+  party.started = true;
+
+  const mentions = party.members.map((id) => `<@${id}>`).join(" ");
+  await thread.send(nya(`${mentions}\n끝말잇기를 시작합니다! 치유미도 함께한다`));
+
+  const { embed, row } = buildWordChainPartyEmbed(party);
+  await interaction.editReply({
+    content: nya(`게임이 시작되었습니다: ${thread}`),
+    embeds: [embed],
+    components: [row],
+  });
+
+  await startWordChainGame(thread, party);
+}
+
+async function handleWordChainDisband(interaction) {
+  const partyId = interaction.customId.slice(WORDCHAIN_DISBAND_PREFIX.length);
+  const party = getWordChainParty(partyId);
+
+  if (!party) {
+    await interaction.reply({
+      content: nya("해당 파티를 찾을 수 없습니다. (오류 코드: WORDCHAIN-003)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  if (interaction.user.id !== party.hostId) {
+    await interaction.reply({
+      content: nya("방장만 파티를 해체할 수 있습니다. (오류 코드: WORDCHAIN-007)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  removeWordChainParty(partyId);
+
+  const embed = new EmbedBuilder()
+    .setTitle("끝말잇기 파티 모집")
+    .setDescription(nya("방장이 파티를 해체했습니다."))
+    .setColor(0xed4245);
+
+  await interaction.update({ embeds: [embed], components: [] });
+}
+
 async function handleDevAction(interaction) {
   if (!isDeveloper(interaction.user.id)) {
     await interaction.reply({
@@ -1029,6 +1301,28 @@ async function handleChannelSelect(interaction) {
     return;
   }
 
+  if (interaction.customId === WORDCHAIN_CHANNEL_SELECT_ID) {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({
+        content: nya(
+          "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
+        ),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const channelId = interaction.values[0];
+    setWordChainChannel(interaction.guild.id, channelId);
+
+    await interaction.update({
+      content: null,
+      embeds: [buildWordChainEmbed(interaction.guild.id)],
+      components: [buildWordChainRow()],
+    });
+    return;
+  }
+
   if (interaction.customId === WELCOME_CHANNEL_SELECT_ID) {
     if (!hasManageGuild(interaction)) {
       await interaction.reply({
@@ -1383,6 +1677,31 @@ async function handleButton(interaction) {
 
   if (interaction.customId.startsWith(TICKET_MANAGE_PREFIX)) {
     await handleTicketManage(interaction);
+    return;
+  }
+
+  if (interaction.customId.startsWith(WORDCHAIN_ACTION_PREFIX)) {
+    await handleWordChainActionButton(interaction);
+    return;
+  }
+
+  if (interaction.customId === WORDCHAIN_CREATE_ID) {
+    await handleWordChainCreate(interaction);
+    return;
+  }
+
+  if (interaction.customId.startsWith(WORDCHAIN_JOIN_PREFIX)) {
+    await handleWordChainJoin(interaction);
+    return;
+  }
+
+  if (interaction.customId.startsWith(WORDCHAIN_START_PREFIX)) {
+    await handleWordChainStart(interaction);
+    return;
+  }
+
+  if (interaction.customId.startsWith(WORDCHAIN_DISBAND_PREFIX)) {
+    await handleWordChainDisband(interaction);
     return;
   }
 
@@ -2488,6 +2807,11 @@ async function showMessageModal(interaction, setup) {
 }
 
 async function handleModalSubmit(interaction) {
+  if (interaction.customId === WORDCHAIN_SIZE_MODAL_ID) {
+    await handleWordChainSizeModal(interaction);
+    return;
+  }
+
   if (interaction.customId.startsWith(PET_NAME_MODAL_PREFIX)) {
     const ownerId = interaction.customId.slice(PET_NAME_MODAL_PREFIX.length);
     const name = interaction.fields.getTextInputValue("name").trim();

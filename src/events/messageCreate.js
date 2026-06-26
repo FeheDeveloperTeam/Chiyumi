@@ -6,6 +6,7 @@ const { getLogOptions, sendLog } = require("../utils/guildConfig");
 const { grantActivityReward, levelFromXp } = require("../utils/levels");
 const { addBalance } = require("../utils/credits");
 const { announceLevelUp } = require("../utils/levelUpAnnounce");
+const { handleMessage: handleWordChainMessage } = require("../utils/wordchainGame");
 
 const CALL_NAME_PATTERN = /^유미야[,!~]?\s*(.*)$/s;
 
@@ -88,6 +89,10 @@ module.exports = {
   name: Events.MessageCreate,
   async execute(message) {
     if (message.author.bot) return;
+
+    if (message.channel.isThread() && (await handleWordChainMessage(message))) {
+      return;
+    }
 
     if (
       message.guild &&

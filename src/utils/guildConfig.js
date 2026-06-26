@@ -168,6 +168,17 @@ function getTicketMessage(guildId) {
   return configs[guildId]?.ticketMessage ?? DEFAULT_TICKET_MESSAGE;
 }
 
+function setWordChainChannel(guildId, channelId) {
+  const configs = loadAll();
+  configs[guildId] = { ...(configs[guildId] ?? {}), wordChainChannelId: channelId };
+  saveAll(configs);
+}
+
+function getWordChainChannelId(guildId) {
+  const configs = loadAll();
+  return configs[guildId]?.wordChainChannelId ?? null;
+}
+
 module.exports = {
   setLogChannel,
   getLogChannelId,
@@ -192,4 +203,6 @@ module.exports = {
   setTicketMessage,
   getTicketMessage,
   DEFAULT_TICKET_MESSAGE,
+  setWordChainChannel,
+  getWordChainChannelId,
 };
