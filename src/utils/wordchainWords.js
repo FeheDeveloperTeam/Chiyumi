@@ -89,13 +89,29 @@ function matchesChainStart(word, requiredChar) {
   return start === requiredChar || start === applyDueum(requiredChar);
 }
 
-function pickBotWord(requiredChar, usedWords) {
+async function pickBotWord(requiredChar, usedWords) {
   const candidates = WORD_LIST.filter(
     (word) => !usedWords.has(word) && matchesChainStart(word, requiredChar),
   );
 
-  if (candidates.length === 0) return null;
-  return candidates[Math.floor(Math.random() * candidates.length)];
+  if (candidates.length > 0) {
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  }
+
+  if (!requiredChar) return null;
+
+  const { findWordsStartingWith } = require("./wordchainDict");
+  const dueumChar = applyDueum(requiredChar);
+  const searchChars = dueumChar === requiredChar ? [requiredChar] : [requiredChar, dueumChar];
+
+  for (const char of searchChars) {
+    const found = await findWordsStartingWith(char, usedWords);
+    if (found.length > 0) {
+      return found[Math.floor(Math.random() * found.length)];
+    }
+  }
+
+  return null;
 }
 
 module.exports = {

@@ -174,7 +174,7 @@ async function promptTurn(game, thread) {
 
     await new Promise((resolve) => setTimeout(resolve, BOT_THINK_DELAY_MS));
 
-    const botWord = pickBotWord(game.lastChar, game.usedWords);
+    const botWord = await pickBotWord(game.lastChar, game.usedWords);
 
     if (!botWord) {
       const ended = await eliminate(game, thread, BOT_ID, "더 이상 이어갈 단어가 없습니다");

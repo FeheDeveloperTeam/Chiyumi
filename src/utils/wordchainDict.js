@@ -36,4 +36,30 @@ async function isRealWord(word) {
   }
 }
 
-module.exports = { isRealWord };
+async function findWordsStartingWith(char, excludeSet) {
+  const apiKey = getApiKey();
+  if (!apiKey) return [];
+
+  const url = `${API_BASE}?key=${apiKey}&q=${encodeURIComponent(char)}&req_type=json&method=start&num=100`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    const words = (data?.channel?.item ?? []).map((item) => item.word);
+    const valid = words.filter(
+      (word) => /^[가-힣]{2,6}$/.test(word) && word[0] === char && !excludeSet.has(word),
+    );
+
+    return [...new Set(valid)];
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+module.exports = { isRealWord, findWordsStartingWith };
