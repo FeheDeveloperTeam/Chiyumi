@@ -1,6 +1,6 @@
 const API_BASE = "https://opendict.korean.go.kr/api/search";
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const REQUEST_TIMEOUT_MS = 3000;
+const REQUEST_TIMEOUT_MS = 5000;
 
 const cache = new Map();
 
@@ -21,7 +21,7 @@ async function isRealWord(word) {
 
   try {
     const response = await fetch(url, { signal: controller.signal });
-    if (!response.ok) return true;
+    if (!response.ok) return false;
 
     const data = await response.json();
     const total = Number(data?.channel?.total ?? 0);
@@ -30,7 +30,7 @@ async function isRealWord(word) {
     cache.set(word, { result, expiresAt: Date.now() + CACHE_TTL_MS });
     return result;
   } catch {
-    return true;
+    return false;
   } finally {
     clearTimeout(timeout);
   }
