@@ -1,5 +1,5 @@
 const crypto = require("node:crypto");
-const { isValidWord, firstChar, lastChar, pickBotWord } = require("./wordchainWords");
+const { isValidWord, lastChar, matchesChainStart, pickBotWord } = require("./wordchainWords");
 const { isRealWord } = require("./wordchainDict");
 
 const MIN_PARTY_SIZE = 2;
@@ -205,7 +205,7 @@ async function handleMessage(message) {
       return true;
     }
 
-    if (game.lastChar && firstChar(word) !== game.lastChar) {
+    if (!matchesChainStart(word, game.lastChar)) {
       await message.reply(`'${game.lastChar}'로 시작하는 단어가 아닙니다.`).catch(() => {});
       return true;
     }

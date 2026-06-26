@@ -27,6 +27,49 @@ const WORD_LIST = [
   "호박", "화분", "회전목마", "후추",
 ];
 
+const HANGUL_BASE = 0xac00;
+const JUNGSEONG_COUNT = 21;
+const JONGSEONG_COUNT = 28;
+const Y_VOWEL_INDICES = new Set([2, 6, 7, 12, 17, 20]); // ㅑㅕㅖㅛㅠㅣ
+const CHO_RIEUL = 5; // ㄹ
+const CHO_NIEUN = 2; // ㄴ
+const CHO_IEUNG = 11; // ㅇ (소리값 없음)
+
+function decompose(char) {
+  const code = char.charCodeAt(0) - HANGUL_BASE;
+  if (code < 0 || code > 11171) return null;
+
+  const choIdx = Math.floor(code / (JUNGSEONG_COUNT * JONGSEONG_COUNT));
+  const jungIdx = Math.floor((code % (JUNGSEONG_COUNT * JONGSEONG_COUNT)) / JONGSEONG_COUNT);
+  const jongIdx = code % JONGSEONG_COUNT;
+  return { choIdx, jungIdx, jongIdx };
+}
+
+function compose(choIdx, jungIdx, jongIdx) {
+  return String.fromCharCode(
+    HANGUL_BASE + choIdx * JUNGSEONG_COUNT * JONGSEONG_COUNT + jungIdx * JONGSEONG_COUNT + jongIdx,
+  );
+}
+
+// 두음법칙: 어두에서 ㄹ→ㄴ/ㅇ, ㄴ→ㅇ(이중모음/'ㅣ' 앞)으로 바뀌는 한국어 발음 규칙
+function applyDueum(char) {
+  const decomposed = decompose(char);
+  if (!decomposed) return char;
+
+  const { choIdx, jungIdx, jongIdx } = decomposed;
+  const isYVowel = Y_VOWEL_INDICES.has(jungIdx);
+
+  if (choIdx === CHO_RIEUL) {
+    return compose(isYVowel ? CHO_IEUNG : CHO_NIEUN, jungIdx, jongIdx);
+  }
+
+  if (choIdx === CHO_NIEUN && isYVowel) {
+    return compose(CHO_IEUNG, jungIdx, jongIdx);
+  }
+
+  return char;
+}
+
 function isValidWord(word) {
   return /^[가-힣]{2,}$/.test(word);
 }
@@ -39,13 +82,28 @@ function lastChar(word) {
   return word[word.length - 1];
 }
 
+function matchesChainStart(word, requiredChar) {
+  if (!requiredChar) return true;
+
+  const start = firstChar(word);
+  return start === requiredChar || start === applyDueum(requiredChar);
+}
+
 function pickBotWord(requiredChar, usedWords) {
   const candidates = WORD_LIST.filter(
-    (word) => !usedWords.has(word) && (!requiredChar || firstChar(word) === requiredChar),
+    (word) => !usedWords.has(word) && matchesChainStart(word, requiredChar),
   );
 
   if (candidates.length === 0) return null;
   return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
-module.exports = { WORD_LIST, isValidWord, firstChar, lastChar, pickBotWord };
+module.exports = {
+  WORD_LIST,
+  isValidWord,
+  firstChar,
+  lastChar,
+  applyDueum,
+  matchesChainStart,
+  pickBotWord,
+};
