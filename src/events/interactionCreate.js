@@ -153,6 +153,7 @@ const PET_ACTION_PREFIX = "pet-action:";
 const PET_NAME_MODAL_PREFIX = "pet-name-modal:";
 const DEV_ACTION_PREFIX = "dev-action:";
 const DEV_MODAL_PREFIX = "dev-modal:";
+const DEV_GRANT_MAX_AMOUNT = 1_000_000;
 
 function buildRankPage(guild, type, page) {
   const memberIds = [...guild.members.cache.values()]
@@ -1587,9 +1588,15 @@ async function handleDevGrantModal(interaction, direction) {
     return;
   }
 
-  if (!Number.isInteger(rawAmount) || rawAmount <= 0) {
+  if (
+    !Number.isInteger(rawAmount) ||
+    rawAmount <= 0 ||
+    rawAmount > DEV_GRANT_MAX_AMOUNT
+  ) {
     await interaction.reply({
-      content: nya("올바른 금액이 아닙니다. (오류 코드: DEV-003)"),
+      content: nya(
+        `올바른 금액이 아닙니다. 1~${DEV_GRANT_MAX_AMOUNT}개까지만 가능합니다. (오류 코드: DEV-003)`,
+      ),
       ephemeral: true,
     });
     return;
