@@ -193,36 +193,51 @@ async function handleMessage(message) {
 
   const currentId = getCurrentPlayerId(game);
   if (message.author.id !== currentId) return true;
+  if (game.processing) return true;
 
-  const word = message.content.trim();
+  game.processing = true;
 
-  if (!isValidWord(word)) {
-    await message.reply("2글자 이상의 한글 단어만 가능합니다. 다시 시도해주세요.").catch(() => {});
+  try {
+    const word = message.content.trim();
+
+    if (!isValidWord(word)) {
+      await message.reply("2글자 이상의 한글 단어만 가능합니다. 다시 시도해주세요.").catch(() => {});
+      return true;
+    }
+
+    if (game.lastChar && firstChar(word) !== game.lastChar) {
+      await message.reply(`'${game.lastChar}'로 시작하는 단어가 아닙니다.`).catch(() => {});
+      return true;
+    }
+
+    if (game.usedWords.has(word)) {
+      await message.reply("이미 사용된 단어입니다.").catch(() => {});
+      return true;
+    }
+
+    const isReal = await Promise.race([
+      isRealWord(word).catch(() => true),
+      new Promise((resolve) => setTimeout(() => resolve(true), 4000)),
+    ]);
+
+    if (!isReal) {
+      await message.reply("사전에 등록된 단어가 아닙니다. 다시 시도해주세요.").catch(() => {});
+      return true;
+    }
+
+    clearTimeout(game.timer);
+    game.usedWords.add(word);
+    game.lastChar = lastChar(word);
+
+    advanceTurnIndex(game);
+    await promptTurn(game, message.channel);
     return true;
-  }
-
-  if (game.lastChar && firstChar(word) !== game.lastChar) {
-    await message.reply(`'${game.lastChar}'로 시작하는 단어가 아닙니다.`).catch(() => {});
+  } catch (error) {
+    console.error("끝말잇기 메시지 처리 오류:", error);
     return true;
+  } finally {
+    game.processing = false;
   }
-
-  if (game.usedWords.has(word)) {
-    await message.reply("이미 사용된 단어입니다.").catch(() => {});
-    return true;
-  }
-
-  if (!(await isRealWord(word))) {
-    await message.reply("사전에 등록된 단어가 아닙니다. 다시 시도해주세요.").catch(() => {});
-    return true;
-  }
-
-  clearTimeout(game.timer);
-  game.usedWords.add(word);
-  game.lastChar = lastChar(word);
-
-  advanceTurnIndex(game);
-  await promptTurn(game, message.channel);
-  return true;
 }
 
 module.exports = {

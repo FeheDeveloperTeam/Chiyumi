@@ -841,7 +841,7 @@ async function handleWordChainStart(interaction) {
 
   const { embed, row } = buildWordChainPartyEmbed(party);
   await interaction.editReply({
-    content: nya(`게임이 시작되었습니다: ${thread}`),
+    content: null,
     embeds: [embed],
     components: [row],
   });
