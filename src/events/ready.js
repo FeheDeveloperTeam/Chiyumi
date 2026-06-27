@@ -17,9 +17,9 @@ function updatePresence(client) {
   });
 }
 
-async function runSheetsSync() {
+async function runSheetsSync(client) {
   try {
-    await syncDataToSheets();
+    await syncDataToSheets(client);
   } catch (error) {
     console.error("구글 시트 동기화 실패:", error);
   }
@@ -34,7 +34,7 @@ module.exports = {
     client.on(Events.GuildCreate, () => updatePresence(client));
     client.on(Events.GuildDelete, () => updatePresence(client));
 
-    runSheetsSync();
-    setInterval(runSheetsSync, SHEETS_SYNC_INTERVAL_MS);
+    runSheetsSync(client);
+    setInterval(() => runSheetsSync(client), SHEETS_SYNC_INTERVAL_MS);
   },
 };

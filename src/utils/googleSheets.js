@@ -69,6 +69,14 @@ function guildUserMapToRows(data) {
   return [header, ...rows];
 }
 
+function buildGuildListRows(client) {
+  const header = ["서버ID", "서버이름"];
+  if (!client) return [header];
+
+  const rows = [...client.guilds.cache.values()].map((guild) => [guild.id, guild.name]);
+  return [header, ...rows];
+}
+
 function getAuthClient() {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const key = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
@@ -117,13 +125,32 @@ async function ensureSheetsExist(authClient, spreadsheetId, titles) {
   });
 }
 
-async function syncDataToSheets() {
+async function writeSheet(authClient, spreadsheetId, title, rows) {
+  const range = encodeURIComponent(`'${title}'!A1:Z10000`);
+
+  await sheetsRequest(authClient, `${SHEETS_API_BASE}/${spreadsheetId}/values/${range}:clear`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+
+  const updateRange = encodeURIComponent(`'${title}'!A1`);
+  await sheetsRequest(
+    authClient,
+    `${SHEETS_API_BASE}/${spreadsheetId}/values/${updateRange}?valueInputOption=RAW`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ values: rows }),
+    },
+  );
+}
+
+async function syncDataToSheets(client) {
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
   const authClient = getAuthClient();
 
   if (!spreadsheetId || !authClient) return;
 
-  const titles = Object.keys(SHEET_FILES);
+  const titles = [...Object.keys(SHEET_FILES), "서버목록"];
   await ensureSheetsExist(authClient, spreadsheetId, titles);
 
   for (const [title, fileName] of Object.entries(SHEET_FILES)) {
@@ -131,23 +158,10 @@ async function syncDataToSheets() {
     const rows = GUILD_USER_MAP_FILES.has(fileName)
       ? guildUserMapToRows(data)
       : objectToRows(data);
-    const range = encodeURIComponent(`'${title}'!A1:Z10000`);
-
-    await sheetsRequest(authClient, `${SHEETS_API_BASE}/${spreadsheetId}/values/${range}:clear`, {
-      method: "POST",
-      body: JSON.stringify({}),
-    });
-
-    const updateRange = encodeURIComponent(`'${title}'!A1`);
-    await sheetsRequest(
-      authClient,
-      `${SHEETS_API_BASE}/${spreadsheetId}/values/${updateRange}?valueInputOption=RAW`,
-      {
-        method: "PUT",
-        body: JSON.stringify({ values: rows }),
-      },
-    );
+    await writeSheet(authClient, spreadsheetId, title, rows);
   }
+
+  await writeSheet(authClient, spreadsheetId, "서버목록", buildGuildListRows(client));
 }
 
 module.exports = { syncDataToSheets };
