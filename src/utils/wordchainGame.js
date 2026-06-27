@@ -169,6 +169,26 @@ async function eliminate(game, thread, userId, reasonText) {
   return false;
 }
 
+function armTurnTimer(game, thread, currentId, durationMs = TURN_DURATION_MS) {
+  game.timer = setTimeout(async () => {
+    // 같은 턴의 메시지가 마침 처리 중이면(특히 사전 확인 대기 중) 타임아웃을 건너뛰고
+    // 메시지 처리가 끝나도록 양보한다 (중복 탈락/턴 중복 진행 방지용 이중 안전장치)
+    if (game.processing) return;
+    if (getCurrentPlayerId(game) !== currentId) return;
+
+    game.processing = true;
+    try {
+      const ended = await eliminate(game, thread, currentId, "제한시간 초과");
+      if (!ended) {
+        advanceTurnIndex(game);
+        await promptTurn(game, thread);
+      }
+    } finally {
+      game.processing = false;
+    }
+  }, durationMs);
+}
+
 async function promptTurn(game, thread) {
   if (game.ended) return;
 
@@ -206,13 +226,7 @@ async function promptTurn(game, thread) {
     .send(`<@${currentId}>님의 차례입니다! ${constraintText} (제한시간 ${TURN_DURATION_MS / 1000}초)`)
     .catch(() => {});
 
-  game.timer = setTimeout(async () => {
-    const ended = await eliminate(game, thread, currentId, "제한시간 초과");
-    if (!ended) {
-      advanceTurnIndex(game);
-      await promptTurn(game, thread);
-    }
-  }, TURN_DURATION_MS);
+  armTurnTimer(game, thread, currentId);
 }
 
 async function startGame(thread, party) {
@@ -235,22 +249,26 @@ async function handleMessage(message) {
   if (game.processing) return true;
 
   game.processing = true;
+  clearTimeout(game.timer);
 
   try {
     const word = message.content.trim();
 
     if (!isValidWord(word)) {
       await message.reply("2글자 이상의 한글 단어만 가능합니다. 다시 시도해주세요.").catch(() => {});
+      armTurnTimer(game, message.channel, currentId);
       return true;
     }
 
     if (!matchesChainStart(word, game.lastChar)) {
       await message.reply(`'${game.lastChar}'로 시작하는 단어가 아닙니다.`).catch(() => {});
+      armTurnTimer(game, message.channel, currentId);
       return true;
     }
 
     if (game.usedWords.has(word)) {
       await message.reply("이미 사용된 단어입니다.").catch(() => {});
+      armTurnTimer(game, message.channel, currentId);
       return true;
     }
 
@@ -261,10 +279,10 @@ async function handleMessage(message) {
 
     if (!isReal) {
       await message.reply("잘못된 단어입니다. 사전에 없는 단어예요. 다시 시도해주세요.").catch(() => {});
+      armTurnTimer(game, message.channel, currentId);
       return true;
     }
 
-    clearTimeout(game.timer);
     game.usedWords.add(word);
     game.lastChar = lastChar(word);
 
@@ -273,6 +291,7 @@ async function handleMessage(message) {
     return true;
   } catch (error) {
     console.error("끝말잇기 메시지 처리 오류:", error);
+    armTurnTimer(game, message.channel, currentId);
     return true;
   } finally {
     game.processing = false;
