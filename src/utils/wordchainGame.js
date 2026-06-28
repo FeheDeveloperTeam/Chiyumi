@@ -274,7 +274,7 @@ async function handleMessage(message) {
 
     const isReal = await Promise.race([
       isRealWord(word).catch(() => false),
-      new Promise((resolve) => setTimeout(() => resolve(false), 7000)),
+      new Promise((resolve) => setTimeout(() => resolve(false), 12000)),
     ]);
 
     if (!isReal) {
