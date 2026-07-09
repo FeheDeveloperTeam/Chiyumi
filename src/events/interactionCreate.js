@@ -76,6 +76,10 @@ const {
   getSession: getStatsSession,
 } = require("../utils/statsSession");
 const { buildWordChainEmbed, buildWordChainRow } = require("../commands/wordchain");
+const { buildMarketEmbed, buildPortfolioEmbed, buildStockRow } = require("../commands/stock");
+const { buildBankEmbed, buildBankRow } = require("../commands/bank");
+const { getStockDef, getCurrentPrices, getPortfolio, buyStock, sellStock } = require("../utils/stocks");
+const { getAccount, getTotalOwed, deposit, withdraw, takeLoan, repayLoan, MAX_LOAN, MIN_LOAN } = require("../utils/bank");
 const {
   MIN_PARTY_SIZE: WORDCHAIN_MIN_SIZE,
   MAX_PARTY_SIZE: WORDCHAIN_MAX_SIZE,
@@ -175,6 +179,13 @@ const PET_NAME_MODAL_PREFIX = "pet-name-modal:";
 const DEV_ACTION_PREFIX = "dev-action:";
 const DEV_MODAL_PREFIX = "dev-modal:";
 const DEV_GRANT_MAX_AMOUNT = 1_000_000;
+const STOCK_ACTION_PREFIX = "stock-action:";
+const STOCK_BUY_MODAL_ID = "stock-modal:buy";
+const STOCK_SELL_MODAL_ID = "stock-modal:sell";
+const BANK_ACTION_PREFIX = "bank-action:";
+const BANK_DEPOSIT_MODAL_ID = "bank-modal:deposit";
+const BANK_WITHDRAW_MODAL_ID = "bank-modal:withdraw";
+const BANK_LOAN_MODAL_ID = "bank-modal:loan";
 
 function buildRankPage(guild, type, page) {
   const memberIds = [...guild.members.cache.values()]
@@ -991,6 +1002,382 @@ async function handleDevModal(interaction, action) {
   }
 }
 
+async function handleStockAction(interaction) {
+  const action = interaction.customId.slice(STOCK_ACTION_PREFIX.length);
+  const userId = interaction.user.id;
+
+  if (action === "refresh") {
+    await interaction.update({
+      embeds: [buildMarketEmbed()],
+      components: [buildStockRow()],
+    });
+    return;
+  }
+
+  if (action === "portfolio") {
+    await interaction.reply({
+      embeds: [buildPortfolioEmbed(userId)],
+      ephemeral: true,
+    });
+    return;
+  }
+
+  if (action === "buy") {
+    const prices = getCurrentPrices();
+    const tickerList = Object.entries(prices)
+      .map(([id, p]) => `${id}: ${p.toLocaleString()}코인`)
+      .join(", ");
+
+    const modal = new ModalBuilder()
+      .setCustomId(STOCK_BUY_MODAL_ID)
+      .setTitle("주식 매수");
+
+    const tickerInput = new TextInputBuilder()
+      .setCustomId("ticker")
+      .setLabel(`종목 코드 (${tickerList})`)
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder("예: CHY")
+      .setMaxLength(3)
+      .setRequired(true);
+
+    const qtyInput = new TextInputBuilder()
+      .setCustomId("quantity")
+      .setLabel("수량 (주)")
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder("예: 5")
+      .setRequired(true);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(tickerInput),
+      new ActionRowBuilder().addComponents(qtyInput),
+    );
+
+    await interaction.showModal(modal);
+    return;
+  }
+
+  if (action === "sell") {
+    const portfolio = getPortfolio(userId);
+    const prices = getCurrentPrices();
+    const holdingText = Object.entries(portfolio)
+      .filter(([, qty]) => qty > 0)
+      .map(([id, qty]) => `${id}: ${qty}주 (${(prices[id] ?? 0).toLocaleString()}코인)`)
+      .join(", ") || "없음";
+
+    const modal = new ModalBuilder()
+      .setCustomId(STOCK_SELL_MODAL_ID)
+      .setTitle("주식 매도");
+
+    const tickerInput = new TextInputBuilder()
+      .setCustomId("ticker")
+      .setLabel(`보유 종목 (${holdingText})`)
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder("예: CHY")
+      .setMaxLength(3)
+      .setRequired(true);
+
+    const qtyInput = new TextInputBuilder()
+      .setCustomId("quantity")
+      .setLabel("수량 (주)")
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder("예: 3")
+      .setRequired(true);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(tickerInput),
+      new ActionRowBuilder().addComponents(qtyInput),
+    );
+
+    await interaction.showModal(modal);
+    return;
+  }
+}
+
+async function handleStockBuyModal(interaction) {
+  const userId = interaction.user.id;
+  const ticker = interaction.fields.getTextInputValue("ticker").trim().toUpperCase();
+  const quantityStr = interaction.fields.getTextInputValue("quantity").trim();
+  const quantity = parseInt(quantityStr, 10);
+
+  if (!getStockDef(ticker)) {
+    await interaction.reply({
+      content: nya(`존재하지 않는 종목 코드입니다: ${ticker} (오류 코드: STOCK-001)`),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  if (!Number.isInteger(quantity) || quantity < 1) {
+    await interaction.reply({
+      content: nya("수량은 1 이상의 정수로 입력해주세요. (오류 코드: STOCK-002)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const result = buyStock(userId, ticker, quantity);
+  if (!result.success) {
+    await interaction.reply({
+      content: nya(`매수에 실패했습니다: ${result.reason} (오류 코드: STOCK-003)`),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const balance = getBalance(userId);
+  if (balance < result.totalCost) {
+    sellStock(userId, ticker, quantity);
+    await interaction.reply({
+      content: nya(`치유미코인이 부족합니다. 필요: ${result.totalCost.toLocaleString()}코인, 보유: ${balance.toLocaleString()}코인 (오류 코드: STOCK-004)`),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  addBalance(userId, -result.totalCost);
+
+  const def = getStockDef(ticker);
+  await interaction.reply({
+    content: nya(`**[${ticker}] ${def.name}** ${quantity}주를 ${result.totalCost.toLocaleString()}코인에 매수했습니다.\n잔액: ${(balance - result.totalCost).toLocaleString()}코인`),
+    ephemeral: true,
+  });
+}
+
+async function handleStockSellModal(interaction) {
+  const userId = interaction.user.id;
+  const ticker = interaction.fields.getTextInputValue("ticker").trim().toUpperCase();
+  const quantityStr = interaction.fields.getTextInputValue("quantity").trim();
+  const quantity = parseInt(quantityStr, 10);
+
+  if (!getStockDef(ticker)) {
+    await interaction.reply({
+      content: nya(`존재하지 않는 종목 코드입니다: ${ticker} (오류 코드: STOCK-001)`),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  if (!Number.isInteger(quantity) || quantity < 1) {
+    await interaction.reply({
+      content: nya("수량은 1 이상의 정수로 입력해주세요. (오류 코드: STOCK-002)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const result = sellStock(userId, ticker, quantity);
+  if (!result.success) {
+    const reason = result.reason === "보유량 부족"
+      ? "보유 주식이 부족합니다."
+      : result.reason;
+    await interaction.reply({
+      content: nya(`${reason} (오류 코드: STOCK-005)`),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  addBalance(userId, result.totalGain);
+  const newBalance = getBalance(userId);
+  const def = getStockDef(ticker);
+
+  await interaction.reply({
+    content: nya(`**[${ticker}] ${def.name}** ${quantity}주를 ${result.totalGain.toLocaleString()}코인에 매도했습니다.\n잔액: ${newBalance.toLocaleString()}코인`),
+    ephemeral: true,
+  });
+}
+
+async function handleBankAction(interaction) {
+  const action = interaction.customId.slice(BANK_ACTION_PREFIX.length);
+  const userId = interaction.user.id;
+
+  if (action === "deposit") {
+    const walletBalance = getBalance(userId);
+
+    const modal = new ModalBuilder()
+      .setCustomId(BANK_DEPOSIT_MODAL_ID)
+      .setTitle("예금 입금");
+
+    const input = new TextInputBuilder()
+      .setCustomId("amount")
+      .setLabel(`입금할 금액 (지갑: ${walletBalance.toLocaleString()}코인)`)
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder("예: 1000")
+      .setRequired(true);
+
+    modal.addComponents(new ActionRowBuilder().addComponents(input));
+    await interaction.showModal(modal);
+    return;
+  }
+
+  if (action === "withdraw") {
+    const acc = getAccount(userId);
+
+    const modal = new ModalBuilder()
+      .setCustomId(BANK_WITHDRAW_MODAL_ID)
+      .setTitle("예금 출금");
+
+    const input = new TextInputBuilder()
+      .setCustomId("amount")
+      .setLabel(`출금할 금액 (예금: ${acc.savings.toLocaleString()}코인)`)
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder("예: 1000")
+      .setRequired(true);
+
+    modal.addComponents(new ActionRowBuilder().addComponents(input));
+    await interaction.showModal(modal);
+    return;
+  }
+
+  if (action === "loan") {
+    const modal = new ModalBuilder()
+      .setCustomId(BANK_LOAN_MODAL_ID)
+      .setTitle("대출 신청");
+
+    const input = new TextInputBuilder()
+      .setCustomId("amount")
+      .setLabel(`대출 금액 (${MIN_LOAN.toLocaleString()} ~ ${MAX_LOAN.toLocaleString()}코인)`)
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder("예: 10000")
+      .setRequired(true);
+
+    modal.addComponents(new ActionRowBuilder().addComponents(input));
+    await interaction.showModal(modal);
+    return;
+  }
+
+  if (action === "repay") {
+    const acc = getAccount(userId);
+    if (!acc.loan) {
+      await interaction.reply({
+        content: nya("현재 대출이 없습니다."),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const owed = getTotalOwed(acc.loan);
+    const walletBalance = getBalance(userId);
+
+    if (walletBalance < owed) {
+      await interaction.reply({
+        content: nya(`지갑 잔액이 부족합니다. 상환 필요: ${owed.toLocaleString()}코인, 보유: ${walletBalance.toLocaleString()}코인 (오류 코드: BANK-003)`),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    addBalance(userId, -owed);
+    repayLoan(userId);
+
+    await interaction.update({
+      embeds: [buildBankEmbed(userId)],
+      components: [buildBankRow(false)],
+    });
+  }
+}
+
+async function handleBankDepositModal(interaction) {
+  const userId = interaction.user.id;
+  const amountStr = interaction.fields.getTextInputValue("amount").trim();
+  const amount = parseInt(amountStr, 10);
+
+  if (!Number.isInteger(amount) || amount < 1) {
+    await interaction.reply({
+      content: nya("금액은 1 이상의 정수로 입력해주세요. (오류 코드: BANK-001)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const walletBalance = getBalance(userId);
+  if (walletBalance < amount) {
+    await interaction.reply({
+      content: nya(`지갑 잔액이 부족합니다. 보유: ${walletBalance.toLocaleString()}코인 (오류 코드: BANK-002)`),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  addBalance(userId, -amount);
+  const newSavings = deposit(userId, amount);
+
+  await interaction.reply({
+    content: nya(`${amount.toLocaleString()}코인을 입금했습니다. 예금 잔액: ${newSavings.toLocaleString()}코인`),
+    ephemeral: true,
+  });
+}
+
+async function handleBankWithdrawModal(interaction) {
+  const userId = interaction.user.id;
+  const amountStr = interaction.fields.getTextInputValue("amount").trim();
+  const amount = parseInt(amountStr, 10);
+
+  if (!Number.isInteger(amount) || amount < 1) {
+    await interaction.reply({
+      content: nya("금액은 1 이상의 정수로 입력해주세요. (오류 코드: BANK-001)"),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const result = withdraw(userId, amount);
+  if (!result.success) {
+    const acc = getAccount(userId);
+    await interaction.reply({
+      content: nya(`예금 잔액이 부족합니다. 예금: ${acc.savings.toLocaleString()}코인 (오류 코드: BANK-002)`),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  addBalance(userId, amount);
+  const newWallet = getBalance(userId);
+
+  await interaction.reply({
+    content: nya(`${amount.toLocaleString()}코인을 출금했습니다. 지갑 잔액: ${newWallet.toLocaleString()}코인`),
+    ephemeral: true,
+  });
+}
+
+async function handleBankLoanModal(interaction) {
+  const userId = interaction.user.id;
+  const amountStr = interaction.fields.getTextInputValue("amount").trim();
+  const amount = parseInt(amountStr, 10);
+
+  if (!Number.isInteger(amount) || amount < MIN_LOAN || amount > MAX_LOAN) {
+    await interaction.reply({
+      content: nya(`대출 금액은 ${MIN_LOAN.toLocaleString()} ~ ${MAX_LOAN.toLocaleString()}코인 범위로 입력해주세요. (오류 코드: BANK-004)`),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const result = takeLoan(userId, amount);
+  if (!result.success) {
+    if (result.reason === "existing_loan") {
+      await interaction.reply({
+        content: nya("이미 대출 중인 건이 있습니다. 기존 대출을 먼저 상환해주세요. (오류 코드: BANK-005)"),
+        ephemeral: true,
+      });
+    } else {
+      await interaction.reply({
+        content: nya(`대출 금액이 올바르지 않습니다. (오류 코드: BANK-004)`),
+        ephemeral: true,
+      });
+    }
+    return;
+  }
+
+  addBalance(userId, amount);
+  const newWallet = getBalance(userId);
+
+  await interaction.reply({
+    content: nya(`${amount.toLocaleString()}코인을 대출받았습니다. 지갑 잔액: ${newWallet.toLocaleString()}코인\n이자율: 하루 5% (매일 자정 복리 적용)`),
+    ephemeral: true,
+  });
+}
+
 async function handlePetAction(interaction) {
   const [action, ownerId] = interaction.customId.slice(PET_ACTION_PREFIX.length).split(":");
 
@@ -1709,6 +2096,16 @@ async function handleButton(interaction) {
 
   if (interaction.customId.startsWith(WORDCHAIN_DISBAND_PREFIX)) {
     await handleWordChainDisband(interaction);
+    return;
+  }
+
+  if (interaction.customId.startsWith(STOCK_ACTION_PREFIX)) {
+    await handleStockAction(interaction);
+    return;
+  }
+
+  if (interaction.customId.startsWith(BANK_ACTION_PREFIX)) {
+    await handleBankAction(interaction);
     return;
   }
 
@@ -2814,6 +3211,31 @@ async function showMessageModal(interaction, setup) {
 }
 
 async function handleModalSubmit(interaction) {
+  if (interaction.customId === STOCK_BUY_MODAL_ID) {
+    await handleStockBuyModal(interaction);
+    return;
+  }
+
+  if (interaction.customId === STOCK_SELL_MODAL_ID) {
+    await handleStockSellModal(interaction);
+    return;
+  }
+
+  if (interaction.customId === BANK_DEPOSIT_MODAL_ID) {
+    await handleBankDepositModal(interaction);
+    return;
+  }
+
+  if (interaction.customId === BANK_WITHDRAW_MODAL_ID) {
+    await handleBankWithdrawModal(interaction);
+    return;
+  }
+
+  if (interaction.customId === BANK_LOAN_MODAL_ID) {
+    await handleBankLoanModal(interaction);
+    return;
+  }
+
   if (interaction.customId === WORDCHAIN_SIZE_MODAL_ID) {
     await handleWordChainSizeModal(interaction);
     return;
