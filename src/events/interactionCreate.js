@@ -1024,9 +1024,6 @@ async function handleStockAction(interaction) {
 
   if (action === "buy") {
     const prices = getCurrentPrices();
-    const tickerList = Object.entries(prices)
-      .map(([id, p]) => `${id}: ${p.toLocaleString()}코인`)
-      .join(", ");
 
     const modal = new ModalBuilder()
       .setCustomId(STOCK_BUY_MODAL_ID)
@@ -1034,9 +1031,9 @@ async function handleStockAction(interaction) {
 
     const tickerInput = new TextInputBuilder()
       .setCustomId("ticker")
-      .setLabel(`종목 코드 (${tickerList})`)
+      .setLabel("종목 코드")
       .setStyle(TextInputStyle.Short)
-      .setPlaceholder("예: CHY")
+      .setPlaceholder(Object.keys(prices).join(" / "))
       .setMaxLength(3)
       .setRequired(true);
 
@@ -1058,11 +1055,10 @@ async function handleStockAction(interaction) {
 
   if (action === "sell") {
     const portfolio = getPortfolio(userId);
-    const prices = getCurrentPrices();
-    const holdingText = Object.entries(portfolio)
+    const heldIds = Object.entries(portfolio)
       .filter(([, qty]) => qty > 0)
-      .map(([id, qty]) => `${id}: ${qty}주 (${(prices[id] ?? 0).toLocaleString()}코인)`)
-      .join(", ") || "없음";
+      .map(([id]) => id)
+      .join(" / ") || "없음";
 
     const modal = new ModalBuilder()
       .setCustomId(STOCK_SELL_MODAL_ID)
@@ -1070,9 +1066,9 @@ async function handleStockAction(interaction) {
 
     const tickerInput = new TextInputBuilder()
       .setCustomId("ticker")
-      .setLabel(`보유 종목 (${holdingText})`)
+      .setLabel("보유 종목 코드")
       .setStyle(TextInputStyle.Short)
-      .setPlaceholder("예: CHY")
+      .setPlaceholder(heldIds)
       .setMaxLength(3)
       .setRequired(true);
 
@@ -1400,11 +1396,14 @@ async function handleBankDepositModal(interaction) {
   }
 
   addBalance(userId, -amount);
-  const newSavings = deposit(userId, amount);
+  deposit(userId, amount);
 
-  await interaction.reply({
-    content: nya(`${amount.toLocaleString()}코인을 입금했습니다. 예금 잔액: ${newSavings.toLocaleString()}코인`),
-    ephemeral: true,
+  const accAfterDeposit = getAccount(userId);
+  const hasLoanD = Boolean(accAfterDeposit.loan);
+  const canBankruptD = hasLoanD && (getBalance(userId) + accAfterDeposit.savings + getPortfolioValue(userId) < getTotalOwed(accAfterDeposit.loan));
+  await interaction.update({
+    embeds: [buildBankEmbed(userId)],
+    components: [buildBankRow(hasLoanD, canBankruptD)],
   });
 }
 
@@ -1432,11 +1431,13 @@ async function handleBankWithdrawModal(interaction) {
   }
 
   addBalance(userId, amount);
-  const newWallet = getBalance(userId);
 
-  await interaction.reply({
-    content: nya(`${amount.toLocaleString()}코인을 출금했습니다. 지갑 잔액: ${newWallet.toLocaleString()}코인`),
-    ephemeral: true,
+  const accAfterWithdraw = getAccount(userId);
+  const hasLoanW = Boolean(accAfterWithdraw.loan);
+  const canBankruptW = hasLoanW && (getBalance(userId) + accAfterWithdraw.savings + getPortfolioValue(userId) < getTotalOwed(accAfterWithdraw.loan));
+  await interaction.update({
+    embeds: [buildBankEmbed(userId)],
+    components: [buildBankRow(hasLoanW, canBankruptW)],
   });
 }
 
@@ -1470,11 +1471,12 @@ async function handleBankLoanModal(interaction) {
   }
 
   addBalance(userId, amount);
-  const newWallet = getBalance(userId);
 
-  await interaction.reply({
-    content: nya(`${amount.toLocaleString()}코인을 대출받았습니다. 지갑 잔액: ${newWallet.toLocaleString()}코인\n이자율: 하루 5% (매일 자정 복리 적용)`),
-    ephemeral: true,
+  const accAfterLoan = getAccount(userId);
+  const canBankruptL = getBalance(userId) + accAfterLoan.savings + getPortfolioValue(userId) < getTotalOwed(accAfterLoan.loan);
+  await interaction.update({
+    embeds: [buildBankEmbed(userId)],
+    components: [buildBankRow(true, canBankruptL)],
   });
 }
 
@@ -1585,6 +1587,20 @@ async function promptConsent(interaction) {
   await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
 }
 
+async function safeHandle(interaction, fn) {
+  try {
+    await fn();
+  } catch (err) {
+    console.error("[상호작용 오류]", interaction.customId ?? interaction.commandName, err);
+    const msg = { content: nya("명령어를 실행하는 중 오류가 발생했습니다. (오류 코드: CMD-001)"), ephemeral: true };
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp(msg).catch(() => {});
+    } else if (interaction.isRepliable()) {
+      await interaction.reply(msg).catch(() => {});
+    }
+  }
+}
+
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction) {
@@ -1619,32 +1635,32 @@ module.exports = {
         return;
       }
 
-      await handleButton(interaction);
+      await safeHandle(interaction, () => handleButton(interaction));
       return;
     }
 
     if (interaction.isRoleSelectMenu()) {
-      await handleRoleSelect(interaction);
+      await safeHandle(interaction, () => handleRoleSelect(interaction));
       return;
     }
 
     if (interaction.isChannelSelectMenu()) {
-      await handleChannelSelect(interaction);
+      await safeHandle(interaction, () => handleChannelSelect(interaction));
       return;
     }
 
     if (interaction.isStringSelectMenu()) {
-      await handleStringSelect(interaction);
+      await safeHandle(interaction, () => handleStringSelect(interaction));
       return;
     }
 
     if (interaction.isUserSelectMenu()) {
-      await handleTicketAddUserSelect(interaction);
+      await safeHandle(interaction, () => handleTicketAddUserSelect(interaction));
       return;
     }
 
     if (interaction.isModalSubmit()) {
-      await handleModalSubmit(interaction);
+      await safeHandle(interaction, () => handleModalSubmit(interaction));
       return;
     }
 
