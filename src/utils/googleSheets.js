@@ -16,6 +16,8 @@ const SHEET_FILES = {
   약관동의: "consent.json",
 };
 
+const STOCK_HISTORY_COLS = 6;
+
 const GUILD_USER_MAP_FILES = new Set(["levels.json", "voiceTime.json"]);
 
 function readJsonFile(fileName) {
@@ -65,6 +67,21 @@ function guildUserMapToRows(data) {
       rows.push([guildId, userId, stringifyCell(flatValue)]);
     }
   }
+
+  return [header, ...rows];
+}
+
+function stockPricesToRows(data) {
+  const { prices = {}, lastUpdated = "", history = {} } = data;
+  const pastHeaders = Array.from({ length: STOCK_HISTORY_COLS }, (_, i) => `D-${i + 1}`);
+  const header = ["종목코드", "현재가", ...pastHeaders, "업데이트"];
+
+  const rows = Object.entries(prices).map(([id, price]) => {
+    const hist = history[id] ?? [];
+    const past = hist.slice(0, -1).reverse().slice(0, STOCK_HISTORY_COLS);
+    const padded = [...past, ...Array(STOCK_HISTORY_COLS - past.length).fill("")];
+    return [id, price, ...padded, lastUpdated];
+  });
 
   return [header, ...rows];
 }
@@ -150,7 +167,7 @@ async function syncDataToSheets(client) {
 
   if (!spreadsheetId || !authClient) return;
 
-  const titles = [...Object.keys(SHEET_FILES), "서버목록"];
+  const titles = [...Object.keys(SHEET_FILES), "주식시세", "주식포트폴리오", "서버목록"];
   await ensureSheetsExist(authClient, spreadsheetId, titles);
 
   for (const [title, fileName] of Object.entries(SHEET_FILES)) {
@@ -161,6 +178,8 @@ async function syncDataToSheets(client) {
     await writeSheet(authClient, spreadsheetId, title, rows);
   }
 
+  await writeSheet(authClient, spreadsheetId, "주식시세", stockPricesToRows(readJsonFile("stocks.json")));
+  await writeSheet(authClient, spreadsheetId, "주식포트폴리오", objectToRows(readJsonFile("stockPortfolios.json")));
   await writeSheet(authClient, spreadsheetId, "서버목록", buildGuildListRows(client));
 }
 
