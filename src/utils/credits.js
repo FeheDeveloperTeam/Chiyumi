@@ -88,10 +88,18 @@ function claimDaily(userId) {
   return { success: true, amount: DAILY_CLAIM_AMOUNT, balance, streak };
 }
 
+function setBalance(userId, amount) {
+  const balances = loadAll();
+  balances[userId] = amount;
+  saveAll(balances);
+  return amount;
+}
+
 module.exports = {
   getBalance,
   getAllBalances,
   addBalance,
+  setBalance,
   claimDaily,
   STARTING_BALANCE,
   DAILY_CLAIM_AMOUNT,

@@ -130,6 +130,22 @@ function sellStock(userId, stockId, quantity) {
   return { success: true, price, totalGain };
 }
 
+function getPortfolioValue(userId) {
+  const portfolio = getPortfolio(userId);
+  const prices = getCurrentPrices();
+  let total = 0;
+  for (const [stockId, qty] of Object.entries(portfolio)) {
+    total += (prices[stockId] ?? 0) * qty;
+  }
+  return total;
+}
+
+function clearPortfolio(userId) {
+  const portfolios = loadPortfolios();
+  delete portfolios[userId];
+  savePortfolios(portfolios);
+}
+
 module.exports = {
   STOCK_DEFS,
   getAllStockDefs,
@@ -139,6 +155,8 @@ module.exports = {
   updateDailyPrices,
   getPortfolio,
   getAllPortfolios,
+  getPortfolioValue,
+  clearPortfolio,
   buyStock,
   sellStock,
 };

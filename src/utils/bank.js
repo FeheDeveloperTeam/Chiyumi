@@ -26,8 +26,9 @@ function saveBank(data) {
 
 function ensureAccount(bank, userId) {
   if (!bank[userId]) {
-    bank[userId] = { savings: 0, loan: null, lastInterestAt: getKstDateString() };
+    bank[userId] = { savings: 0, loan: null, rebirths: 0, lastInterestAt: getKstDateString() };
   }
+  if (bank[userId].rebirths === undefined) bank[userId].rebirths = 0;
   return bank[userId];
 }
 
@@ -109,6 +110,16 @@ function applyDailyInterest() {
   if (changed) saveBank(bank);
 }
 
+function declareBankruptcy(userId) {
+  const bank = loadBank();
+  const acc = ensureAccount(bank, userId);
+  acc.savings = 0;
+  acc.loan = null;
+  acc.rebirths += 1;
+  saveBank(bank);
+  return acc.rebirths;
+}
+
 module.exports = {
   SAVINGS_INTEREST_RATE,
   LOAN_INTEREST_RATE,
@@ -121,5 +132,6 @@ module.exports = {
   getTotalOwed,
   takeLoan,
   repayLoan,
+  declareBankruptcy,
   applyDailyInterest,
 };

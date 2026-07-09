@@ -14,6 +14,8 @@ const {
   MAX_LOAN,
   MIN_LOAN,
 } = require("../utils/bank");
+const { getBalance } = require("../utils/credits");
+const { getPortfolioValue } = require("../utils/stocks");
 
 function buildBankEmbed(userId) {
   const acc = getAccount(userId);
@@ -38,13 +40,18 @@ function buildBankEmbed(userId) {
     lines.push("대출은 1건만 유지할 수 있습니다.");
   }
 
+  if (acc.rebirths > 0) {
+    lines.push("");
+    lines.push(`환생 ${acc.rebirths}회`);
+  }
+
   return new EmbedBuilder()
     .setTitle("🏦 치유미 은행")
     .setDescription(lines.join("\n"))
     .setColor(0xe1aa74);
 }
 
-function buildBankRow(hasLoan) {
+function buildBankRow(hasLoan, canBankrupt = false) {
   const components = [
     new ButtonBuilder()
       .setCustomId("bank-action:deposit")
@@ -63,6 +70,14 @@ function buildBankRow(hasLoan) {
         .setLabel("대출 상환")
         .setStyle(ButtonStyle.Danger),
     );
+    if (canBankrupt) {
+      components.push(
+        new ButtonBuilder()
+          .setCustomId("bank-action:bankrupt")
+          .setLabel("파산 신청")
+          .setStyle(ButtonStyle.Danger),
+      );
+    }
   } else {
     components.push(
       new ButtonBuilder()
@@ -87,10 +102,17 @@ module.exports = {
   buildBankRow,
 
   async execute(interaction) {
-    const acc = getAccount(interaction.user.id);
+    const userId = interaction.user.id;
+    const acc = getAccount(userId);
+    let canBankrupt = false;
+    if (acc.loan) {
+      const owed = getTotalOwed(acc.loan);
+      const totalAssets = getBalance(userId) + acc.savings + getPortfolioValue(userId);
+      canBankrupt = totalAssets < owed;
+    }
     await interaction.reply({
-      embeds: [buildBankEmbed(interaction.user.id)],
-      components: [buildBankRow(Boolean(acc.loan))],
+      embeds: [buildBankEmbed(userId)],
+      components: [buildBankRow(Boolean(acc.loan), canBankrupt)],
       ephemeral: true,
     });
   },

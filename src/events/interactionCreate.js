@@ -16,7 +16,7 @@ const {
   UserSelectMenuBuilder,
 } = require("discord.js");
 const { nya } = require("../utils/nya");
-const { getBalance, getAllBalances, addBalance } = require("../utils/credits");
+const { getBalance, getAllBalances, addBalance, setBalance, STARTING_BALANCE } = require("../utils/credits");
 const {
   sendLog,
   setLogChannel,
@@ -78,8 +78,8 @@ const {
 const { buildWordChainEmbed, buildWordChainRow } = require("../commands/wordchain");
 const { buildMarketEmbed, buildPortfolioEmbed, buildStockRow } = require("../commands/stock");
 const { buildBankEmbed, buildBankRow } = require("../commands/bank");
-const { getStockDef, getCurrentPrices, getPortfolio, buyStock, sellStock } = require("../utils/stocks");
-const { getAccount, getTotalOwed, deposit, withdraw, takeLoan, repayLoan, MAX_LOAN, MIN_LOAN } = require("../utils/bank");
+const { getStockDef, getCurrentPrices, getPortfolio, getPortfolioValue, clearPortfolio, buyStock, sellStock } = require("../utils/stocks");
+const { getAccount, getTotalOwed, deposit, withdraw, takeLoan, repayLoan, declareBankruptcy, MAX_LOAN, MIN_LOAN } = require("../utils/bank");
 const {
   MIN_PARTY_SIZE: WORDCHAIN_MIN_SIZE,
   MAX_PARTY_SIZE: WORDCHAIN_MAX_SIZE,
@@ -1272,7 +1272,107 @@ async function handleBankAction(interaction) {
 
     await interaction.update({
       embeds: [buildBankEmbed(userId)],
-      components: [buildBankRow(false)],
+      components: [buildBankRow(false, false)],
+    });
+    return;
+  }
+
+  if (action === "bankrupt") {
+    const acc = getAccount(userId);
+    if (!acc.loan) {
+      await interaction.reply({
+        content: nya("현재 대출이 없습니다."),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const owed = getTotalOwed(acc.loan);
+    const walletBalance = getBalance(userId);
+    const stockValue = getPortfolioValue(userId);
+    const totalAssets = walletBalance + acc.savings + stockValue;
+
+    if (totalAssets >= owed) {
+      await interaction.reply({
+        content: nya("아직 대출을 갚을 수 있는 상태입니다. 파산 조건을 충족하지 않습니다."),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const confirmEmbed = new EmbedBuilder()
+      .setTitle("⚠️ 파산 신청 확인")
+      .setDescription(
+        nya(
+          `총 자산(${totalAssets.toLocaleString()}코인)이 상환 필요액(${owed.toLocaleString()}코인)에 미치지 못합니다.\n\n` +
+          `**환생 시 초기화되는 것:**\n` +
+          `- 지갑 코인 → ${STARTING_BALANCE}코인으로 초기화\n` +
+          `- 예금 잔액 → 0 (${acc.savings.toLocaleString()}코인 소멸)\n` +
+          `- 대출 → 탕감\n` +
+          `- 보유 주식 전부 소멸 (평가액 ${stockValue.toLocaleString()}코인)\n\n` +
+          `**유지되는 것:** 키우기, 레벨, 출석 스트릭\n\n` +
+          `정말 환생하시겠습니까?`
+        )
+      )
+      .setColor(0xff4444);
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("bank-action:bankrupt-confirm")
+        .setLabel("환생하기")
+        .setStyle(ButtonStyle.Danger),
+      new ButtonBuilder()
+        .setCustomId("bank-action:bankrupt-cancel")
+        .setLabel("취소")
+        .setStyle(ButtonStyle.Secondary),
+    );
+
+    await interaction.reply({ embeds: [confirmEmbed], components: [row], ephemeral: true });
+    return;
+  }
+
+  if (action === "bankrupt-confirm") {
+    const acc = getAccount(userId);
+    if (!acc.loan) {
+      await interaction.update({
+        content: nya("이미 처리되었거나 대출이 없습니다."),
+        embeds: [],
+        components: [],
+      });
+      return;
+    }
+
+    const walletBefore = getBalance(userId);
+    const savingsBefore = acc.savings;
+    const stocksBefore = getPortfolioValue(userId);
+
+    setBalance(userId, STARTING_BALANCE);
+    clearPortfolio(userId);
+    const rebirthCount = declareBankruptcy(userId);
+
+    const rebirthEmbed = new EmbedBuilder()
+      .setTitle("✨ 환생")
+      .setDescription(
+        nya(
+          `새로운 시작을 맞이했습니다.\n\n` +
+          `**소멸된 자산:**\n` +
+          `- 지갑 ${walletBefore.toLocaleString()}코인 → ${STARTING_BALANCE}코인\n` +
+          `- 예금 ${savingsBefore.toLocaleString()}코인 → 0코인\n` +
+          `- 주식 평가액 ${stocksBefore.toLocaleString()}코인 → 0코인\n\n` +
+          `현재 환생 횟수: **${rebirthCount}회**`
+        )
+      )
+      .setColor(0xe1aa74);
+
+    await interaction.update({ embeds: [rebirthEmbed], components: [] });
+    return;
+  }
+
+  if (action === "bankrupt-cancel") {
+    await interaction.update({
+      content: nya("파산 신청을 취소했습니다."),
+      embeds: [],
+      components: [],
     });
   }
 }
