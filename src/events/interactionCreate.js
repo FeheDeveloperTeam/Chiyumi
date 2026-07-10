@@ -2591,13 +2591,10 @@ async function handleLolStatsModal(interaction) {
     const sessionId = createStatsSession(session);
 
     const displayWithIdx = matches.slice(0, 5).map((match, i) => ({ match, originalIndex: i }));
-    const { embed, tierAttachment } = buildStatsEmbed(session, displayWithIdx);
+    const { embeds, files } = buildStatsEmbeds(session, displayWithIdx);
     const components = buildStatsRows(sessionId, displayWithIdx, session);
 
-    const payload = { content: null, embeds: [embed], components };
-    if (tierAttachment) payload.files = [tierAttachment];
-
-    await interaction.editReply(payload);
+    await interaction.editReply({ content: null, embeds, components, files });
   } catch (error) {
     console.error(error);
     await interaction.editReply(nya("전적을 불러오는 중 오류가 발생했습니다. (오류 코드: STATS-003)"));
@@ -2668,12 +2665,13 @@ const TIER_DATA = (() => {
   }
 })();
 
-function getTierAttachment(tier) {
+function getTierAttachment(tier, suffix) {
   if (!tier) return null;
   const key = tier.toLowerCase();
   const b64 = TIER_DATA[key];
   if (!b64) return null;
-  return new AttachmentBuilder(Buffer.from(b64, "base64"), { name: `${key}.png` });
+  const name = suffix ? `${key}-${suffix}.png` : `${key}.png`;
+  return new AttachmentBuilder(Buffer.from(b64, "base64"), { name });
 }
 
 function formatRankEntry(entry) {
@@ -2691,22 +2689,31 @@ function buildMatchLines(matches, puuid) {
   }).join("\n");
 }
 
-function buildStatsEmbed(session, displayWithIdx) {
+function buildStatsEmbeds(session, displayWithIdx) {
   const { account, summoner, soloEntry, flexEntry } = session;
-  const embed = new EmbedBuilder()
+
+  const soloAttachment = getTierAttachment(soloEntry?.tier, "solo");
+  const flexAttachment = getTierAttachment(flexEntry?.tier, "flex");
+
+  const embed1 = new EmbedBuilder()
     .setTitle(`${account.gameName}#${account.tagLine}`)
     .setColor(TIER_COLORS[soloEntry?.tier?.toUpperCase()] ?? 0xe1aa74)
     .addFields(
       { name: "소환사 레벨", value: `Lv. **${summoner.summonerLevel}**`, inline: true },
       { name: "솔로랭크", value: formatRankEntry(soloEntry), inline: true },
+    );
+  if (soloAttachment) embed1.setThumbnail(`attachment://${soloAttachment.name}`);
+
+  const embed2 = new EmbedBuilder()
+    .setColor(TIER_COLORS[flexEntry?.tier?.toUpperCase()] ?? 0xe1aa74)
+    .addFields(
       { name: "자유랭크", value: formatRankEntry(flexEntry), inline: true },
       { name: "최근 전적", value: buildMatchLines(displayWithIdx, session.puuid) },
     );
+  if (flexAttachment) embed2.setThumbnail(`attachment://${flexAttachment.name}`);
 
-  const tierAttachment = getTierAttachment(soloEntry?.tier);
-  if (tierAttachment) embed.setImage(`attachment://${tierAttachment.name}`);
-
-  return { embed, tierAttachment };
+  const files = [soloAttachment, flexAttachment].filter(Boolean);
+  return { embeds: [embed1, embed2], files };
 }
 
 function buildStatsRows(sessionId, displayWithIdx, session) {
@@ -2761,13 +2768,10 @@ async function handleStatsFilterButton(interaction) {
     .filter(({ match }) => queueId === 0 || match.info.queueId === queueId);
 
   const displayWithIdx = filteredWithIdx.slice(0, 5);
-  const { embed, tierAttachment } = buildStatsEmbed(session, displayWithIdx);
+  const { embeds, files } = buildStatsEmbeds(session, displayWithIdx);
   const components = buildStatsRows(sessionId, displayWithIdx, session);
 
-  const payload = { embeds: [embed], components };
-  if (tierAttachment) payload.files = [tierAttachment];
-
-  await interaction.update(payload);
+  await interaction.update({ embeds, components, files });
 }
 
 async function handleStatsDetailButton(interaction) {
