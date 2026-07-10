@@ -36,7 +36,9 @@ const {
   setTicketMessage,
   setWordChainChannel,
   getWordChainChannelId,
+  setSupportMessageId,
 } = require("../utils/guildConfig");
+const { buildSupportEmbed } = require("../utils/supportInfo");
 const { buildLogContent, buildLogRows } = require("../commands/log");
 const {
   buildFilterEmbed: buildCensorFilterEmbed,
@@ -408,6 +410,28 @@ async function handleTicketActionButton(interaction) {
 
     await interaction.reply({
       content: nya(`${channel}에 티켓 생성 버튼을 올렸습니다.`),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  if (action === "post-support") {
+    const channelId = getTicketChannelId(interaction.guild.id);
+    const channel = channelId ? interaction.guild.channels.cache.get(channelId) : null;
+
+    if (!channel) {
+      await interaction.reply({
+        content: nya("먼저 티켓 채널을 설정해주세요. (오류 코드: TICKET-001)"),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const msg = await channel.send({ embeds: [buildSupportEmbed()] });
+    setSupportMessageId(interaction.guild.id, msg.id);
+
+    await interaction.reply({
+      content: nya(`${channel}에 운영 안내를 게시했습니다. 운영 시간 시작(10:00)·종료(19:00) KST에 자동으로 수정됩니다.`),
       ephemeral: true,
     });
   }
