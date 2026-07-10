@@ -2541,21 +2541,9 @@ async function handleLolStatsModal(interaction) {
     return;
   }
 
-  let resultMessage = null;
+  await interaction.deferReply({ ephemeral: true });
 
-  if (interaction.message) {
-    await interaction.deferUpdate();
-    await interaction.deleteReply().catch(() => {});
-    resultMessage = await interaction.followUp({
-      content: nya("전적을 조회하고 있습니다..."),
-      ephemeral: true,
-    });
-  } else {
-    await interaction.deferReply({ ephemeral: true });
-  }
-
-  const updateResult = (payload) =>
-    resultMessage ? resultMessage.edit(payload) : interaction.editReply(payload);
+  const updateResult = (payload) => interaction.editReply(payload);
 
   let account;
 
