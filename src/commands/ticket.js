@@ -41,10 +41,6 @@ function buildTicketRow() {
       .setCustomId("ticket-action:post")
       .setLabel("메시지 게시")
       .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId("ticket-action:post-support")
-      .setLabel("운영 안내 게시")
-      .setStyle(ButtonStyle.Secondary),
   );
 }
 

@@ -36,7 +36,7 @@ const {
   setTicketMessage,
   setWordChainChannel,
   getWordChainChannelId,
-  setSupportMessageId,
+  setSupportMessage,
 } = require("../utils/guildConfig");
 const { buildSupportEmbed } = require("../utils/supportInfo");
 const { buildLogContent, buildLogRows } = require("../commands/log");
@@ -165,6 +165,7 @@ const RANK_LEVELUP_CHANNEL_SELECT_ID = "rank-levelup-channel-select";
 const RANK_LEVELUP_MODAL_ID = "rank-levelup-modal";
 const TICKET_ACTION_PREFIX = "ticket-action:";
 const TICKET_CHANNEL_SELECT_ID = "ticket-channel-select";
+const DEV_SUPPORT_CHANNEL_SELECT_ID = "dev-support-channel-select";
 const TICKET_MODAL_ID = "ticket-modal";
 const TICKET_CREATE_ID = "ticket-create";
 const TICKET_MANAGE_PREFIX = "ticket-manage:";
@@ -410,28 +411,6 @@ async function handleTicketActionButton(interaction) {
 
     await interaction.reply({
       content: nya(`${channel}에 티켓 생성 버튼을 올렸습니다.`),
-      ephemeral: true,
-    });
-    return;
-  }
-
-  if (action === "post-support") {
-    const channelId = getTicketChannelId(interaction.guild.id);
-    const channel = channelId ? interaction.guild.channels.cache.get(channelId) : null;
-
-    if (!channel) {
-      await interaction.reply({
-        content: nya("먼저 티켓 채널을 설정해주세요. (오류 코드: TICKET-001)"),
-        ephemeral: true,
-      });
-      return;
-    }
-
-    const msg = await channel.send({ embeds: [buildSupportEmbed()] });
-    setSupportMessageId(interaction.guild.id, msg.id);
-
-    await interaction.reply({
-      content: nya(`${channel}에 운영 안내를 게시했습니다. 운영 시간 시작(10:00)·종료(19:00) KST에 자동으로 수정됩니다.`),
       ephemeral: true,
     });
   }
@@ -931,6 +910,22 @@ async function handleDevAction(interaction) {
   }
 
   const action = interaction.customId.slice(DEV_ACTION_PREFIX.length);
+
+  if (action === "support") {
+    const channelSelect = new ChannelSelectMenuBuilder()
+      .setCustomId(DEV_SUPPORT_CHANNEL_SELECT_ID)
+      .setPlaceholder("운영 안내를 게시할 채널을 선택하세요")
+      .addChannelTypes(ChannelType.GuildText)
+      .setMinValues(1)
+      .setMaxValues(1);
+
+    await interaction.update({
+      content: nya("운영 안내를 게시할 채널을 선택하세요."),
+      embeds: [],
+      components: [new ActionRowBuilder().addComponents(channelSelect)],
+    });
+    return;
+  }
 
   const modal = new ModalBuilder()
     .setCustomId(`${DEV_MODAL_PREFIX}${action}`)
@@ -1874,6 +1869,30 @@ async function handleChannelSelect(interaction) {
     await interaction.update({
       embeds: [buildWelcomeEmbed(interaction.guild.id)],
       components: buildWelcomeRows(interaction.guild.id),
+    });
+    return;
+  }
+
+  if (interaction.customId === DEV_SUPPORT_CHANNEL_SELECT_ID) {
+    if (!isDeveloper(interaction.user.id)) {
+      await interaction.reply({
+        content: nya("이 기능은 개발자만 사용할 수 있습니다. (오류 코드: DEV-001)"),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const channelId = interaction.values[0];
+    const channel = interaction.guild.channels.cache.get(channelId);
+    if (!channel) return;
+
+    const msg = await channel.send({ embeds: [buildSupportEmbed()] });
+    setSupportMessage(interaction.guild.id, channelId, msg.id);
+
+    await interaction.update({
+      content: nya(`${channel}에 운영 안내를 게시했습니다. 운영 시간 시작(10:00)·종료(19:00) KST에 자동으로 수정됩니다.`),
+      embeds: [],
+      components: [],
     });
     return;
   }

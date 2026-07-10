@@ -179,15 +179,10 @@ function getWordChainChannelId(guildId) {
   return configs[guildId]?.wordChainChannelId ?? null;
 }
 
-function setSupportMessageId(guildId, messageId) {
+function setSupportMessage(guildId, channelId, messageId) {
   const configs = loadAll();
-  configs[guildId] = { ...(configs[guildId] ?? {}), supportMessageId: messageId };
+  configs[guildId] = { ...(configs[guildId] ?? {}), supportChannelId: channelId, supportMessageId: messageId };
   saveAll(configs);
-}
-
-function getSupportMessageId(guildId) {
-  const configs = loadAll();
-  return configs[guildId]?.supportMessageId ?? null;
 }
 
 function getAllConfigs() {
@@ -220,7 +215,6 @@ module.exports = {
   DEFAULT_TICKET_MESSAGE,
   setWordChainChannel,
   getWordChainChannelId,
-  setSupportMessageId,
-  getSupportMessageId,
+  setSupportMessage,
   getAllConfigs,
 };

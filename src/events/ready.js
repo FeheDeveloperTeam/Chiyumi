@@ -62,12 +62,12 @@ function scheduleDailyTasks() {
 async function updateSupportMessages(client) {
   const configs = getAllConfigs();
   for (const [guildId, config] of Object.entries(configs)) {
-    const { ticketChannelId, supportMessageId } = config;
-    if (!ticketChannelId || !supportMessageId) continue;
+    const { supportChannelId, supportMessageId } = config;
+    if (!supportChannelId || !supportMessageId) continue;
     try {
       const guild = client.guilds.cache.get(guildId);
       if (!guild) continue;
-      const channel = guild.channels.cache.get(ticketChannelId);
+      const channel = guild.channels.cache.get(supportChannelId);
       if (!channel) continue;
       const message = await channel.messages.fetch(supportMessageId).catch(() => null);
       if (!message) continue;
