@@ -15,7 +15,6 @@ const {
   TextInputStyle,
   UserSelectMenuBuilder,
 } = require("discord.js");
-const fs = require("node:fs");
 const path = require("node:path");
 const { nya } = require("../utils/nya");
 const { getBalance, getAllBalances, addBalance, setBalance, STARTING_BALANCE } = require("../utils/credits");
@@ -2661,18 +2660,20 @@ const TIER_COLORS = {
   CHALLENGER: 0xf4c874,
 };
 
-const TIER_ASSETS_DIR = path.join(__dirname, "..", "assets", "tiers");
+const TIER_DATA = (() => {
+  try {
+    return require(path.join(__dirname, "..", "assets", "tiers", "tierData.js"));
+  } catch {
+    return {};
+  }
+})();
 
 function getTierAttachment(tier) {
   if (!tier) return null;
-  const filename = `${tier.toLowerCase()}.png`;
-  const filePath = path.join(TIER_ASSETS_DIR, filename);
-  try {
-    const buffer = fs.readFileSync(filePath);
-    return new AttachmentBuilder(buffer, { name: filename });
-  } catch {
-    return null;
-  }
+  const key = tier.toLowerCase();
+  const b64 = TIER_DATA[key];
+  if (!b64) return null;
+  return new AttachmentBuilder(Buffer.from(b64, "base64"), { name: `${key}.png` });
 }
 
 function formatRankEntry(entry) {
