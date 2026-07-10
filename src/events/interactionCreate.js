@@ -15,6 +15,7 @@ const {
   TextInputStyle,
   UserSelectMenuBuilder,
 } = require("discord.js");
+const fs = require("node:fs");
 const path = require("node:path");
 const { nya } = require("../utils/nya");
 const { getBalance, getAllBalances, addBalance, setBalance, STARTING_BALANCE } = require("../utils/credits");
@@ -2667,7 +2668,8 @@ function getTierAttachment(tier) {
   const filename = `${tier.toLowerCase()}.png`;
   const filePath = path.join(TIER_ASSETS_DIR, filename);
   try {
-    return new AttachmentBuilder(filePath, { name: filename });
+    const buffer = fs.readFileSync(filePath);
+    return new AttachmentBuilder(buffer, { name: filename });
   } catch {
     return null;
   }
@@ -2701,7 +2703,7 @@ function buildStatsEmbed(session, displayWithIdx) {
     );
 
   const tierAttachment = getTierAttachment(soloEntry?.tier);
-  if (tierAttachment) embed.setThumbnail(`attachment://${tierAttachment.name}`);
+  if (tierAttachment) embed.setImage(`attachment://${tierAttachment.name}`);
 
   return { embed, tierAttachment };
 }
