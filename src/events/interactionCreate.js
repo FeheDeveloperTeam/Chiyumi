@@ -1694,6 +1694,10 @@ module.exports = {
       return;
     }
 
+    if (interaction.commandName === "stats") {
+      await cleanupUserStats(interaction.client, interaction.user.id);
+    }
+
     try {
       await command.execute(interaction);
     } catch (error) {
@@ -1711,6 +1715,13 @@ module.exports = {
       } else {
         await interaction.reply(message);
       }
+    }
+
+    if (interaction.commandName === "stats") {
+      userStatsTokens.set(interaction.user.id, {
+        applicationId: interaction.applicationId,
+        cmdToken: interaction.token,
+      });
     }
   },
 };
@@ -2548,6 +2559,13 @@ async function handleLolStatsModal(interaction) {
     return;
   }
 
+  // 게임 선택 메시지 삭제 (모달 제출 시점에 더 이상 필요 없음)
+  const prevStatsState = userStatsTokens.get(interaction.user.id);
+  if (prevStatsState?.cmdToken) {
+    userStatsTokens.set(interaction.user.id, { applicationId: prevStatsState.applicationId });
+    await tryDeleteInteractionMsg(interaction.client, prevStatsState.applicationId, prevStatsState.cmdToken);
+  }
+
   await interaction.deferReply({ ephemeral: true });
 
   let account;
@@ -2595,6 +2613,12 @@ async function handleLolStatsModal(interaction) {
     const components = buildStatsRows(sessionId, displayWithIdx, session);
 
     await interaction.editReply({ content: null, embeds, components, files });
+
+    // 다음 검색 시 삭제할 수 있도록 토큰 보관
+    userStatsTokens.set(interaction.user.id, {
+      applicationId: interaction.applicationId,
+      statsToken: interaction.token,
+    });
   } catch (error) {
     console.error(error);
     await interaction.editReply(nya("전적을 불러오는 중 오류가 발생했습니다. (오류 코드: STATS-003)"));
@@ -2664,6 +2688,26 @@ const TIER_DATA = (() => {
     return {};
   }
 })();
+
+// userId → { applicationId, cmdToken?, statsToken? }
+const userStatsTokens = new Map();
+
+async function tryDeleteInteractionMsg(client, applicationId, token) {
+  if (!token) return;
+  try {
+    await client.rest.delete(`/webhooks/${applicationId}/${token}/messages/@original`);
+  } catch {}
+}
+
+async function cleanupUserStats(client, userId) {
+  const state = userStatsTokens.get(userId);
+  if (!state) return;
+  userStatsTokens.delete(userId);
+  await Promise.allSettled([
+    tryDeleteInteractionMsg(client, state.applicationId, state.cmdToken),
+    tryDeleteInteractionMsg(client, state.applicationId, state.statsToken),
+  ]);
+}
 
 function getTierAttachment(tier, suffix) {
   if (!tier) return null;
