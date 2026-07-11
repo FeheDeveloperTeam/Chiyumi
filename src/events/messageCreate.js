@@ -6,6 +6,7 @@ const { getLogOptions, sendLog } = require("../utils/guildConfig");
 const { grantActivityReward, levelFromXp } = require("../utils/levels");
 const { addBalance } = require("../utils/credits");
 const { announceLevelUp } = require("../utils/levelUpAnnounce");
+const { hasAgreed } = require("../utils/consent");
 const { handleMessage: handleWordChainMessage } = require("../utils/wordchainGame");
 
 const CALL_NAME_PATTERN = /^유미야[,!~]?\s*(.*)$/s;
@@ -112,7 +113,7 @@ module.exports = {
       return;
     }
 
-    if (message.guild) {
+    if (message.guild && hasAgreed(message.author.id)) {
       const reward = grantActivityReward(message.guild.id, message.author.id);
 
       if (reward) {
