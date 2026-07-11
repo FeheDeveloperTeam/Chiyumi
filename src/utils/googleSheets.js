@@ -87,10 +87,10 @@ function stockPricesToRows(data) {
 }
 
 function buildGuildListRows(client) {
-  const header = ["서버ID", "서버이름"];
+  const header = ["서버ID", "서버이름", "인원수"];
   if (!client) return [header];
 
-  const rows = [...client.guilds.cache.values()].map((guild) => [guild.id, guild.name]);
+  const rows = [...client.guilds.cache.values()].map((guild) => [guild.id, guild.name, guild.memberCount]);
   return [header, ...rows];
 }
 
