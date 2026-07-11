@@ -41,9 +41,7 @@ module.exports = {
 
     if (member && !member.bannable) {
       await interaction.reply({
-        content: nya(
-          "이 사용자를 차단할 수 없습니다. 권한과 역할 순서를 확인해주세요 (오류 코드: BAN-001)",
-        ),
+        content: nya("이 사용자를 차단할 수 없습니다. 권한과 역할 순서를 확인해주세요") + "\n(오류 코드: BAN-001)",
         ephemeral: true,
       });
       return;
@@ -54,7 +52,7 @@ module.exports = {
     } catch (error) {
       console.error(error);
       await interaction.reply({
-        content: nya("사용자를 차단하지 못했습니다 (오류 코드: BAN-002)"),
+        content: nya("사용자를 차단하지 못했습니다") + "\n(오류 코드: BAN-002)",
         ephemeral: true,
       });
       return;

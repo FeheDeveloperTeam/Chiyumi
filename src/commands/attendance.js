@@ -32,9 +32,7 @@ module.exports = {
 
     if (!result.success) {
       await interaction.reply({
-        content: nya(
-          `이미 오늘 출석했습니다. ${formatRemainingTime(result.remainingMs)} 후에 다시 출석할 수 있습니다. (오류 코드: ATTEND-001)`,
-        ),
+        content: nya(`이미 오늘 출석했습니다. ${formatRemainingTime(result.remainingMs)} 후에 다시 출석할 수 있습니다.`) + "\n(오류 코드: ATTEND-001)",
         ephemeral: true,
       });
       return;

@@ -91,7 +91,7 @@ module.exports = {
     } catch (error) {
       console.error(error);
       await interaction.editReply(
-        nya("순위 카드를 만드는 중 오류가 발생했습니다. (오류 코드: RANK-001)"),
+        nya("순위 카드를 만드는 중 오류가 발생했습니다.") + "\n(오류 코드: RANK-001)",
       );
     }
   },

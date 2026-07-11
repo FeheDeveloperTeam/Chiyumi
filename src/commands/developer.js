@@ -47,7 +47,7 @@ module.exports = {
   async execute(interaction) {
     if (!isDeveloper(interaction.user.id)) {
       await interaction.reply({
-        content: nya("이 명령어는 개발자만 사용할 수 있습니다. (오류 코드: DEV-001)"),
+        content: nya("이 명령어는 개발자만 사용할 수 있습니다.") + "\n(오류 코드: DEV-001)",
         ephemeral: true,
       });
       return;

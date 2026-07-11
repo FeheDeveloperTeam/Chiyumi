@@ -39,9 +39,7 @@ module.exports = {
 
     if (!member) {
       await interaction.reply({
-        content: nya(
-          "해당 사용자를 서버에서 찾을 수 없습니다 (오류 코드: KICK-001)",
-        ),
+        content: nya("해당 사용자를 서버에서 찾을 수 없습니다") + "\n(오류 코드: KICK-001)",
         ephemeral: true,
       });
       return;
@@ -49,9 +47,7 @@ module.exports = {
 
     if (!member.kickable) {
       await interaction.reply({
-        content: nya(
-          "이 사용자를 추방할 수 없습니다. 권한과 역할 순서를 확인해주세요 (오류 코드: KICK-002)",
-        ),
+        content: nya("이 사용자를 추방할 수 없습니다. 권한과 역할 순서를 확인해주세요") + "\n(오류 코드: KICK-002)",
         ephemeral: true,
       });
       return;
@@ -62,7 +58,7 @@ module.exports = {
     } catch (error) {
       console.error(error);
       await interaction.reply({
-        content: nya("사용자를 추방하지 못했습니다 (오류 코드: KICK-003)"),
+        content: nya("사용자를 추방하지 못했습니다") + "\n(오류 코드: KICK-003)",
         ephemeral: true,
       });
       return;

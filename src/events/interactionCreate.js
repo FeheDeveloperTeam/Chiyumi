@@ -245,7 +245,7 @@ function buildRankPage(guild, type, page) {
 async function handleRankLeaderboard(interaction) {
   if (!interaction.inGuild()) {
     await interaction.reply({
-      content: nya("서버에서만 사용할 수 있는 버튼입니다. (오류 코드: GUILD-001)"),
+      content: nya("서버에서만 사용할 수 있는 버튼입니다.") + "\n(오류 코드: GUILD-001)",
       ephemeral: true,
     });
     return;
@@ -262,7 +262,7 @@ async function handleRankLeaderboard(interaction) {
 async function handleLevelUpSettingsButton(interaction) {
   if (!interaction.inGuild()) {
     await interaction.reply({
-      content: nya("서버에서만 사용할 수 있는 버튼입니다. (오류 코드: GUILD-001)"),
+      content: nya("서버에서만 사용할 수 있는 버튼입니다.") + "\n(오류 코드: GUILD-001)",
       ephemeral: true,
     });
     return;
@@ -270,9 +270,7 @@ async function handleLevelUpSettingsButton(interaction) {
 
   if (!hasManageGuild(interaction)) {
     await interaction.reply({
-      content: nya(
-        "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
-      ),
+      content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
       ephemeral: true,
     });
     return;
@@ -288,9 +286,7 @@ async function handleLevelUpSettingsButton(interaction) {
 async function handleLevelUpActionButton(interaction) {
   if (!hasManageGuild(interaction)) {
     await interaction.reply({
-      content: nya(
-        "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
-      ),
+      content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
       ephemeral: true,
     });
     return;
@@ -338,9 +334,7 @@ async function handleLevelUpActionButton(interaction) {
 async function handleTicketActionButton(interaction) {
   if (!hasManageGuild(interaction)) {
     await interaction.reply({
-      content: nya(
-        "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
-      ),
+      content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
       ephemeral: true,
     });
     return;
@@ -389,7 +383,7 @@ async function handleTicketActionButton(interaction) {
 
     if (!channel) {
       await interaction.reply({
-        content: nya("먼저 티켓 채널을 설정해주세요. (오류 코드: TICKET-001)"),
+        content: nya("먼저 티켓 채널을 설정해주세요.") + "\n(오류 코드: TICKET-001)",
         ephemeral: true,
       });
       return;
@@ -421,7 +415,7 @@ async function handleTicketActionButton(interaction) {
 async function handleTicketCreate(interaction) {
   if (!interaction.inGuild()) {
     await interaction.reply({
-      content: nya("서버에서만 사용할 수 있는 버튼입니다. (오류 코드: GUILD-001)"),
+      content: nya("서버에서만 사용할 수 있는 버튼입니다.") + "\n(오류 코드: GUILD-001)",
       ephemeral: true,
     });
     return;
@@ -474,7 +468,7 @@ async function handleTicketCreate(interaction) {
   } catch (error) {
     console.error(error);
     await interaction.editReply(
-      nya("티켓을 생성하지 못했습니다. 봇의 권한을 확인해주세요. (오류 코드: TICKET-002)"),
+      nya("티켓을 생성하지 못했습니다. 봇의 권한을 확인해주세요.") + "\n(오류 코드: TICKET-002)",
     );
   }
 }
@@ -501,9 +495,9 @@ async function handleTicketManage(interaction) {
   const action = interaction.customId.slice(TICKET_MANAGE_PREFIX.length);
   const thread = interaction.channel;
 
-  if (action !== "close" && action !== "adduser" && !hasManageGuild(interaction)) {
+  if (action !== "close" && !hasManageGuild(interaction)) {
     await interaction.reply({
-      content: nya("이 기능은 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)"),
+      content: nya("이 기능은 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
       ephemeral: true,
     });
     return;
@@ -623,7 +617,7 @@ async function handleTicketAddUserSelect(interaction) {
 
   if (targetMember?.user.bot) {
     await interaction.update({
-      content: nya("봇은 티켓 스레드에 추가할 수 없습니다. (오류 코드: TICKET-003)"),
+      content: nya("봇은 티켓 스레드에 추가할 수 없습니다.") + "\n(오류 코드: TICKET-003)",
       components: [],
     });
     return;
@@ -638,7 +632,7 @@ async function handleTicketAddUserSelect(interaction) {
   } catch (error) {
     console.error(error);
     await interaction.update({
-      content: nya("사용자를 추가하지 못했습니다. (오류 코드: TICKET-003)"),
+      content: nya("사용자를 추가하지 못했습니다.") + "\n(오류 코드: TICKET-003)",
       components: [],
     });
   }
@@ -683,9 +677,7 @@ function buildWordChainPartyEmbed(party) {
 async function handleWordChainActionButton(interaction) {
   if (!hasManageGuild(interaction)) {
     await interaction.reply({
-      content: nya(
-        "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
-      ),
+      content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
       ephemeral: true,
     });
     return;
@@ -717,7 +709,7 @@ async function handleWordChainActionButton(interaction) {
 
     if (!channel) {
       await interaction.reply({
-        content: nya("먼저 끝말잇기 채널을 설정해주세요. (오류 코드: WORDCHAIN-001)"),
+        content: nya("먼저 끝말잇기 채널을 설정해주세요.") + "\n(오류 코드: WORDCHAIN-001)",
         ephemeral: true,
       });
       return;
@@ -772,9 +764,7 @@ async function handleWordChainSizeModal(interaction) {
     maxSize > WORDCHAIN_MAX_SIZE
   ) {
     await interaction.reply({
-      content: nya(
-        `최대 인원은 ${WORDCHAIN_MIN_SIZE}~${WORDCHAIN_MAX_SIZE} 사이의 숫자여야 합니다. (오류 코드: WORDCHAIN-002)`,
-      ),
+      content: nya(`최대 인원은 ${WORDCHAIN_MIN_SIZE}~${WORDCHAIN_MAX_SIZE} 사이의 숫자여야 합니다.`) + "\n(오류 코드: WORDCHAIN-002)",
       ephemeral: true,
     });
     return;
@@ -800,10 +790,10 @@ async function handleWordChainJoin(interaction) {
 
   if (!result.ok) {
     const messages = {
-      not_found: "해당 파티를 찾을 수 없습니다. (오류 코드: WORDCHAIN-003)",
-      started: "이미 시작된 파티입니다. (오류 코드: WORDCHAIN-004)",
-      already_joined: "이미 참여한 파티입니다. (오류 코드: WORDCHAIN-005)",
-      full: "파티 인원이 가득 찼습니다. (오류 코드: WORDCHAIN-006)",
+      not_found: "해당 파티를 찾을 수 없습니다.\n(오류 코드: WORDCHAIN-003)",
+      started: "이미 시작된 파티입니다.\n(오류 코드: WORDCHAIN-004)",
+      already_joined: "이미 참여한 파티입니다.\n(오류 코드: WORDCHAIN-005)",
+      full: "파티 인원이 가득 찼습니다.\n(오류 코드: WORDCHAIN-006)",
     };
 
     await interaction.reply({
@@ -823,7 +813,7 @@ async function handleWordChainStart(interaction) {
 
   if (!party) {
     await interaction.reply({
-      content: nya("해당 파티를 찾을 수 없습니다. (오류 코드: WORDCHAIN-003)"),
+      content: nya("해당 파티를 찾을 수 없습니다.") + "\n(오류 코드: WORDCHAIN-003)",
       ephemeral: true,
     });
     return;
@@ -831,7 +821,7 @@ async function handleWordChainStart(interaction) {
 
   if (interaction.user.id !== party.hostId) {
     await interaction.reply({
-      content: nya("방장만 게임을 시작할 수 있습니다. (오류 코드: WORDCHAIN-007)"),
+      content: nya("방장만 게임을 시작할 수 있습니다.") + "\n(오류 코드: WORDCHAIN-007)",
       ephemeral: true,
     });
     return;
@@ -840,6 +830,14 @@ async function handleWordChainStart(interaction) {
   await interaction.deferUpdate();
 
   const channel = interaction.guild.channels.cache.get(party.channelId);
+
+  if (!channel) {
+    await interaction.followUp({
+      content: nya("끝말잇기 채널을 찾을 수 없습니다.") + "\n(오류 코드: WORDCHAIN-008)",
+      ephemeral: true,
+    });
+    return;
+  }
 
   const thread = await channel.threads.create({
     name: `끝말잇기-${interaction.user.username}`,
@@ -878,7 +876,7 @@ async function handleWordChainDisband(interaction) {
 
   if (!party) {
     await interaction.reply({
-      content: nya("해당 파티를 찾을 수 없습니다. (오류 코드: WORDCHAIN-003)"),
+      content: nya("해당 파티를 찾을 수 없습니다.") + "\n(오류 코드: WORDCHAIN-003)",
       ephemeral: true,
     });
     return;
@@ -886,7 +884,7 @@ async function handleWordChainDisband(interaction) {
 
   if (interaction.user.id !== party.hostId) {
     await interaction.reply({
-      content: nya("방장만 파티를 해체할 수 있습니다. (오류 코드: WORDCHAIN-007)"),
+      content: nya("방장만 파티를 해체할 수 있습니다.") + "\n(오류 코드: WORDCHAIN-007)",
       ephemeral: true,
     });
     return;
@@ -905,7 +903,7 @@ async function handleWordChainDisband(interaction) {
 async function handleDevAction(interaction) {
   if (!isDeveloper(interaction.user.id)) {
     await interaction.reply({
-      content: nya("이 기능은 개발자만 사용할 수 있습니다. (오류 코드: DEV-001)"),
+      content: nya("이 기능은 개발자만 사용할 수 있습니다.") + "\n(오류 코드: DEV-001)",
       ephemeral: true,
     });
     return;
@@ -964,7 +962,7 @@ async function handleDevAction(interaction) {
 async function handleDevModal(interaction, action) {
   if (!isDeveloper(interaction.user.id)) {
     await interaction.reply({
-      content: nya("이 기능은 개발자만 사용할 수 있습니다. (오류 코드: DEV-001)"),
+      content: nya("이 기능은 개발자만 사용할 수 있습니다.") + "\n(오류 코드: DEV-001)",
       ephemeral: true,
     });
     return;
@@ -974,7 +972,7 @@ async function handleDevModal(interaction, action) {
 
   if (!/^\d{15,20}$/.test(targetUserId)) {
     await interaction.update({
-      content: nya("올바른 사용자 ID가 아닙니다. (오류 코드: DEV-002)"),
+      content: nya("올바른 사용자 ID가 아닙니다.") + "\n(오류 코드: DEV-002)",
       embeds: [],
       components: [],
     });
@@ -1118,7 +1116,7 @@ async function handleStockBuyModal(interaction) {
 
   if (!getStockDef(ticker)) {
     await interaction.reply({
-      content: nya(`존재하지 않는 종목 코드입니다: ${ticker} (오류 코드: STOCK-001)`),
+      content: nya(`존재하지 않는 종목 코드입니다: ${ticker}`) + "\n(오류 코드: STOCK-001)",
       ephemeral: true,
     });
     return;
@@ -1126,7 +1124,19 @@ async function handleStockBuyModal(interaction) {
 
   if (!Number.isInteger(quantity) || quantity < 1) {
     await interaction.reply({
-      content: nya("수량은 1 이상의 정수로 입력해주세요. (오류 코드: STOCK-002)"),
+      content: nya("수량은 1 이상의 정수로 입력해주세요.") + "\n(오류 코드: STOCK-002)",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const prices = getCurrentPrices();
+  const price = prices[ticker];
+  const totalCost = price * quantity;
+  const balance = getBalance(userId);
+  if (balance < totalCost) {
+    await interaction.reply({
+      content: nya(`치유미코인이 부족합니다. 필요: ${totalCost.toLocaleString()}코인, 보유: ${balance.toLocaleString()}코인`) + "\n(오류 코드: STOCK-004)",
       ephemeral: true,
     });
     return;
@@ -1135,17 +1145,7 @@ async function handleStockBuyModal(interaction) {
   const result = buyStock(userId, ticker, quantity);
   if (!result.success) {
     await interaction.reply({
-      content: nya(`매수에 실패했습니다: ${result.reason} (오류 코드: STOCK-003)`),
-      ephemeral: true,
-    });
-    return;
-  }
-
-  const balance = getBalance(userId);
-  if (balance < result.totalCost) {
-    sellStock(userId, ticker, quantity);
-    await interaction.reply({
-      content: nya(`치유미코인이 부족합니다. 필요: ${result.totalCost.toLocaleString()}코인, 보유: ${balance.toLocaleString()}코인 (오류 코드: STOCK-004)`),
+      content: nya(`매수에 실패했습니다: ${result.reason}`) + "\n(오류 코드: STOCK-003)",
       ephemeral: true,
     });
     return;
@@ -1168,7 +1168,7 @@ async function handleStockSellModal(interaction) {
 
   if (!getStockDef(ticker)) {
     await interaction.reply({
-      content: nya(`존재하지 않는 종목 코드입니다: ${ticker} (오류 코드: STOCK-001)`),
+      content: nya(`존재하지 않는 종목 코드입니다: ${ticker}`) + "\n(오류 코드: STOCK-001)",
       ephemeral: true,
     });
     return;
@@ -1176,7 +1176,7 @@ async function handleStockSellModal(interaction) {
 
   if (!Number.isInteger(quantity) || quantity < 1) {
     await interaction.reply({
-      content: nya("수량은 1 이상의 정수로 입력해주세요. (오류 코드: STOCK-002)"),
+      content: nya("수량은 1 이상의 정수로 입력해주세요.") + "\n(오류 코드: STOCK-002)",
       ephemeral: true,
     });
     return;
@@ -1188,7 +1188,7 @@ async function handleStockSellModal(interaction) {
       ? "보유 주식이 부족합니다."
       : result.reason;
     await interaction.reply({
-      content: nya(`${reason} (오류 코드: STOCK-005)`),
+      content: nya(`${reason}`) + "\n(오류 코드: STOCK-005)",
       ephemeral: true,
     });
     return;
@@ -1278,7 +1278,7 @@ async function handleBankAction(interaction) {
 
     if (walletBalance < owed) {
       await interaction.reply({
-        content: nya(`지갑 잔액이 부족합니다. 상환 필요: ${owed.toLocaleString()}코인, 보유: ${walletBalance.toLocaleString()}코인 (오류 코드: BANK-003)`),
+        content: nya(`지갑 잔액이 부족합니다. 상환 필요: ${owed.toLocaleString()}코인, 보유: ${walletBalance.toLocaleString()}코인`) + "\n(오류 코드: BANK-003)",
         ephemeral: true,
       });
       return;
@@ -1401,7 +1401,7 @@ async function handleBankDepositModal(interaction) {
 
   if (!Number.isInteger(amount) || amount < 1) {
     await interaction.reply({
-      content: nya("금액은 1 이상의 정수로 입력해주세요. (오류 코드: BANK-001)"),
+      content: nya("금액은 1 이상의 정수로 입력해주세요.") + "\n(오류 코드: BANK-001)",
       ephemeral: true,
     });
     return;
@@ -1410,7 +1410,7 @@ async function handleBankDepositModal(interaction) {
   const walletBalance = getBalance(userId);
   if (walletBalance < amount) {
     await interaction.reply({
-      content: nya(`지갑 잔액이 부족합니다. 보유: ${walletBalance.toLocaleString()}코인 (오류 코드: BANK-002)`),
+      content: nya(`지갑 잔액이 부족합니다. 보유: ${walletBalance.toLocaleString()}코인`) + "\n(오류 코드: BANK-002)",
       ephemeral: true,
     });
     return;
@@ -1435,7 +1435,7 @@ async function handleBankWithdrawModal(interaction) {
 
   if (!Number.isInteger(amount) || amount < 1) {
     await interaction.reply({
-      content: nya("금액은 1 이상의 정수로 입력해주세요. (오류 코드: BANK-001)"),
+      content: nya("금액은 1 이상의 정수로 입력해주세요.") + "\n(오류 코드: BANK-001)",
       ephemeral: true,
     });
     return;
@@ -1445,7 +1445,7 @@ async function handleBankWithdrawModal(interaction) {
   if (!result.success) {
     const acc = getAccount(userId);
     await interaction.reply({
-      content: nya(`예금 잔액이 부족합니다. 예금: ${acc.savings.toLocaleString()}코인 (오류 코드: BANK-002)`),
+      content: nya(`예금 잔액이 부족합니다. 예금: ${acc.savings.toLocaleString()}코인`) + "\n(오류 코드: BANK-002)",
       ephemeral: true,
     });
     return;
@@ -1469,7 +1469,7 @@ async function handleBankLoanModal(interaction) {
 
   if (!Number.isInteger(amount) || amount < MIN_LOAN || amount > MAX_LOAN) {
     await interaction.reply({
-      content: nya(`대출 금액은 ${MIN_LOAN.toLocaleString()} ~ ${MAX_LOAN.toLocaleString()}코인 범위로 입력해주세요. (오류 코드: BANK-004)`),
+      content: nya(`대출 금액은 ${MIN_LOAN.toLocaleString()} ~ ${MAX_LOAN.toLocaleString()}코인 범위로 입력해주세요.`) + "\n(오류 코드: BANK-004)",
       ephemeral: true,
     });
     return;
@@ -1479,12 +1479,12 @@ async function handleBankLoanModal(interaction) {
   if (!result.success) {
     if (result.reason === "existing_loan") {
       await interaction.reply({
-        content: nya("이미 대출 중인 건이 있습니다. 기존 대출을 먼저 상환해주세요. (오류 코드: BANK-005)"),
+        content: nya("이미 대출 중인 건이 있습니다. 기존 대출을 먼저 상환해주세요.") + "\n(오류 코드: BANK-005)",
         ephemeral: true,
       });
     } else {
       await interaction.reply({
-        content: nya(`대출 금액이 올바르지 않습니다. (오류 코드: BANK-004)`),
+        content: nya(`대출 금액이 올바르지 않습니다.`) + "\n(오류 코드: BANK-004)",
         ephemeral: true,
       });
     }
@@ -1534,9 +1534,7 @@ async function handlePetAction(interaction) {
 
   if (result.alreadyDone) {
     await interaction.reply({
-      content: nya(
-        `오늘은 이미 ${ACTIONS[action].label}를 했습니다. 내일 다시 해주세요. (오류 코드: PET-001)`,
-      ),
+      content: nya(`오늘은 이미 ${ACTIONS[action].label}를 했습니다. 내일 다시 해주세요.`) + "\n(오류 코드: PET-001)",
       ephemeral: true,
     });
     return;
@@ -1568,7 +1566,7 @@ async function handlePetAction(interaction) {
 async function handleRankPageButton(interaction) {
   if (!interaction.inGuild()) {
     await interaction.reply({
-      content: nya("서버에서만 사용할 수 있는 버튼입니다. (오류 코드: GUILD-001)"),
+      content: nya("서버에서만 사용할 수 있는 버튼입니다.") + "\n(오류 코드: GUILD-001)",
       ephemeral: true,
     });
     return;
@@ -1613,7 +1611,7 @@ async function safeHandle(interaction, fn) {
     await fn();
   } catch (err) {
     console.error("[상호작용 오류]", interaction.customId ?? interaction.commandName, err);
-    const msg = { content: nya("명령어를 실행하는 중 오류가 발생했습니다. (오류 코드: CMD-001)"), ephemeral: true };
+    const msg = { content: nya("명령어를 실행하는 중 오류가 발생했습니다.") + "\n(오류 코드: CMD-001)", ephemeral: true };
     if (interaction.replied || interaction.deferred) {
       await interaction.followUp(msg).catch(() => {});
     } else if (interaction.isRepliable()) {
@@ -1629,9 +1627,7 @@ module.exports = {
       if (interaction.isRepliable()) {
         const restriction = getRestriction(interaction.user.id);
         await interaction.reply({
-          content: nya(
-            `이용이 제한된 사용자입니다. 제한 사유: ${restriction?.reason ?? "사유 없음"} (오류 코드: DEV-004)`,
-          ),
+          content: nya(`이용이 제한된 사용자입니다. 제한 사유: ${restriction?.reason ?? "사유 없음"}`) + "\n(오류 코드: DEV-004)",
           ephemeral: true,
         }).catch(() => {});
       }
@@ -1704,9 +1700,7 @@ module.exports = {
       console.error(error);
 
       const message = {
-        content: nya(
-          "명령어를 실행하는 중 오류가 발생했습니다. (오류 코드: CMD-001)",
-        ),
+        content: nya("명령어를 실행하는 중 오류가 발생했습니다.") + "\n(오류 코드: CMD-001)",
         ephemeral: true,
       };
 
@@ -1731,9 +1725,7 @@ async function handleRoleSelect(interaction) {
 
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
     await interaction.reply({
-      content: nya(
-        "이 설정은 역할 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
-      ),
+      content: nya("이 설정은 역할 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
       ephemeral: true,
     });
     return;
@@ -1748,9 +1740,7 @@ async function handleRoleSelect(interaction) {
 
   if (!role) {
     await interaction.update({
-      content: nya(
-        "선택한 역할을 찾을 수 없습니다. 다시 시도해주세요. (오류 코드: ROLE-001)",
-      ),
+      content: nya("선택한 역할을 찾을 수 없습니다. 다시 시도해주세요.") + "\n(오류 코드: ROLE-001)",
       components: [],
     });
     return;
@@ -1758,9 +1748,7 @@ async function handleRoleSelect(interaction) {
 
   if (!role.editable) {
     await interaction.update({
-      content: nya(
-        "이 역할은 봇이 지급할 수 없습니다. 봇 역할을 해당 역할보다 위로 올려주세요. (오류 코드: ROLE-002)",
-      ),
+      content: nya("이 역할은 봇이 지급할 수 없습니다. 봇 역할을 해당 역할보다 위로 올려주세요.") + "\n(오류 코드: ROLE-002)",
       components: [],
     });
     return;
@@ -1802,9 +1790,7 @@ async function handleChannelSelect(interaction) {
   if (interaction.customId === RANK_LEVELUP_CHANNEL_SELECT_ID) {
     if (!hasManageGuild(interaction)) {
       await interaction.reply({
-        content: nya(
-          "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
-        ),
+        content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
         ephemeral: true,
       });
       return;
@@ -1824,9 +1810,7 @@ async function handleChannelSelect(interaction) {
   if (interaction.customId === TICKET_CHANNEL_SELECT_ID) {
     if (!hasManageGuild(interaction)) {
       await interaction.reply({
-        content: nya(
-          "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
-        ),
+        content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
         ephemeral: true,
       });
       return;
@@ -1846,9 +1830,7 @@ async function handleChannelSelect(interaction) {
   if (interaction.customId === WORDCHAIN_CHANNEL_SELECT_ID) {
     if (!hasManageGuild(interaction)) {
       await interaction.reply({
-        content: nya(
-          "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
-        ),
+        content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
         ephemeral: true,
       });
       return;
@@ -1868,9 +1850,7 @@ async function handleChannelSelect(interaction) {
   if (interaction.customId === WELCOME_CHANNEL_SELECT_ID) {
     if (!hasManageGuild(interaction)) {
       await interaction.reply({
-        content: nya(
-          "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
-        ),
+        content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
         ephemeral: true,
       });
       return;
@@ -1889,7 +1869,7 @@ async function handleChannelSelect(interaction) {
   if (interaction.customId === DEV_SUPPORT_CHANNEL_SELECT_ID) {
     if (!isDeveloper(interaction.user.id)) {
       await interaction.reply({
-        content: nya("이 기능은 개발자만 사용할 수 있습니다. (오류 코드: DEV-001)"),
+        content: nya("이 기능은 개발자만 사용할 수 있습니다.") + "\n(오류 코드: DEV-001)",
         ephemeral: true,
       });
       return;
@@ -1914,9 +1894,7 @@ async function handleChannelSelect(interaction) {
 
   if (!hasManageGuild(interaction)) {
     await interaction.reply({
-      content: nya(
-        "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
-      ),
+      content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
       ephemeral: true,
     });
     return;
@@ -1935,9 +1913,7 @@ async function handleButton(interaction) {
   if (interaction.customId.startsWith(LOG_ACTION_PREFIX)) {
     if (!hasManageGuild(interaction)) {
       await interaction.reply({
-        content: nya(
-          "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
-        ),
+        content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
         ephemeral: true,
       });
       return;
@@ -1968,9 +1944,7 @@ async function handleButton(interaction) {
   if (interaction.customId.startsWith(LOG_TOGGLE_PREFIX)) {
     if (!hasManageGuild(interaction)) {
       await interaction.reply({
-        content: nya(
-          "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
-        ),
+        content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
         ephemeral: true,
       });
       return;
@@ -1990,9 +1964,7 @@ async function handleButton(interaction) {
   if (interaction.customId.startsWith(WELCOME_ACTION_PREFIX)) {
     if (!hasManageGuild(interaction)) {
       await interaction.reply({
-        content: nya(
-          "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
-        ),
+        content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
         ephemeral: true,
       });
       return;
@@ -2029,9 +2001,7 @@ async function handleButton(interaction) {
   if (interaction.customId.startsWith(WELCOME_TOGGLE_PREFIX)) {
     if (!hasManageGuild(interaction)) {
       await interaction.reply({
-        content: nya(
-          "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
-        ),
+        content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
         ephemeral: true,
       });
       return;
@@ -2054,9 +2024,7 @@ async function handleButton(interaction) {
   ) {
     if (!hasManageGuild(interaction)) {
       await interaction.reply({
-        content: nya(
-          "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
-        ),
+        content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
         ephemeral: true,
       });
       return;
@@ -2074,9 +2042,7 @@ async function handleButton(interaction) {
   if (interaction.customId.startsWith("censor-toggle:")) {
     if (!hasManageGuild(interaction)) {
       await interaction.reply({
-        content: nya(
-          "이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
-        ),
+        content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
         ephemeral: true,
       });
       return;
@@ -2137,7 +2103,7 @@ async function handleButton(interaction) {
     if (action === "dev") {
       if (!isDeveloper(interaction.user.id)) {
         await interaction.reply({
-          content: nya("이 버튼은 개발자만 사용할 수 있습니다. (오류 코드: DEV-001)"),
+          content: nya("이 버튼은 개발자만 사용할 수 있습니다.") + "\n(오류 코드: DEV-001)",
           ephemeral: true,
         });
         return;
@@ -2177,7 +2143,7 @@ async function handleButton(interaction) {
   if (interaction.customId.startsWith(COIN_DEV_ACTION_PREFIX)) {
     if (!isDeveloper(interaction.user.id)) {
       await interaction.reply({
-        content: nya("이 버튼은 개발자만 사용할 수 있습니다. (오류 코드: DEV-001)"),
+        content: nya("이 버튼은 개발자만 사용할 수 있습니다.") + "\n(오류 코드: DEV-001)",
         ephemeral: true,
       });
       return;
@@ -2311,9 +2277,7 @@ async function handleButton(interaction) {
   if (interaction.customId.startsWith(VERIFY_ACTION_PREFIX)) {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
       await interaction.reply({
-        content: nya(
-          "이 설정은 역할 관리 권한이 있는 관리자만 사용할 수 있습니다. (오류 코드: AUTH-001)",
-        ),
+        content: nya("이 설정은 역할 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
         ephemeral: true,
       });
       return;
@@ -2352,7 +2316,7 @@ async function handleButton(interaction) {
 
   if (!interaction.inGuild()) {
     await interaction.reply({
-      content: nya("서버에서만 사용할 수 있는 버튼입니다. (오류 코드: GUILD-001)"),
+      content: nya("서버에서만 사용할 수 있는 버튼입니다.") + "\n(오류 코드: GUILD-001)",
       ephemeral: true,
     });
     return;
@@ -2363,9 +2327,7 @@ async function handleButton(interaction) {
 
   if (!role) {
     await interaction.reply({
-      content: nya(
-        "인증 역할을 찾을 수 없습니다. 관리자에게 문의해주세요. (오류 코드: ROLE-003)",
-      ),
+      content: nya("인증 역할을 찾을 수 없습니다. 관리자에게 문의해주세요.") + "\n(오류 코드: ROLE-003)",
       ephemeral: true,
     });
     return;
@@ -2388,9 +2350,7 @@ async function handleButton(interaction) {
   } catch (error) {
     console.error(error);
     await interaction.reply({
-      content: nya(
-        "역할을 지급하지 못했습니다. 봇 권한과 역할 순서를 확인해주세요. (오류 코드: ROLE-004)",
-      ),
+      content: nya("역할을 지급하지 못했습니다. 봇 권한과 역할 순서를 확인해주세요.") + "\n(오류 코드: ROLE-004)",
       ephemeral: true,
     });
   }
@@ -2415,7 +2375,7 @@ async function showDevLookupModal(interaction) {
 async function handleDevLookupModal(interaction) {
   if (!isDeveloper(interaction.user.id)) {
     await interaction.reply({
-      content: nya("이 기능은 개발자만 사용할 수 있습니다. (오류 코드: DEV-001)"),
+      content: nya("이 기능은 개발자만 사용할 수 있습니다.") + "\n(오류 코드: DEV-001)",
       ephemeral: true,
     });
     return;
@@ -2425,7 +2385,7 @@ async function handleDevLookupModal(interaction) {
 
   if (!/^\d{15,20}$/.test(targetUserId)) {
     await interaction.reply({
-      content: nya("올바른 사용자 ID가 아닙니다. (오류 코드: DEV-002)"),
+      content: nya("올바른 사용자 ID가 아닙니다.") + "\n(오류 코드: DEV-002)",
       ephemeral: true,
     });
     return;
@@ -2470,7 +2430,7 @@ async function showDevGrantModal(interaction, direction) {
 async function handleDevGrantModal(interaction, direction) {
   if (!isDeveloper(interaction.user.id)) {
     await interaction.reply({
-      content: nya("이 기능은 개발자만 사용할 수 있습니다. (오류 코드: DEV-001)"),
+      content: nya("이 기능은 개발자만 사용할 수 있습니다.") + "\n(오류 코드: DEV-001)",
       ephemeral: true,
     });
     return;
@@ -2482,7 +2442,7 @@ async function handleDevGrantModal(interaction, direction) {
 
   if (!/^\d{15,20}$/.test(targetUserId)) {
     await interaction.reply({
-      content: nya("올바른 사용자 ID가 아닙니다. (오류 코드: DEV-002)"),
+      content: nya("올바른 사용자 ID가 아닙니다.") + "\n(오류 코드: DEV-002)",
       ephemeral: true,
     });
     return;
@@ -2494,9 +2454,7 @@ async function handleDevGrantModal(interaction, direction) {
     rawAmount > DEV_GRANT_MAX_AMOUNT
   ) {
     await interaction.reply({
-      content: nya(
-        `올바른 금액이 아닙니다. 1~${DEV_GRANT_MAX_AMOUNT}개까지만 가능합니다. (오류 코드: DEV-003)`,
-      ),
+      content: nya(`올바른 금액이 아닙니다. 1~${DEV_GRANT_MAX_AMOUNT}개까지만 가능합니다.`) + "\n(오류 코드: DEV-003)",
       ephemeral: true,
     });
     return;
@@ -2551,9 +2509,7 @@ async function handleLolStatsModal(interaction) {
 
   if (!gameName || !tagLine) {
     await interaction.reply({
-      content: nya(
-        "닉네임#태그 형식으로 입력해주세요. 예: Hide on bush#KR1 (오류 코드: STATS-001)",
-      ),
+      content: nya("닉네임#태그 형식으로 입력해주세요. 예: Hide on bush#KR1") + "\n(오류 코드: STATS-001)",
       ephemeral: true,
     });
     return;
@@ -2573,11 +2529,11 @@ async function handleLolStatsModal(interaction) {
     account = await getAccountByRiotId(gameName, tagLine);
   } catch (error) {
     if (error.status === 404) {
-      await interaction.editReply(nya(`'${riotId}' 소환사를 찾을 수 없습니다. (오류 코드: STATS-002)`));
+      await interaction.editReply(nya(`'${riotId}' 소환사를 찾을 수 없습니다.`) + "\n(오류 코드: STATS-002)");
       return;
     }
     console.error(error);
-    await interaction.editReply(nya("전적을 불러오는 중 오류가 발생했습니다. (오류 코드: STATS-003)"));
+    await interaction.editReply(nya("전적을 불러오는 중 오류가 발생했습니다.") + "\n(오류 코드: STATS-003)");
     return;
   }
 
@@ -2621,7 +2577,7 @@ async function handleLolStatsModal(interaction) {
     });
   } catch (error) {
     console.error(error);
-    await interaction.editReply(nya("전적을 불러오는 중 오류가 발생했습니다. (오류 코드: STATS-003)"));
+    await interaction.editReply(nya("전적을 불러오는 중 오류가 발생했습니다.") + "\n(오류 코드: STATS-003)");
   }
 }
 
@@ -2727,10 +2683,11 @@ function buildMatchLines(matches, puuid) {
   if (matches.length === 0) return "해당 게임 모드의 전적이 없습니다";
   return matches.map(({ match }, i) => {
     const p = match.info.participants.find((x) => x.puuid === puuid);
+    if (!p) return null;
     const queue = QUEUE_NAMES[match.info.queueId] ?? `큐 ${match.info.queueId}`;
     const result = p.win ? "✅ 승리" : "❌ 패배";
     return `\`${i + 1}\` ${queue}  **${p.championName}**  ${p.kills}/${p.deaths}/${p.assists}  ${result}  ${formatDuration(match.info.gameDuration)}`;
-  }).join("\n");
+  }).filter(Boolean).join("\n") || "해당 게임 모드의 전적이 없습니다";
 }
 
 function buildStatsEmbeds(session, displayWithIdx) {
@@ -2801,7 +2758,7 @@ async function handleStatsFilterButton(interaction) {
 
   if (!session) {
     await interaction.reply({
-      content: nya("전적 정보가 만료되었습니다. 다시 검색해주세요. (오류 코드: STATS-004)"),
+      content: nya("전적 정보가 만료되었습니다. 다시 검색해주세요.") + "\n(오류 코드: STATS-004)",
       ephemeral: true,
     });
     return;
@@ -2826,7 +2783,7 @@ async function handleStatsDetailButton(interaction) {
 
   if (!session) {
     await interaction.reply({
-      content: nya("전적 정보가 만료되었습니다. 다시 검색해주세요. (오류 코드: STATS-004)"),
+      content: nya("전적 정보가 만료되었습니다. 다시 검색해주세요.") + "\n(오류 코드: STATS-004)",
       ephemeral: true,
     });
     return;
@@ -2836,13 +2793,21 @@ async function handleStatsDetailButton(interaction) {
 
   if (!match) {
     await interaction.reply({
-      content: nya("해당 경기를 찾을 수 없습니다. (오류 코드: STATS-005)"),
+      content: nya("해당 경기를 찾을 수 없습니다.") + "\n(오류 코드: STATS-005)",
       ephemeral: true,
     });
     return;
   }
 
   const participant = match.info.participants.find((p) => p.puuid === session.puuid);
+  if (!participant) {
+    await interaction.reply({
+      content: nya("경기 데이터를 불러올 수 없습니다.") + "\n(오류 코드: STATS-006)",
+      ephemeral: true,
+    });
+    return;
+  }
+
   const queueName = QUEUE_NAMES[match.info.queueId] ?? `큐 ${match.info.queueId}`;
 
   const embed = new EmbedBuilder()
@@ -2888,6 +2853,10 @@ async function showWelcomeMessageModal(interaction, type) {
 
 async function handleWelcomeMessageModal(interaction, type) {
   const message = interaction.fields.getTextInputValue("message").trim();
+  if (!message) {
+    await interaction.reply({ content: nya("문구는 비워둘 수 없습니다.") + "\n(오류 코드: MSG-001)", ephemeral: true });
+    return;
+  }
   setWelcomeMessage(interaction.guild.id, type, message);
 
   await interaction.update({
@@ -2968,7 +2937,7 @@ async function handleInquiryModal(interaction, type) {
   } catch (error) {
     console.error(error);
     await interaction.update({
-      content: nya("문의를 전달하지 못했습니다. 잠시 후 다시 시도해주세요. (오류 코드: INQUIRY-001)"),
+      content: nya("문의를 전달하지 못했습니다. 잠시 후 다시 시도해주세요.") + "\n(오류 코드: INQUIRY-001)",
       embeds: [],
       components: [],
     });
@@ -3031,7 +3000,7 @@ async function handleGambleModal(interaction, game) {
 
   if (!Number.isInteger(bet) || bet <= 0) {
     await interaction.reply({
-      content: nya("올바른 베팅 금액이 아닙니다. (오류 코드: GAMBLE-001)"),
+      content: nya("올바른 베팅 금액이 아닙니다.") + "\n(오류 코드: GAMBLE-001)",
       ephemeral: true,
     });
     return;
@@ -3042,9 +3011,7 @@ async function handleGambleModal(interaction, game) {
 
   if (bet > balance) {
     await interaction.reply({
-      content: nya(
-        `보유한 치유미코인(${balance}개)보다 많은 금액을 베팅할 수 없습니다. (오류 코드: GAMBLE-002)`,
-      ),
+      content: nya(`보유한 치유미코인(${balance}개)보다 많은 금액을 베팅할 수 없습니다.`) + "\n(오류 코드: GAMBLE-002)",
       ephemeral: true,
     });
     return;
@@ -3128,7 +3095,7 @@ async function playOddEvenGame(interaction, userId, bet) {
   const choice = choiceRaw === "홀" ? "odd" : choiceRaw === "짝" ? "even" : null;
 
   if (!choice) {
-    await interaction.editReply(nya("홀 또는 짝 중 하나를 입력해주세요. (오류 코드: GAMBLE-003)"));
+    await interaction.editReply(nya("홀 또는 짝 중 하나를 입력해주세요.") + "\n(오류 코드: GAMBLE-003)");
     return;
   }
 
@@ -3161,7 +3128,7 @@ async function playNumberGuessGame(interaction, userId, bet) {
   const guess = Number(guessText);
 
   if (!Number.isInteger(guess) || guess < 1 || guess > 10) {
-    await interaction.editReply(nya("1부터 10 사이의 숫자를 입력해주세요. (오류 코드: GAMBLE-004)"));
+    await interaction.editReply(nya("1부터 10 사이의 숫자를 입력해주세요.") + "\n(오류 코드: GAMBLE-004)");
     return;
   }
 
@@ -3231,7 +3198,7 @@ async function playRpsGame(interaction, userId, bet) {
   const choiceRaw = interaction.fields.getTextInputValue("choice").trim();
 
   if (!RPS_CHOICES.includes(choiceRaw)) {
-    await interaction.editReply(nya("가위, 바위, 보 중 하나를 입력해주세요. (오류 코드: GAMBLE-005)"));
+    await interaction.editReply(nya("가위, 바위, 보 중 하나를 입력해주세요.") + "\n(오류 코드: GAMBLE-005)");
     return;
   }
 
@@ -3278,7 +3245,7 @@ async function handleBlackjackAction(interaction) {
 
   if (!session) {
     await interaction.reply({
-      content: nya("이미 종료된 게임입니다. (오류 코드: BJ-002)"),
+      content: nya("이미 종료된 게임입니다.") + "\n(오류 코드: BJ-002)",
       ephemeral: true,
     });
     return;
@@ -3286,7 +3253,7 @@ async function handleBlackjackAction(interaction) {
 
   if (interaction.user.id !== session.userId) {
     await interaction.reply({
-      content: nya("자신이 시작한 게임만 진행할 수 있습니다. (오류 코드: BJ-003)"),
+      content: nya("자신이 시작한 게임만 진행할 수 있습니다.") + "\n(오류 코드: BJ-003)",
       ephemeral: true,
     });
     return;
@@ -3392,9 +3359,7 @@ async function deleteVerifyMessage(interaction, messageId) {
 
     if (message.author.id !== interaction.client.user.id) {
       await interaction.update({
-        content: nya(
-          "이 봇이 만든 메시지만 삭제할 수 있습니다. (오류 코드: VERIFY-004)",
-        ),
+        content: nya("이 봇이 만든 메시지만 삭제할 수 있습니다.") + "\n(오류 코드: VERIFY-004)",
         components: [],
       });
       return;
@@ -3408,9 +3373,7 @@ async function deleteVerifyMessage(interaction, messageId) {
   } catch (error) {
     console.error(error);
     await interaction.update({
-      content: nya(
-        "메시지를 삭제하지 못했습니다. 메시지 ID와 채널이 맞는지 확인해주세요. (오류 코드: VERIFY-001)",
-      ),
+      content: nya("메시지를 삭제하지 못했습니다. 메시지 ID와 채널이 맞는지 확인해주세요.") + "\n(오류 코드: VERIFY-001)",
       components: [],
     });
   }
@@ -3428,7 +3391,7 @@ async function handleAnnounceModal(interaction) {
 
   if (!channel) {
     await interaction.reply({
-      content: nya("채널을 찾을 수 없습니다. (오류 코드: ANNOUNCE-001)"),
+      content: nya("채널을 찾을 수 없습니다.") + "\n(오류 코드: ANNOUNCE-001)",
       ephemeral: true,
     });
     return;
@@ -3449,9 +3412,7 @@ async function handleAnnounceModal(interaction) {
   } catch (error) {
     console.error(error);
     await interaction.reply({
-      content: nya(
-        `${channel}에 공지를 보내지 못했습니다. 봇에게 해당 채널의 메시지 보내기/임베드 권한이 있는지 확인해주세요. (오류 코드: ANNOUNCE-002)`,
-      ),
+      content: nya(`${channel}에 공지를 보내지 못했습니다. 봇에게 해당 채널의 메시지 보내기/임베드 권한이 있는지 확인해주세요.`) + "\n(오류 코드: ANNOUNCE-002)",
       ephemeral: true,
     });
     return;
@@ -3545,6 +3506,10 @@ async function handleModalSubmit(interaction) {
 
   if (interaction.customId === RANK_LEVELUP_MODAL_ID) {
     const message = interaction.fields.getTextInputValue("message").trim();
+    if (!message) {
+      await interaction.reply({ content: nya("문구는 비워둘 수 없습니다.") + "\n(오류 코드: MSG-001)", ephemeral: true });
+      return;
+    }
     setLevelUpMessage(interaction.guild.id, message);
 
     await interaction.update({
@@ -3556,6 +3521,10 @@ async function handleModalSubmit(interaction) {
 
   if (interaction.customId === TICKET_MODAL_ID) {
     const message = interaction.fields.getTextInputValue("message").trim();
+    if (!message) {
+      await interaction.reply({ content: nya("문구는 비워둘 수 없습니다.") + "\n(오류 코드: MSG-001)", ephemeral: true });
+      return;
+    }
     setTicketMessage(interaction.guild.id, message);
 
     await interaction.update({
@@ -3633,9 +3602,7 @@ async function saveVerifyMessage(interaction, setup, message) {
 
   if (!role) {
     await interaction.update({
-      content: nya(
-        "인증 역할을 찾을 수 없습니다. 다시 설정해주세요. (오류 코드: ROLE-005)",
-      ),
+      content: nya("인증 역할을 찾을 수 없습니다. 다시 설정해주세요.") + "\n(오류 코드: ROLE-005)",
       components: [],
     });
     return;
@@ -3643,9 +3610,7 @@ async function saveVerifyMessage(interaction, setup, message) {
 
   if (!role.editable) {
     await interaction.update({
-      content: nya(
-        "이 역할은 봇이 지급할 수 없습니다. 봇 역할을 해당 역할보다 위로 올려주세요. (오류 코드: ROLE-006)",
-      ),
+      content: nya("이 역할은 봇이 지급할 수 없습니다. 봇 역할을 해당 역할보다 위로 올려주세요.") + "\n(오류 코드: ROLE-006)",
       components: [],
     });
     return;
@@ -3682,9 +3647,7 @@ async function editVerifyMessage(interaction, messageId, message, row, role) {
 
     if (targetMessage.author.id !== interaction.client.user.id) {
       await interaction.update({
-        content: nya(
-          "이 봇이 만든 메시지만 수정할 수 있습니다. (오류 코드: VERIFY-002)",
-        ),
+        content: nya("이 봇이 만든 메시지만 수정할 수 있습니다.") + "\n(오류 코드: VERIFY-002)",
         components: [],
       });
       return;
@@ -3702,9 +3665,7 @@ async function editVerifyMessage(interaction, messageId, message, row, role) {
   } catch (error) {
     console.error(error);
     await interaction.update({
-      content: nya(
-        "메시지를 수정하지 못했습니다. 메시지 ID와 채널이 맞는지 확인해주세요. (오류 코드: VERIFY-003)",
-      ),
+      content: nya("메시지를 수정하지 못했습니다. 메시지 ID와 채널이 맞는지 확인해주세요.") + "\n(오류 코드: VERIFY-003)",
       components: [],
     });
   }
