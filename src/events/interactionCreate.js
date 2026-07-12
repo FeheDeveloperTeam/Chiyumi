@@ -1787,9 +1787,11 @@ async function handleStreamAlertPlatformSelect(interaction) {
 async function handleStreamAlertModal(interaction) {
   const pending = pendingSetups.get(interaction.user.id);
   if (!pending) {
-    await interaction.reply({
+    const alerts = getGuildAlerts(interaction.guild.id);
+    await interaction.update({
       content: nya("세션이 만료되었습니다. 다시 시도해주세요."),
-      ephemeral: true,
+      embeds: [buildAlertListEmbed(alerts)],
+      components: buildStreamAlertComponents(alerts),
     });
     return;
   }
@@ -1802,18 +1804,22 @@ async function handleStreamAlertModal(interaction) {
   const channelId = extractChannelId(pending.platform, link);
   if (!channelId) {
     pendingSetups.delete(interaction.user.id);
-    await interaction.reply({
+    const alerts = getGuildAlerts(pending.guildId);
+    await interaction.update({
       content: nya("채널 링크를 인식할 수 없습니다. 올바른 링크를 입력해주세요.") + "\n(오류 코드: STREAM-001)",
-      ephemeral: true,
+      embeds: [buildAlertListEmbed(alerts)],
+      components: buildStreamAlertComponents(alerts),
     });
     return;
   }
 
   if (isDuplicate(pending.guildId, pending.platform, channelId)) {
     pendingSetups.delete(interaction.user.id);
-    await interaction.reply({
+    const alerts = getGuildAlerts(pending.guildId);
+    await interaction.update({
       content: nya("이미 등록된 방송인입니다.") + "\n(오류 코드: STREAM-002)",
-      ephemeral: true,
+      embeds: [buildAlertListEmbed(alerts)],
+      components: buildStreamAlertComponents(alerts),
     });
     return;
   }
@@ -1834,10 +1840,10 @@ async function handleStreamAlertModal(interaction) {
       .setChannelTypes(ChannelType.GuildText),
   );
 
-  await interaction.reply({
+  await interaction.update({
     content: nya("알림을 받을 채널을 선택하세요"),
+    embeds: [],
     components: [row],
-    ephemeral: true,
   });
 }
 
