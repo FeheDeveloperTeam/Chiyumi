@@ -59,6 +59,18 @@ function buildStreamAlertComponents(alerts) {
             ),
           ),
       ),
+      new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId("streamalert:test_select")
+          .setPlaceholder("테스트 알림 전송")
+          .addOptions(
+            alerts.slice(0, 25).map((a) =>
+              new StringSelectMenuOptionBuilder()
+                .setLabel(`${PLATFORM_EMOJIS[a.platform]} ${alertDisplayName(a)} (${PLATFORM_LABELS[a.platform]})`)
+                .setValue(a.id),
+            ),
+          ),
+      ),
     );
   }
 

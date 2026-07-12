@@ -87,6 +87,7 @@ const {
   removeAlert,
   extractChannelId,
   isDuplicate,
+  buildNotificationContent,
   pendingSetups,
 } = require("../utils/streamAlert");
 const { buildAlertListEmbed, buildStreamAlertComponents, PLATFORM_LABELS } = require("../commands/streamAlert");
@@ -149,6 +150,7 @@ const COIN_DEV_ACTION_PREFIX = "coin-dev-action:";
 const COIN_DEV_MODAL_PREFIX = "coin-dev-modal:";
 const DEFAULT_VERIFY_MESSAGE = nya("아래 버튼을 눌러 서버 인증을 완료하세요.");
 const STREAMALERT_PLATFORM_SELECT = "streamalert:platform";
+const STREAMALERT_TEST_SELECT = "streamalert:test_select";
 const STREAMALERT_MODAL_ID = "streamalert:modal";
 const STREAMALERT_NOTIFCHANNEL_SELECT = "streamalert:notifchannel";
 const STREAMALERT_DELETE_SELECT = "streamalert:delete_select";
@@ -1768,6 +1770,15 @@ async function handleStreamAlertPlatformSelect(interaction) {
         .setRequired(false)
         .setMaxLength(200),
     ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId("mention")
+        .setLabel("멘션 (없음 / everyone / here)")
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder("없음")
+        .setRequired(false)
+        .setMaxLength(10),
+    ),
   );
 
   await interaction.showModal(modal);
@@ -1785,6 +1796,8 @@ async function handleStreamAlertModal(interaction) {
 
   const link = interaction.fields.getTextInputValue("link").trim();
   const customText = interaction.fields.getTextInputValue("text").trim();
+  const mentionRaw = interaction.fields.getTextInputValue("mention").trim().toLowerCase();
+  const mention = ["everyone", "here"].includes(mentionRaw) ? mentionRaw : "none";
 
   const channelId = extractChannelId(pending.platform, link);
   if (!channelId) {
@@ -1811,7 +1824,7 @@ async function handleStreamAlertModal(interaction) {
     channelId,
     channelName: channelId,
     customText,
-    mention: "none",
+    mention,
   });
 
   const row = new ActionRowBuilder().addComponents(
@@ -1861,6 +1874,31 @@ async function handleStreamAlertDeleteSelect(interaction) {
   const alerts = getGuildAlerts(interaction.guild.id);
   await interaction.update({
     content: null,
+    embeds: [buildAlertListEmbed(alerts)],
+    components: buildStreamAlertComponents(alerts),
+  });
+}
+
+async function handleStreamAlertTestSelect(interaction) {
+  const alertId = interaction.values[0];
+  const alert = getGuildAlerts(interaction.guild.id).find((a) => a.id === alertId);
+  if (!alert) {
+    const alerts = getGuildAlerts(interaction.guild.id);
+    await interaction.update({ content: null, embeds: [buildAlertListEmbed(alerts)], components: buildStreamAlertComponents(alerts) });
+    return;
+  }
+
+  const channel = interaction.guild.channels.cache.get(alert.notifChannelId);
+  if (!channel?.isTextBased()) {
+    const alerts = getGuildAlerts(interaction.guild.id);
+    await interaction.update({ content: nya("알림 채널을 찾을 수 없습니다."), embeds: [buildAlertListEmbed(alerts)], components: buildStreamAlertComponents(alerts) });
+    return;
+  }
+
+  await channel.send(buildNotificationContent(alert));
+  const alerts = getGuildAlerts(interaction.guild.id);
+  await interaction.update({
+    content: nya(`<#${alert.notifChannelId}>에 테스트 알림을 전송했습니다`),
     embeds: [buildAlertListEmbed(alerts)],
     components: buildStreamAlertComponents(alerts),
   });
@@ -1928,6 +1966,11 @@ async function handleStringSelect(interaction) {
 
   if (interaction.customId === STREAMALERT_DELETE_SELECT) {
     await handleStreamAlertDeleteSelect(interaction);
+    return;
+  }
+
+  if (interaction.customId === STREAMALERT_TEST_SELECT) {
+    await handleStreamAlertTestSelect(interaction);
     return;
   }
 
