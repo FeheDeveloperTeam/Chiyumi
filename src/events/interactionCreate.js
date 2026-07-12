@@ -11,8 +11,6 @@ const {
   ModalBuilder,
   PermissionFlagsBits,
   RoleSelectMenuBuilder,
-  StringSelectMenuBuilder,
-  StringSelectMenuOptionBuilder,
   TextInputBuilder,
   TextInputStyle,
   UserSelectMenuBuilder,
@@ -90,7 +88,7 @@ const {
   buildNotificationContent,
   pendingSetups,
 } = require("../utils/streamAlert");
-const { buildAlertListEmbed, buildStreamAlertComponents, PLATFORM_LABELS } = require("../commands/streamAlert");
+const { buildStreamAlertPage, buildPlatformButtons, PLATFORM_LABELS } = require("../commands/streamAlert");
 const { buildMarketEmbed, buildPortfolioEmbed, buildStockRow } = require("../commands/stock");
 const { buildBankEmbed, buildBankRow } = require("../commands/bank");
 const { getStockDef, getCurrentPrices, getPortfolio, getPortfolioValue, clearPortfolio, buyStock, sellStock } = require("../utils/stocks");
@@ -149,11 +147,13 @@ const WELCOME_MODAL_PREFIX = "welcome-modal:";
 const COIN_DEV_ACTION_PREFIX = "coin-dev-action:";
 const COIN_DEV_MODAL_PREFIX = "coin-dev-modal:";
 const DEFAULT_VERIFY_MESSAGE = nya("아래 버튼을 눌러 서버 인증을 완료하세요.");
-const STREAMALERT_PLATFORM_SELECT = "streamalert:platform";
-const STREAMALERT_TEST_SELECT = "streamalert:test_select";
 const STREAMALERT_MODAL_ID = "streamalert:modal";
 const STREAMALERT_NOTIFCHANNEL_SELECT = "streamalert:notifchannel";
-const STREAMALERT_DELETE_SELECT = "streamalert:delete_select";
+const STREAMALERT_NAV_PREFIX = "streamalert:nav:";
+const STREAMALERT_DELETE_PREFIX = "streamalert:delete:";
+const STREAMALERT_TEST_PREFIX = "streamalert:test:";
+const STREAMALERT_PLATFORM_BTN_PREFIX = "streamalert:platform:";
+const STREAMALERT_ACTION_PREFIX = "streamalert:action:";
 const STREAMALERT_LINK_PLACEHOLDERS = {
   youtube: "https://www.youtube.com/@채널핸들",
   chzzk: "https://chzzk.naver.com/채널ID",
@@ -1744,10 +1744,7 @@ module.exports = {
   },
 };
 
-async function handleStreamAlertPlatformSelect(interaction) {
-  const platform = interaction.values[0];
-  pendingSetups.set(interaction.user.id, { guildId: interaction.guild.id, platform });
-
+function buildStreamAlertModal(platform) {
   const modal = new ModalBuilder()
     .setCustomId(STREAMALERT_MODAL_ID)
     .setTitle(`${STREAMALERT_PLATFORM_NAMES[platform]} 방송 알림 등록`);
@@ -1780,19 +1777,20 @@ async function handleStreamAlertPlatformSelect(interaction) {
         .setMaxLength(10),
     ),
   );
+  return modal;
+}
 
-  await interaction.showModal(modal);
+async function handleStreamAlertPlatformButton(interaction) {
+  const platform = interaction.customId.slice(STREAMALERT_PLATFORM_BTN_PREFIX.length);
+  pendingSetups.set(interaction.user.id, { guildId: interaction.guild.id, platform });
+  await interaction.showModal(buildStreamAlertModal(platform));
 }
 
 async function handleStreamAlertModal(interaction) {
   const pending = pendingSetups.get(interaction.user.id);
   if (!pending) {
     const alerts = getGuildAlerts(interaction.guild.id);
-    await interaction.update({
-      content: nya("세션이 만료되었습니다. 다시 시도해주세요."),
-      embeds: [buildAlertListEmbed(alerts)],
-      components: buildStreamAlertComponents(alerts),
-    });
+    await interaction.update({ ...buildStreamAlertPage(alerts, 0), content: nya("세션이 만료되었습니다. 다시 시도해주세요.") });
     return;
   }
 
@@ -1806,9 +1804,8 @@ async function handleStreamAlertModal(interaction) {
     pendingSetups.delete(interaction.user.id);
     const alerts = getGuildAlerts(pending.guildId);
     await interaction.update({
+      ...buildStreamAlertPage(alerts, 0),
       content: nya("채널 링크를 인식할 수 없습니다. 올바른 링크를 입력해주세요.") + "\n(오류 코드: STREAM-001)",
-      embeds: [buildAlertListEmbed(alerts)],
-      components: buildStreamAlertComponents(alerts),
     });
     return;
   }
@@ -1817,46 +1814,37 @@ async function handleStreamAlertModal(interaction) {
     pendingSetups.delete(interaction.user.id);
     const alerts = getGuildAlerts(pending.guildId);
     await interaction.update({
+      ...buildStreamAlertPage(alerts, 0),
       content: nya("이미 등록된 방송인입니다.") + "\n(오류 코드: STREAM-002)",
-      embeds: [buildAlertListEmbed(alerts)],
-      components: buildStreamAlertComponents(alerts),
     });
     return;
   }
 
-  pendingSetups.set(interaction.user.id, {
-    ...pending,
-    channelLink: link,
-    channelId,
-    channelName: channelId,
-    customText,
-    mention,
-  });
-
-  const row = new ActionRowBuilder().addComponents(
-    new ChannelSelectMenuBuilder()
-      .setCustomId(STREAMALERT_NOTIFCHANNEL_SELECT)
-      .setPlaceholder("알림을 받을 채널 선택")
-      .setChannelTypes(ChannelType.GuildText),
-  );
+  pendingSetups.set(interaction.user.id, { ...pending, channelLink: link, channelId, channelName: channelId, customText, mention });
 
   await interaction.update({
     content: nya("알림을 받을 채널을 선택하세요"),
     embeds: [],
-    components: [row],
+    components: [
+      new ActionRowBuilder().addComponents(
+        new ChannelSelectMenuBuilder()
+          .setCustomId(STREAMALERT_NOTIFCHANNEL_SELECT)
+          .setPlaceholder("알림을 받을 채널 선택")
+          .setChannelTypes(ChannelType.GuildText),
+      ),
+    ],
   });
 }
 
 async function handleStreamAlertChannelSelect(interaction) {
   const pending = pendingSetups.get(interaction.user.id);
   if (!pending?.channelLink) {
-    await interaction.update({ content: nya("세션이 만료되었습니다. 다시 시도해주세요."), components: [] });
+    const alerts = getGuildAlerts(interaction.guild.id);
+    await interaction.update({ ...buildStreamAlertPage(alerts, 0), content: nya("세션이 만료되었습니다. 다시 시도해주세요.") });
     return;
   }
 
   pendingSetups.delete(interaction.user.id);
-  const notifChannelId = interaction.values[0];
-
   addAlert(pending.guildId, {
     platform: pending.platform,
     channelLink: pending.channelLink,
@@ -1864,50 +1852,67 @@ async function handleStreamAlertChannelSelect(interaction) {
     channelName: pending.channelName,
     customText: pending.customText,
     mention: pending.mention,
-    notifChannelId,
+    notifChannelId: interaction.values[0],
   });
 
   const alerts = getGuildAlerts(pending.guildId);
-  await interaction.update({
-    content: null,
-    embeds: [buildAlertListEmbed(alerts)],
-    components: buildStreamAlertComponents(alerts),
-  });
+  await interaction.update(buildStreamAlertPage(alerts, alerts.length - 1));
 }
 
-async function handleStreamAlertDeleteSelect(interaction) {
-  removeAlert(interaction.guild.id, interaction.values[0]);
+async function handleStreamAlertNavButton(interaction) {
+  const index = parseInt(interaction.customId.slice(STREAMALERT_NAV_PREFIX.length), 10);
   const alerts = getGuildAlerts(interaction.guild.id);
-  await interaction.update({
-    content: null,
-    embeds: [buildAlertListEmbed(alerts)],
-    components: buildStreamAlertComponents(alerts),
-  });
+  await interaction.update(buildStreamAlertPage(alerts, index));
 }
 
-async function handleStreamAlertTestSelect(interaction) {
-  const alertId = interaction.values[0];
-  const alert = getGuildAlerts(interaction.guild.id).find((a) => a.id === alertId);
+async function handleStreamAlertDeleteButton(interaction) {
+  const alertId = interaction.customId.slice(STREAMALERT_DELETE_PREFIX.length);
+  removeAlert(interaction.guild.id, alertId);
+  const alerts = getGuildAlerts(interaction.guild.id);
+  await interaction.update(buildStreamAlertPage(alerts, 0));
+}
+
+async function handleStreamAlertTestButton(interaction) {
+  const alertId = interaction.customId.slice(STREAMALERT_TEST_PREFIX.length);
+  const alerts = getGuildAlerts(interaction.guild.id);
+  const alert = alerts.find((a) => a.id === alertId);
+  const alertIndex = alerts.findIndex((a) => a.id === alertId);
+
   if (!alert) {
-    const alerts = getGuildAlerts(interaction.guild.id);
-    await interaction.update({ content: null, embeds: [buildAlertListEmbed(alerts)], components: buildStreamAlertComponents(alerts) });
+    await interaction.update(buildStreamAlertPage(alerts, 0));
     return;
   }
 
   const channel = interaction.guild.channels.cache.get(alert.notifChannelId);
   if (!channel?.isTextBased()) {
-    const alerts = getGuildAlerts(interaction.guild.id);
-    await interaction.update({ content: nya("알림 채널을 찾을 수 없습니다."), embeds: [buildAlertListEmbed(alerts)], components: buildStreamAlertComponents(alerts) });
+    await interaction.update({ ...buildStreamAlertPage(alerts, alertIndex), content: nya("알림 채널을 찾을 수 없습니다.") });
     return;
   }
 
   await channel.send(buildNotificationContent(alert));
-  const alerts = getGuildAlerts(interaction.guild.id);
   await interaction.update({
+    ...buildStreamAlertPage(alerts, alertIndex),
     content: nya(`<#${alert.notifChannelId}>에 테스트 알림을 전송했습니다`),
-    embeds: [buildAlertListEmbed(alerts)],
-    components: buildStreamAlertComponents(alerts),
   });
+}
+
+async function handleStreamAlertActionButton(interaction) {
+  const action = interaction.customId.slice(STREAMALERT_ACTION_PREFIX.length);
+
+  if (action === "add") {
+    await interaction.update({
+      content: nya("알림을 등록할 플랫폼을 선택하세요"),
+      embeds: [],
+      components: [buildPlatformButtons()],
+    });
+    return;
+  }
+
+  if (action === "cancel") {
+    const alerts = getGuildAlerts(interaction.guild.id);
+    await interaction.update(buildStreamAlertPage(alerts, 0));
+    return;
+  }
 }
 
 async function handleRoleSelect(interaction) {
@@ -1965,21 +1970,6 @@ async function handleRoleSelect(interaction) {
 }
 
 async function handleStringSelect(interaction) {
-  if (interaction.customId === STREAMALERT_PLATFORM_SELECT) {
-    await handleStreamAlertPlatformSelect(interaction);
-    return;
-  }
-
-  if (interaction.customId === STREAMALERT_DELETE_SELECT) {
-    await handleStreamAlertDeleteSelect(interaction);
-    return;
-  }
-
-  if (interaction.customId === STREAMALERT_TEST_SELECT) {
-    await handleStreamAlertTestSelect(interaction);
-    return;
-  }
-
   if (interaction.customId !== "help-category-select") return;
 
   const category = interaction.values[0];
@@ -2120,6 +2110,31 @@ async function handleChannelSelect(interaction) {
 }
 
 async function handleButton(interaction) {
+  if (interaction.customId.startsWith(STREAMALERT_PLATFORM_BTN_PREFIX)) {
+    await handleStreamAlertPlatformButton(interaction);
+    return;
+  }
+
+  if (interaction.customId.startsWith(STREAMALERT_NAV_PREFIX)) {
+    await handleStreamAlertNavButton(interaction);
+    return;
+  }
+
+  if (interaction.customId.startsWith(STREAMALERT_DELETE_PREFIX)) {
+    await handleStreamAlertDeleteButton(interaction);
+    return;
+  }
+
+  if (interaction.customId.startsWith(STREAMALERT_TEST_PREFIX)) {
+    await handleStreamAlertTestButton(interaction);
+    return;
+  }
+
+  if (interaction.customId.startsWith(STREAMALERT_ACTION_PREFIX)) {
+    await handleStreamAlertActionButton(interaction);
+    return;
+  }
+
   if (interaction.customId.startsWith(LOG_ACTION_PREFIX)) {
     if (!hasManageGuild(interaction)) {
       await interaction.reply({

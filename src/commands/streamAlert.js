@@ -1,10 +1,10 @@
 const {
   ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   EmbedBuilder,
   PermissionFlagsBits,
   SlashCommandBuilder,
-  StringSelectMenuBuilder,
-  StringSelectMenuOptionBuilder,
 } = require("discord.js");
 const { nya } = require("../utils/nya");
 const { getGuildAlerts } = require("../utils/streamAlert");
@@ -16,72 +16,115 @@ function alertDisplayName(alert) {
   return alert.channelName.length > 20 ? alert.channelName.slice(0, 20) + "…" : alert.channelName;
 }
 
-function buildAlertListEmbed(alerts) {
-  const embed = new EmbedBuilder().setTitle("📡 방송 알림").setColor(0x5865f2);
-  if (alerts.length === 0) {
-    return embed.setDescription("등록된 방송 알림이 없습니다.");
-  }
-  return embed.setDescription(
-    alerts
-      .map(
-        (a, i) =>
-          `**${i + 1}.** ${PLATFORM_EMOJIS[a.platform]} [${alertDisplayName(a)}](${a.channelLink}) · <#${a.notifChannelId}>`,
-      )
-      .join("\n"),
-  );
+function buildAlertDetailEmbed(alert, index, total) {
+  return new EmbedBuilder()
+    .setTitle(`📡 방송 알림 (${index + 1} / ${total})`)
+    .setColor(0x5865f2)
+    .setDescription(
+      [
+        `**플랫폼** ${PLATFORM_EMOJIS[alert.platform]} ${PLATFORM_LABELS[alert.platform]}`,
+        `**채널** [${alertDisplayName(alert)}](${alert.channelLink})`,
+        `**알림 채널** <#${alert.notifChannelId}>`,
+        `**알림 메시지** ${alert.customText || "(기본 메시지)"}`,
+        `**멘션** ${alert.mention === "none" ? "없음" : `@${alert.mention}`}`,
+      ].join("\n"),
+    );
 }
 
-function buildStreamAlertComponents(alerts) {
-  const rows = [
-    new ActionRowBuilder().addComponents(
-      new StringSelectMenuBuilder()
-        .setCustomId("streamalert:platform")
-        .setPlaceholder("플랫폼 선택하여 방송 알림 추가")
-        .addOptions(
-          new StringSelectMenuOptionBuilder().setLabel("유튜브").setEmoji("▶️").setValue("youtube"),
-          new StringSelectMenuOptionBuilder().setLabel("치지직").setEmoji("🟢").setValue("chzzk"),
-          new StringSelectMenuOptionBuilder().setLabel("SOOP").setEmoji("🔵").setValue("soop"),
-        ),
-    ),
-  ];
+function buildEmptyEmbed() {
+  return new EmbedBuilder()
+    .setTitle("📡 방송 알림")
+    .setColor(0x5865f2)
+    .setDescription("등록된 방송 알림이 없습니다.");
+}
 
-  if (alerts.length > 0) {
-    rows.push(
-      new ActionRowBuilder().addComponents(
-        new StringSelectMenuBuilder()
-          .setCustomId("streamalert:delete_select")
-          .setPlaceholder("방송 알림 삭제")
-          .addOptions(
-            alerts.slice(0, 25).map((a) =>
-              new StringSelectMenuOptionBuilder()
-                .setLabel(`${PLATFORM_EMOJIS[a.platform]} ${alertDisplayName(a)} (${PLATFORM_LABELS[a.platform]})`)
-                .setValue(a.id),
-            ),
-          ),
-      ),
-      new ActionRowBuilder().addComponents(
-        new StringSelectMenuBuilder()
-          .setCustomId("streamalert:test_select")
-          .setPlaceholder("테스트 알림 전송")
-          .addOptions(
-            alerts.slice(0, 25).map((a) =>
-              new StringSelectMenuOptionBuilder()
-                .setLabel(`${PLATFORM_EMOJIS[a.platform]} ${alertDisplayName(a)} (${PLATFORM_LABELS[a.platform]})`)
-                .setValue(a.id),
-            ),
-          ),
-      ),
-    );
+function buildStreamAlertPage(alerts, index = 0) {
+  if (alerts.length === 0) {
+    return {
+      content: null,
+      embeds: [buildEmptyEmbed()],
+      components: [
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId("streamalert:action:add")
+            .setLabel("추가")
+            .setStyle(ButtonStyle.Primary),
+        ),
+      ],
+    };
   }
 
-  return rows;
+  const i = Math.max(0, Math.min(index, alerts.length - 1));
+  const alert = alerts[i];
+
+  const navRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`streamalert:nav:${i - 1}`)
+      .setLabel("◀")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(i === 0),
+    new ButtonBuilder()
+      .setCustomId("streamalert:page:label")
+      .setLabel(`${i + 1} / ${alerts.length}`)
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true),
+    new ButtonBuilder()
+      .setCustomId(`streamalert:nav:${i + 1}`)
+      .setLabel("▶")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(i >= alerts.length - 1),
+  );
+
+  const actionRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`streamalert:delete:${alert.id}`)
+      .setLabel("삭제")
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId(`streamalert:test:${alert.id}`)
+      .setLabel("테스트")
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId("streamalert:action:add")
+      .setLabel("추가")
+      .setStyle(ButtonStyle.Primary),
+  );
+
+  return {
+    content: null,
+    embeds: [buildAlertDetailEmbed(alert, i, alerts.length)],
+    components: [navRow, actionRow],
+  };
+}
+
+function buildPlatformButtons() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("streamalert:platform:youtube")
+      .setLabel("유튜브")
+      .setEmoji("▶️")
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId("streamalert:platform:chzzk")
+      .setLabel("치지직")
+      .setEmoji("🟢")
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId("streamalert:platform:soop")
+      .setLabel("SOOP")
+      .setEmoji("🔵")
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId("streamalert:action:cancel")
+      .setLabel("취소")
+      .setStyle(ButtonStyle.Danger),
+  );
 }
 
 async function execute(interaction) {
   const alerts = getGuildAlerts(interaction.guild.id);
   await interaction.reply({
-    embeds: [buildAlertListEmbed(alerts)],
-    components: buildStreamAlertComponents(alerts),
+    ...buildStreamAlertPage(alerts, 0),
     ephemeral: true,
   });
 }
@@ -94,8 +137,8 @@ module.exports = {
     .setDescriptionLocalizations({ ko: "방송 알림을 관리합니다" })
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   execute,
-  buildAlertListEmbed,
-  buildStreamAlertComponents,
+  buildStreamAlertPage,
+  buildPlatformButtons,
   PLATFORM_LABELS,
   PLATFORM_EMOJIS,
 };
