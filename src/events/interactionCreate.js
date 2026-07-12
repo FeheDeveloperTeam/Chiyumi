@@ -87,10 +87,9 @@ const {
   removeAlert,
   extractChannelId,
   isDuplicate,
-  buildNotificationContent,
   pendingSetups,
 } = require("../utils/streamAlert");
-const { buildAlertListEmbed, buildPanelRow, PLATFORM_LABELS } = require("../commands/streamAlert");
+const { buildAlertListEmbed, buildStreamAlertComponents, PLATFORM_LABELS } = require("../commands/streamAlert");
 const { buildMarketEmbed, buildPortfolioEmbed, buildStockRow } = require("../commands/stock");
 const { buildBankEmbed, buildBankRow } = require("../commands/bank");
 const { getStockDef, getCurrentPrices, getPortfolio, getPortfolioValue, clearPortfolio, buyStock, sellStock } = require("../utils/stocks");
@@ -149,12 +148,10 @@ const WELCOME_MODAL_PREFIX = "welcome-modal:";
 const COIN_DEV_ACTION_PREFIX = "coin-dev-action:";
 const COIN_DEV_MODAL_PREFIX = "coin-dev-modal:";
 const DEFAULT_VERIFY_MESSAGE = nya("아래 버튼을 눌러 서버 인증을 완료하세요.");
-const STREAMALERT_BTN_PREFIX = "streamalert:btn:";
 const STREAMALERT_PLATFORM_SELECT = "streamalert:platform";
 const STREAMALERT_MODAL_ID = "streamalert:modal";
 const STREAMALERT_NOTIFCHANNEL_SELECT = "streamalert:notifchannel";
 const STREAMALERT_DELETE_SELECT = "streamalert:delete_select";
-const STREAMALERT_TEST_SELECT = "streamalert:test_select";
 const STREAMALERT_LINK_PLACEHOLDERS = {
   youtube: "https://www.youtube.com/@채널핸들",
   chzzk: "https://chzzk.naver.com/채널ID",
@@ -1745,77 +1742,6 @@ module.exports = {
   },
 };
 
-async function handleStreamAlertButton(interaction) {
-  const action = interaction.customId.slice(STREAMALERT_BTN_PREFIX.length);
-  const alerts = getGuildAlerts(interaction.guild.id);
-
-  if (action === "add") {
-    const row = new ActionRowBuilder().addComponents(
-      new StringSelectMenuBuilder()
-        .setCustomId(STREAMALERT_PLATFORM_SELECT)
-        .setPlaceholder("플랫폼 선택")
-        .addOptions(
-          new StringSelectMenuOptionBuilder().setLabel("유튜브").setEmoji("▶️").setValue("youtube"),
-          new StringSelectMenuOptionBuilder().setLabel("치지직").setEmoji("🟢").setValue("chzzk"),
-          new StringSelectMenuOptionBuilder().setLabel("SOOP").setEmoji("🔵").setValue("soop"),
-        ),
-    );
-    await interaction.update({ content: nya("알림을 등록할 플랫폼을 선택하세요"), embeds: [], components: [row] });
-    return;
-  }
-
-  if (action === "list") {
-    if (alerts.length === 0) {
-      await interaction.update({ content: nya("등록된 방송 알림이 없습니다"), embeds: [], components: [buildPanelRow()] });
-      return;
-    }
-    await interaction.update({ content: null, embeds: [buildAlertListEmbed(alerts)], components: [buildPanelRow()] });
-    return;
-  }
-
-  if (action === "remove") {
-    if (alerts.length === 0) {
-      await interaction.update({ content: nya("등록된 방송 알림이 없습니다"), embeds: [], components: [buildPanelRow()] });
-      return;
-    }
-    const row = new ActionRowBuilder().addComponents(
-      new StringSelectMenuBuilder()
-        .setCustomId(STREAMALERT_DELETE_SELECT)
-        .setPlaceholder("삭제할 방송인을 선택하세요")
-        .addOptions(
-          alerts.slice(0, 25).map((a) =>
-            new StringSelectMenuOptionBuilder()
-              .setLabel(`${a.channelName} (${PLATFORM_LABELS[a.platform]})`)
-              .setValue(a.id),
-          ),
-        ),
-    );
-    await interaction.update({ content: nya("삭제할 방송인을 선택하세요"), embeds: [], components: [row] });
-    return;
-  }
-
-  if (action === "test") {
-    if (alerts.length === 0) {
-      await interaction.update({ content: nya("등록된 방송 알림이 없습니다"), embeds: [], components: [buildPanelRow()] });
-      return;
-    }
-    const row = new ActionRowBuilder().addComponents(
-      new StringSelectMenuBuilder()
-        .setCustomId(STREAMALERT_TEST_SELECT)
-        .setPlaceholder("테스트 알림을 보낼 방송인을 선택하세요")
-        .addOptions(
-          alerts.slice(0, 25).map((a) =>
-            new StringSelectMenuOptionBuilder()
-              .setLabel(`${a.channelName} (${PLATFORM_LABELS[a.platform]})`)
-              .setValue(a.id),
-          ),
-        ),
-    );
-    await interaction.update({ content: nya("테스트 알림을 보낼 방송인을 선택하세요"), embeds: [], components: [row] });
-    return;
-  }
-}
-
 async function handleStreamAlertPlatformSelect(interaction) {
   const platform = interaction.values[0];
   pendingSetups.set(interaction.user.id, { guildId: interaction.guild.id, platform });
@@ -1835,29 +1761,12 @@ async function handleStreamAlertPlatformSelect(interaction) {
     ),
     new ActionRowBuilder().addComponents(
       new TextInputBuilder()
-        .setCustomId("name")
-        .setLabel("방송인 이름 (알림에 표시될 이름)")
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder("예) 페헤")
-        .setRequired(true),
-    ),
-    new ActionRowBuilder().addComponents(
-      new TextInputBuilder()
         .setCustomId("text")
-        .setLabel("알림 문구 (선택 · {name}으로 방송인 이름 삽입)")
+        .setLabel("알림 메시지 (방송 켜졌을 때 · 비우면 기본값)")
         .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder("{name}님이 방송을 시작했습니다! 🎉")
+        .setPlaceholder("방송이 시작되었습니다! 🎉")
         .setRequired(false)
         .setMaxLength(200),
-    ),
-    new ActionRowBuilder().addComponents(
-      new TextInputBuilder()
-        .setCustomId("mention")
-        .setLabel("멘션 (없음 / everyone / here)")
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder("없음")
-        .setRequired(false)
-        .setMaxLength(10),
     ),
   );
 
@@ -1875,10 +1784,7 @@ async function handleStreamAlertModal(interaction) {
   }
 
   const link = interaction.fields.getTextInputValue("link").trim();
-  const channelName = interaction.fields.getTextInputValue("name").trim();
   const customText = interaction.fields.getTextInputValue("text").trim();
-  const mentionRaw = interaction.fields.getTextInputValue("mention").trim().toLowerCase();
-  const mention = ["everyone", "here"].includes(mentionRaw) ? mentionRaw : "none";
 
   const channelId = extractChannelId(pending.platform, link);
   if (!channelId) {
@@ -1903,9 +1809,9 @@ async function handleStreamAlertModal(interaction) {
     ...pending,
     channelLink: link,
     channelId,
-    channelName,
+    channelName: channelId,
     customText,
-    mention,
+    mention: "none",
   });
 
   const row = new ActionRowBuilder().addComponents(
@@ -1916,7 +1822,7 @@ async function handleStreamAlertModal(interaction) {
   );
 
   await interaction.reply({
-    content: nya(`**${channelName}** 알림을 받을 채널을 선택하세요`),
+    content: nya("알림을 받을 채널을 선택하세요"),
     components: [row],
     ephemeral: true,
   });
@@ -1942,43 +1848,21 @@ async function handleStreamAlertChannelSelect(interaction) {
     notifChannelId,
   });
 
+  const alerts = getGuildAlerts(pending.guildId);
   await interaction.update({
-    content: nya(
-      `**${pending.channelName}** (${PLATFORM_LABELS[pending.platform]}) 방송 알림 등록 완료! <#${notifChannelId}>에서 알림을 받습니다`,
-    ),
-    components: [buildPanelRow()],
+    content: null,
+    embeds: [buildAlertListEmbed(alerts)],
+    components: buildStreamAlertComponents(alerts),
   });
 }
 
 async function handleStreamAlertDeleteSelect(interaction) {
-  const removed = removeAlert(interaction.guild.id, interaction.values[0]);
+  removeAlert(interaction.guild.id, interaction.values[0]);
+  const alerts = getGuildAlerts(interaction.guild.id);
   await interaction.update({
-    content: removed ? nya("방송 알림이 삭제되었습니다") : nya("알림을 찾을 수 없습니다."),
-    components: [buildPanelRow()],
-  });
-}
-
-async function handleStreamAlertTestSelect(interaction) {
-  const alertId = interaction.values[0];
-  const alert = getGuildAlerts(interaction.guild.id).find((a) => a.id === alertId);
-  if (!alert) {
-    await interaction.update({ content: nya("알림을 찾을 수 없습니다."), components: [buildPanelRow()] });
-    return;
-  }
-
-  const channel = interaction.guild.channels.cache.get(alert.notifChannelId);
-  if (!channel?.isTextBased()) {
-    await interaction.update({
-      content: nya("알림 채널을 찾을 수 없습니다."),
-      components: [buildPanelRow()],
-    });
-    return;
-  }
-
-  await channel.send(buildNotificationContent(alert));
-  await interaction.update({
-    content: nya(`<#${alert.notifChannelId}>에 테스트 알림을 전송했습니다`),
-    components: [buildPanelRow()],
+    content: null,
+    embeds: [buildAlertListEmbed(alerts)],
+    components: buildStreamAlertComponents(alerts),
   });
 }
 
@@ -2044,11 +1928,6 @@ async function handleStringSelect(interaction) {
 
   if (interaction.customId === STREAMALERT_DELETE_SELECT) {
     await handleStreamAlertDeleteSelect(interaction);
-    return;
-  }
-
-  if (interaction.customId === STREAMALERT_TEST_SELECT) {
-    await handleStreamAlertTestSelect(interaction);
     return;
   }
 
@@ -2192,11 +2071,6 @@ async function handleChannelSelect(interaction) {
 }
 
 async function handleButton(interaction) {
-  if (interaction.customId.startsWith(STREAMALERT_BTN_PREFIX)) {
-    await handleStreamAlertButton(interaction);
-    return;
-  }
-
   if (interaction.customId.startsWith(LOG_ACTION_PREFIX)) {
     if (!hasManageGuild(interaction)) {
       await interaction.reply({
