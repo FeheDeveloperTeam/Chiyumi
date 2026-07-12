@@ -79,6 +79,16 @@ const {
   getSession: getStatsSession,
 } = require("../utils/statsSession");
 const { buildWordChainEmbed, buildWordChainRow } = require("../commands/wordchain");
+const {
+  getGuildAlerts,
+  addAlert,
+  removeAlert,
+  extractChannelId,
+  isDuplicate,
+  buildNotificationContent,
+  pendingSetups,
+} = require("../utils/streamAlert");
+const { buildAlertListEmbed, PLATFORM_LABELS } = require("../commands/streamAlert");
 const { buildMarketEmbed, buildPortfolioEmbed, buildStockRow } = require("../commands/stock");
 const { buildBankEmbed, buildBankRow } = require("../commands/bank");
 const { getStockDef, getCurrentPrices, getPortfolio, getPortfolioValue, clearPortfolio, buyStock, sellStock } = require("../utils/stocks");
@@ -137,6 +147,18 @@ const WELCOME_MODAL_PREFIX = "welcome-modal:";
 const COIN_DEV_ACTION_PREFIX = "coin-dev-action:";
 const COIN_DEV_MODAL_PREFIX = "coin-dev-modal:";
 const DEFAULT_VERIFY_MESSAGE = nya("아래 버튼을 눌러 서버 인증을 완료하세요.");
+const STREAMALERT_PLATFORM_SELECT = "streamalert:platform";
+const STREAMALERT_MODAL_ID = "streamalert:modal";
+const STREAMALERT_NOTIFCHANNEL_SELECT = "streamalert:notifchannel";
+const STREAMALERT_DELETE_SELECT = "streamalert:delete_select";
+const STREAMALERT_TEST_SELECT = "streamalert:test_select";
+const STREAMALERT_LINK_PLACEHOLDERS = {
+  youtube: "https://www.youtube.com/@채널핸들",
+  chzzk: "https://chzzk.naver.com/채널ID",
+  soop: "https://www.sooplive.co.kr/아이디",
+};
+const STREAMALERT_PLATFORM_NAMES = { youtube: "유튜브", chzzk: "치지직", soop: "SOOP" };
+
 const CONSENT_AGREE_ID = "consent-action:agree";
 const TERMS_URL = "https://fehedeveloperteam.github.io/Chiyumi/terms.html";
 const PRIVACY_URL = "https://fehedeveloperteam.github.io/Chiyumi/privacy.html";
@@ -1720,6 +1742,174 @@ module.exports = {
   },
 };
 
+async function handleStreamAlertPlatformSelect(interaction) {
+  const platform = interaction.values[0];
+  pendingSetups.set(interaction.user.id, { guildId: interaction.guild.id, platform });
+
+  const modal = new ModalBuilder()
+    .setCustomId(STREAMALERT_MODAL_ID)
+    .setTitle(`${STREAMALERT_PLATFORM_NAMES[platform]} 방송 알림 등록`);
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId("link")
+        .setLabel("채널 링크")
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder(STREAMALERT_LINK_PLACEHOLDERS[platform])
+        .setRequired(true),
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId("name")
+        .setLabel("방송인 이름 (알림에 표시될 이름)")
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder("예) 페헤")
+        .setRequired(true),
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId("text")
+        .setLabel("알림 문구 (선택 · {name}으로 방송인 이름 삽입)")
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder("{name}님이 방송을 시작했습니다! 🎉")
+        .setRequired(false)
+        .setMaxLength(200),
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId("mention")
+        .setLabel("멘션 (없음 / everyone / here)")
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder("없음")
+        .setRequired(false)
+        .setMaxLength(10),
+    ),
+  );
+
+  await interaction.showModal(modal);
+}
+
+async function handleStreamAlertModal(interaction) {
+  const pending = pendingSetups.get(interaction.user.id);
+  if (!pending) {
+    await interaction.reply({
+      content: nya("세션이 만료되었습니다. 다시 시도해주세요."),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const link = interaction.fields.getTextInputValue("link").trim();
+  const channelName = interaction.fields.getTextInputValue("name").trim();
+  const customText = interaction.fields.getTextInputValue("text").trim();
+  const mentionRaw = interaction.fields.getTextInputValue("mention").trim().toLowerCase();
+  const mention = ["everyone", "here"].includes(mentionRaw) ? mentionRaw : "none";
+
+  const channelId = extractChannelId(pending.platform, link);
+  if (!channelId) {
+    pendingSetups.delete(interaction.user.id);
+    await interaction.reply({
+      content: nya("채널 링크를 인식할 수 없습니다. 올바른 링크를 입력해주세요.") + "\n(오류 코드: STREAM-001)",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  if (isDuplicate(pending.guildId, pending.platform, channelId)) {
+    pendingSetups.delete(interaction.user.id);
+    await interaction.reply({
+      content: nya("이미 등록된 방송인입니다.") + "\n(오류 코드: STREAM-002)",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  pendingSetups.set(interaction.user.id, {
+    ...pending,
+    channelLink: link,
+    channelId,
+    channelName,
+    customText,
+    mention,
+  });
+
+  const row = new ActionRowBuilder().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId(STREAMALERT_NOTIFCHANNEL_SELECT)
+      .setPlaceholder("알림을 받을 채널 선택")
+      .setChannelTypes(ChannelType.GuildText),
+  );
+
+  await interaction.reply({
+    content: nya(`**${channelName}** 알림을 받을 채널을 선택하세요`),
+    components: [row],
+    ephemeral: true,
+  });
+}
+
+async function handleStreamAlertChannelSelect(interaction) {
+  const pending = pendingSetups.get(interaction.user.id);
+  if (!pending?.channelLink) {
+    await interaction.update({ content: nya("세션이 만료되었습니다. 다시 시도해주세요."), components: [] });
+    return;
+  }
+
+  pendingSetups.delete(interaction.user.id);
+  const notifChannelId = interaction.values[0];
+
+  addAlert(pending.guildId, {
+    platform: pending.platform,
+    channelLink: pending.channelLink,
+    channelId: pending.channelId,
+    channelName: pending.channelName,
+    customText: pending.customText,
+    mention: pending.mention,
+    notifChannelId,
+  });
+
+  await interaction.update({
+    content: nya(
+      `**${pending.channelName}** (${PLATFORM_LABELS[pending.platform]}) 방송 알림 등록 완료! <#${notifChannelId}>에서 알림을 받습니다`,
+    ),
+    components: [],
+  });
+}
+
+async function handleStreamAlertDeleteSelect(interaction) {
+  const removed = removeAlert(interaction.guild.id, interaction.values[0]);
+  await interaction.update({
+    content: removed ? nya("방송 알림이 삭제되었습니다") : nya("알림을 찾을 수 없습니다."),
+    components: [],
+  });
+}
+
+async function handleStreamAlertTestSelect(interaction) {
+  const alertId = interaction.values[0];
+  const alert = getGuildAlerts(interaction.guild.id).find((a) => a.id === alertId);
+  if (!alert) {
+    await interaction.update({ content: nya("알림을 찾을 수 없습니다."), components: [] });
+    return;
+  }
+
+  await interaction.update({ content: nya("테스트 알림을 전송합니다..."), components: [] });
+
+  const channel = interaction.guild.channels.cache.get(alert.notifChannelId);
+  if (!channel?.isTextBased()) {
+    await interaction.followUp({
+      content: nya("알림 채널을 찾을 수 없습니다."),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  await channel.send(buildNotificationContent(alert));
+  await interaction.followUp({
+    content: nya(`<#${alert.notifChannelId}>에 테스트 알림을 전송했습니다`),
+    ephemeral: true,
+  });
+}
+
 async function handleRoleSelect(interaction) {
   if (!interaction.customId.startsWith(VERIFY_SETUP_ROLE_SELECT_PREFIX)) return;
 
@@ -1775,6 +1965,21 @@ async function handleRoleSelect(interaction) {
 }
 
 async function handleStringSelect(interaction) {
+  if (interaction.customId === STREAMALERT_PLATFORM_SELECT) {
+    await handleStreamAlertPlatformSelect(interaction);
+    return;
+  }
+
+  if (interaction.customId === STREAMALERT_DELETE_SELECT) {
+    await handleStreamAlertDeleteSelect(interaction);
+    return;
+  }
+
+  if (interaction.customId === STREAMALERT_TEST_SELECT) {
+    await handleStreamAlertTestSelect(interaction);
+    return;
+  }
+
   if (interaction.customId !== "help-category-select") return;
 
   const category = interaction.values[0];
@@ -1787,6 +1992,11 @@ async function handleStringSelect(interaction) {
 }
 
 async function handleChannelSelect(interaction) {
+  if (interaction.customId === STREAMALERT_NOTIFCHANNEL_SELECT) {
+    await handleStreamAlertChannelSelect(interaction);
+    return;
+  }
+
   if (interaction.customId === RANK_LEVELUP_CHANNEL_SELECT_ID) {
     if (!hasManageGuild(interaction)) {
       await interaction.reply({
@@ -3456,6 +3666,11 @@ async function showMessageModal(interaction, setup) {
 }
 
 async function handleModalSubmit(interaction) {
+  if (interaction.customId === STREAMALERT_MODAL_ID) {
+    await handleStreamAlertModal(interaction);
+    return;
+  }
+
   if (interaction.customId === STOCK_BUY_MODAL_ID) {
     await handleStockBuyModal(interaction);
     return;

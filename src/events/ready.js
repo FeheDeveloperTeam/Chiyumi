@@ -5,6 +5,7 @@ const { updateDailyPrices } = require("../utils/stocks");
 const { applyDailyInterest } = require("../utils/bank");
 const { buildSupportEmbed } = require("../utils/supportInfo");
 const { getAllConfigs } = require("../utils/guildConfig");
+const { checkAllStreams } = require("../utils/streamAlert");
 
 const SHEETS_SYNC_INTERVAL_MS = 15 * 60 * 1000;
 const KST_TIMEZONE = "Asia/Seoul";
@@ -108,6 +109,9 @@ module.exports = {
 
     runSheetsSync(client);
     setInterval(() => runSheetsSync(client), SHEETS_SYNC_INTERVAL_MS);
+
+    checkAllStreams(client).catch(() => {});
+    setInterval(() => checkAllStreams(client).catch(() => {}), 5 * 60 * 1000);
 
     scheduleDailyTasks();
     updateSupportMessages(client).catch(() => {});
