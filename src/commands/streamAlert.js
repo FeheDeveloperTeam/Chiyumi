@@ -9,8 +9,13 @@ const {
 const { nya } = require("../utils/nya");
 const { getGuildAlerts } = require("../utils/streamAlert");
 
-const PLATFORM_LABELS = { youtube: "유튜브", chzzk: "치지직", soop: "SOOP" };
-const PLATFORM_EMOJIS = { youtube: "▶️", chzzk: "🟢", soop: "🔵" };
+const PLATFORM_LABELS = {
+  youtube: "유튜브 라이브",
+  youtube_upload: "유튜브 업로드",
+  chzzk: "치지직",
+  soop: "SOOP",
+};
+const PLATFORM_EMOJIS = { youtube: "🔴", youtube_upload: "📹", chzzk: "🟢", soop: "🔵" };
 
 function alertDisplayName(alert) {
   return alert.channelName.length > 20 ? alert.channelName.slice(0, 20) + "…" : alert.channelName;
@@ -98,27 +103,36 @@ function buildStreamAlertPage(alerts, index = 0) {
 }
 
 function buildPlatformButtons() {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId("streamalert:platform:youtube")
-      .setLabel("유튜브")
-      .setEmoji("▶️")
-      .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
-      .setCustomId("streamalert:platform:chzzk")
-      .setLabel("치지직")
-      .setEmoji("🟢")
-      .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
-      .setCustomId("streamalert:platform:soop")
-      .setLabel("SOOP")
-      .setEmoji("🔵")
-      .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
-      .setCustomId("streamalert:action:cancel")
-      .setLabel("취소")
-      .setStyle(ButtonStyle.Danger),
-  );
+  return [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("streamalert:platform:youtube_upload")
+        .setLabel("유튜브 업로드")
+        .setEmoji("📹")
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId("streamalert:platform:youtube")
+        .setLabel("유튜브 라이브")
+        .setEmoji("🔴")
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId("streamalert:platform:chzzk")
+        .setLabel("치지직")
+        .setEmoji("🟢")
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId("streamalert:platform:soop")
+        .setLabel("SOOP")
+        .setEmoji("🔵")
+        .setStyle(ButtonStyle.Secondary),
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("streamalert:action:cancel")
+        .setLabel("취소")
+        .setStyle(ButtonStyle.Danger),
+    ),
+  ];
 }
 
 async function execute(interaction) {

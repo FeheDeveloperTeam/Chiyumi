@@ -42,10 +42,77 @@ function setLiveStatus(guildId, alertId, isLive) {
   save(data);
 }
 
+async function resolveYouTubeChannelId(handle) {
+  if (!handle.startsWith("@")) return handle;
+  try {
+    const res = await fetch(`https://www.youtube.com/${handle}`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
+      },
+    });
+    const html = await res.text();
+    const m =
+      html.match(/"channelId":"(UC[^"]{22})"/) ||
+      html.match(/"externalId":"(UC[^"]{22})"/);
+    return m ? m[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+async function checkYouTubeUpload(channelId) {
+  try {
+    const res = await fetch(
+      `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`,
+      { headers: { "User-Agent": "Mozilla/5.0" } },
+    );
+    if (!res.ok) return null;
+    const xml = await res.text();
+    const entryMatch = xml.match(/<entry>([\s\S]*?)<\/entry>/);
+    if (!entryMatch) return null;
+    const entry = entryMatch[1];
+    const videoIdMatch = entry.match(/<yt:videoId>([^<]+)<\/yt:videoId>/);
+    const titleMatch = entry.match(/<title>([^<]+)<\/title>/);
+    if (!videoIdMatch) return null;
+    return {
+      videoId: videoIdMatch[1],
+      title: (titleMatch?.[1] ?? "새 영상")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">"),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function setLastVideoId(guildId, alertId, videoId) {
+  const data = load();
+  const alert = data[guildId]?.find((a) => a.id === alertId);
+  if (!alert) return;
+  alert.lastVideoId = videoId;
+  save(data);
+}
+
+function buildUploadNotificationContent(alert, videoInfo) {
+  const parts = [];
+  if (alert.mention !== "none") parts.push(`@${alert.mention}`);
+  const text = (alert.customText || "{name}님의 새 영상이 올라왔습니다! 📹").replace(
+    /{name}/g,
+    alert.channelName,
+  );
+  parts.push(text);
+  parts.push(`**${videoInfo.title}**`);
+  parts.push(`https://www.youtube.com/watch?v=${videoInfo.videoId}`);
+  return parts.join("\n");
+}
+
 function extractChannelId(platform, link) {
   try {
     switch (platform) {
-      case "youtube": {
+      case "youtube":
+      case "youtube_upload": {
         const m1 = link.match(/youtube\.com\/@([^/?&#\s]+)/);
         if (m1) return `@${m1[1]}`;
         const m2 = link.match(/youtube\.com\/channel\/([^/?&#\s]+)/);
@@ -147,15 +214,30 @@ async function checkAllStreams(client) {
   for (const [guildId, alerts] of Object.entries(data)) {
     for (const alert of alerts) {
       try {
-        const live = await checkIsLive(alert);
-        if (live && !alert.isLive) {
-          const guild = client.guilds.cache.get(guildId);
-          const channel = guild?.channels.cache.get(alert.notifChannelId);
-          if (channel?.isTextBased()) {
-            await channel.send(buildNotificationContent(alert));
+        if (alert.platform === "youtube_upload") {
+          const latest = await checkYouTubeUpload(alert.channelId);
+          if (!latest) continue;
+          if (alert.lastVideoId == null) {
+            setLastVideoId(guildId, alert.id, latest.videoId);
+          } else if (latest.videoId !== alert.lastVideoId) {
+            const guild = client.guilds.cache.get(guildId);
+            const channel = guild?.channels.cache.get(alert.notifChannelId);
+            if (channel?.isTextBased()) {
+              await channel.send(buildUploadNotificationContent(alert, latest));
+            }
+            setLastVideoId(guildId, alert.id, latest.videoId);
           }
+        } else {
+          const live = await checkIsLive(alert);
+          if (live && !alert.isLive) {
+            const guild = client.guilds.cache.get(guildId);
+            const channel = guild?.channels.cache.get(alert.notifChannelId);
+            if (channel?.isTextBased()) {
+              await channel.send(buildNotificationContent(alert));
+            }
+          }
+          if (live !== alert.isLive) setLiveStatus(guildId, alert.id, live);
         }
-        if (live !== alert.isLive) setLiveStatus(guildId, alert.id, live);
       } catch {}
     }
   }
@@ -171,6 +253,8 @@ module.exports = {
   isDuplicate,
   checkIsLive,
   buildNotificationContent,
+  buildUploadNotificationContent,
   checkAllStreams,
+  resolveYouTubeChannelId,
   pendingSetups,
 };

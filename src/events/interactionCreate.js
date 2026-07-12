@@ -86,6 +86,8 @@ const {
   extractChannelId,
   isDuplicate,
   buildNotificationContent,
+  buildUploadNotificationContent,
+  resolveYouTubeChannelId,
   pendingSetups,
 } = require("../utils/streamAlert");
 const { buildStreamAlertPage, buildPlatformButtons, PLATFORM_LABELS } = require("../commands/streamAlert");
@@ -156,10 +158,16 @@ const STREAMALERT_PLATFORM_BTN_PREFIX = "streamalert:platform:";
 const STREAMALERT_ACTION_PREFIX = "streamalert:action:";
 const STREAMALERT_LINK_PLACEHOLDERS = {
   youtube: "https://www.youtube.com/@채널핸들",
+  youtube_upload: "https://www.youtube.com/@채널핸들",
   chzzk: "https://chzzk.naver.com/채널ID",
   soop: "https://www.sooplive.co.kr/아이디",
 };
-const STREAMALERT_PLATFORM_NAMES = { youtube: "유튜브", chzzk: "치지직", soop: "SOOP" };
+const STREAMALERT_PLATFORM_NAMES = {
+  youtube: "유튜브 라이브",
+  youtube_upload: "유튜브 업로드",
+  chzzk: "치지직",
+  soop: "SOOP",
+};
 
 const CONSENT_AGREE_ID = "consent-action:agree";
 const TERMS_URL = "https://fehedeveloperteam.github.io/Chiyumi/terms.html";
@@ -1745,9 +1753,10 @@ module.exports = {
 };
 
 function buildStreamAlertModal(platform) {
+  const isUpload = platform === "youtube_upload";
   const modal = new ModalBuilder()
     .setCustomId(STREAMALERT_MODAL_ID)
-    .setTitle(`${STREAMALERT_PLATFORM_NAMES[platform]} 방송 알림 등록`);
+    .setTitle(`${STREAMALERT_PLATFORM_NAMES[platform]} 알림 등록`);
 
   modal.addComponents(
     new ActionRowBuilder().addComponents(
@@ -1761,9 +1770,9 @@ function buildStreamAlertModal(platform) {
     new ActionRowBuilder().addComponents(
       new TextInputBuilder()
         .setCustomId("text")
-        .setLabel("알림 메시지 (방송 켜졌을 때 · 비우면 기본값)")
+        .setLabel(isUpload ? "알림 메시지 (새 영상 올라왔을 때 · 비우면 기본값)" : "알림 메시지 (방송 켜졌을 때 · 비우면 기본값)")
         .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder("방송이 시작되었습니다! 🎉")
+        .setPlaceholder(isUpload ? "새 영상이 올라왔습니다! 📹" : "방송이 시작되었습니다! 🎉")
         .setRequired(false)
         .setMaxLength(200),
     ),
@@ -1799,8 +1808,8 @@ async function handleStreamAlertModal(interaction) {
   const mentionRaw = interaction.fields.getTextInputValue("mention").trim().toLowerCase();
   const mention = ["everyone", "here"].includes(mentionRaw) ? mentionRaw : "none";
 
-  const channelId = extractChannelId(pending.platform, link);
-  if (!channelId) {
+  const extractedId = extractChannelId(pending.platform, link);
+  if (!extractedId) {
     pendingSetups.delete(interaction.user.id);
     const alerts = getGuildAlerts(pending.guildId);
     await interaction.update({
@@ -1808,6 +1817,21 @@ async function handleStreamAlertModal(interaction) {
       content: nya("채널 링크를 인식할 수 없습니다. 올바른 링크를 입력해주세요.") + "\n(오류 코드: STREAM-001)",
     });
     return;
+  }
+
+  let channelId = extractedId;
+  if (pending.platform === "youtube_upload") {
+    const resolved = await resolveYouTubeChannelId(extractedId);
+    if (!resolved) {
+      pendingSetups.delete(interaction.user.id);
+      const alerts = getGuildAlerts(pending.guildId);
+      await interaction.update({
+        ...buildStreamAlertPage(alerts, 0),
+        content: nya("채널 ID를 확인할 수 없습니다. 잠시 후 다시 시도해주세요.") + "\n(오류 코드: STREAM-003)",
+      });
+      return;
+    }
+    channelId = resolved;
   }
 
   if (isDuplicate(pending.guildId, pending.platform, channelId)) {
@@ -1820,7 +1844,14 @@ async function handleStreamAlertModal(interaction) {
     return;
   }
 
-  pendingSetups.set(interaction.user.id, { ...pending, channelLink: link, channelId, channelName: channelId, customText, mention });
+  pendingSetups.set(interaction.user.id, {
+    ...pending,
+    channelLink: link,
+    channelId,
+    channelName: extractedId,
+    customText,
+    mention,
+  });
 
   await interaction.update({
     content: nya("알림을 받을 채널을 선택하세요"),
@@ -1889,7 +1920,11 @@ async function handleStreamAlertTestButton(interaction) {
     return;
   }
 
-  await channel.send(buildNotificationContent(alert));
+  const testContent =
+    alert.platform === "youtube_upload"
+      ? buildUploadNotificationContent(alert, { videoId: "dQw4w9WgXcQ", title: "테스트 영상 제목" })
+      : buildNotificationContent(alert);
+  await channel.send(testContent);
   await interaction.update({
     ...buildStreamAlertPage(alerts, alertIndex),
     content: nya(`<#${alert.notifChannelId}>에 테스트 알림을 전송했습니다`),
@@ -1903,7 +1938,7 @@ async function handleStreamAlertActionButton(interaction) {
     await interaction.update({
       content: nya("알림을 등록할 플랫폼을 선택하세요"),
       embeds: [],
-      components: [buildPlatformButtons()],
+      components: buildPlatformButtons(),
     });
     return;
   }
