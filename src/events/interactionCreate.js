@@ -3395,8 +3395,11 @@ async function handleGambleModal(interaction, game) {
   const betText = interaction.fields.getTextInputValue("bet").trim();
   const bet = Number(betText);
 
+  await interaction.deferUpdate();
+  await interaction.deleteReply();
+
   if (!Number.isInteger(bet) || bet <= 0) {
-    await interaction.reply({
+    await interaction.followUp({
       content: nya("올바른 베팅 금액이 아닙니다.") + "\n(오류 코드: GAMBLE-001)",
       ephemeral: true,
     });
@@ -3407,14 +3410,12 @@ async function handleGambleModal(interaction, game) {
   const balance = getBalance(userId);
 
   if (bet > balance) {
-    await interaction.reply({
+    await interaction.followUp({
       content: nya(`보유한 치유미코인(${balance}개)보다 많은 금액을 베팅할 수 없습니다.`) + "\n(오류 코드: GAMBLE-002)",
       ephemeral: true,
     });
     return;
   }
-
-  await interaction.deferReply();
 
   if (game === "slot") {
     await playSlotGame(interaction, userId, bet);
@@ -3463,11 +3464,11 @@ async function playSlotGame(interaction, userId, bet) {
     return embed;
   };
 
-  await interaction.editReply({ embeds: [buildEmbed(0)] });
+  const msg = await interaction.followUp({ embeds: [buildEmbed(0)], fetchReply: true });
 
   for (let revealed = 1; revealed <= reels.length; revealed += 1) {
     await slotWait(800);
-    await interaction.editReply({ embeds: [buildEmbed(revealed)] });
+    await msg.edit({ embeds: [buildEmbed(revealed)] });
   }
 
   const newBalance = addBalance(userId, delta);
@@ -3475,7 +3476,7 @@ async function playSlotGame(interaction, userId, bet) {
   const multiplierText = multiplier ? ` (${multiplier}배)` : "";
 
   await slotWait(800);
-  await interaction.editReply({
+  await msg.edit({
     embeds: [
       buildEmbed(
         reels.length,
@@ -3492,7 +3493,7 @@ async function playOddEvenGame(interaction, userId, bet) {
   const choice = choiceRaw === "홀" ? "odd" : choiceRaw === "짝" ? "even" : null;
 
   if (!choice) {
-    await interaction.editReply(nya("홀 또는 짝 중 하나를 입력해주세요.") + "\n(오류 코드: GAMBLE-003)");
+    await interaction.followUp(nya("홀 또는 짝 중 하나를 입력해주세요.") + "\n(오류 코드: GAMBLE-003)");
     return;
   }
 
@@ -3517,7 +3518,7 @@ async function playOddEvenGame(interaction, userId, bet) {
     })
     .setColor(0xe1aa74);
 
-  await interaction.editReply({ embeds: [embed] });
+  await interaction.followUp({ embeds: [embed] });
 }
 
 async function playNumberGuessGame(interaction, userId, bet) {
@@ -3525,7 +3526,7 @@ async function playNumberGuessGame(interaction, userId, bet) {
   const guess = Number(guessText);
 
   if (!Number.isInteger(guess) || guess < 1 || guess > 10) {
-    await interaction.editReply(nya("1부터 10 사이의 숫자를 입력해주세요.") + "\n(오류 코드: GAMBLE-004)");
+    await interaction.followUp(nya("1부터 10 사이의 숫자를 입력해주세요.") + "\n(오류 코드: GAMBLE-004)");
     return;
   }
 
@@ -3548,7 +3549,7 @@ async function playNumberGuessGame(interaction, userId, bet) {
     })
     .setColor(0xe1aa74);
 
-  await interaction.editReply({ embeds: [embed] });
+  await interaction.followUp({ embeds: [embed] });
 }
 
 async function playBlackjackGame(interaction, userId, bet) {
@@ -3567,7 +3568,7 @@ async function playBlackjackGame(interaction, userId, bet) {
       ? `둘 다 블랙잭! 비겼습니다. 현재 보유: ${newBalance}개`
       : `블랙잭! ${delta} 치유미코인을 획득했습니다. 현재 보유: ${newBalance}개`;
 
-    await interaction.editReply({
+    await interaction.followUp({
       embeds: [buildBjEmbed(session, { revealDealer: true, result: nya(resultText) })],
     });
     return;
@@ -3585,7 +3586,7 @@ async function playBlackjackGame(interaction, userId, bet) {
 
   const row = new ActionRowBuilder().addComponents(hitButton, standButton);
 
-  await interaction.editReply({
+  await interaction.followUp({
     embeds: [buildBjEmbed(session)],
     components: [row],
   });
@@ -3595,7 +3596,7 @@ async function playRpsGame(interaction, userId, bet) {
   const choiceRaw = interaction.fields.getTextInputValue("choice").trim();
 
   if (!RPS_CHOICES.includes(choiceRaw)) {
-    await interaction.editReply(nya("가위, 바위, 보 중 하나를 입력해주세요.") + "\n(오류 코드: GAMBLE-005)");
+    await interaction.followUp(nya("가위, 바위, 보 중 하나를 입력해주세요.") + "\n(오류 코드: GAMBLE-005)");
     return;
   }
 
@@ -3631,7 +3632,7 @@ async function playRpsGame(interaction, userId, bet) {
     })
     .setColor(0xe1aa74);
 
-  await interaction.editReply({ embeds: [embed] });
+  await interaction.followUp({ embeds: [embed] });
 }
 
 async function handleBlackjackAction(interaction) {
