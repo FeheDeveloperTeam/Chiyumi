@@ -86,6 +86,10 @@ function buildStreamAlertPage(alerts, index = 0) {
       .setLabel("삭제")
       .setStyle(ButtonStyle.Danger),
     new ButtonBuilder()
+      .setCustomId(`streamalert:edit:${alert.id}`)
+      .setLabel("수정")
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
       .setCustomId(`streamalert:test:${alert.id}`)
       .setLabel("테스트")
       .setStyle(ButtonStyle.Secondary),

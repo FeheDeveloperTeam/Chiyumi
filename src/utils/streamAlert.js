@@ -87,6 +87,15 @@ async function checkYouTubeUpload(channelId) {
   }
 }
 
+function updateAlert(guildId, alertId, updates) {
+  const data = load();
+  const alert = data[guildId]?.find((a) => a.id === alertId);
+  if (!alert) return false;
+  Object.assign(alert, updates);
+  save(data);
+  return true;
+}
+
 function setLastVideoId(guildId, alertId, videoId) {
   const data = load();
   const alert = data[guildId]?.find((a) => a.id === alertId);
@@ -244,6 +253,7 @@ async function checkAllStreams(client) {
 }
 
 const pendingSetups = new Map();
+const pendingEdits = new Map();
 
 module.exports = {
   getGuildAlerts,
@@ -256,5 +266,7 @@ module.exports = {
   buildUploadNotificationContent,
   checkAllStreams,
   resolveYouTubeChannelId,
+  updateAlert,
   pendingSetups,
+  pendingEdits,
 };

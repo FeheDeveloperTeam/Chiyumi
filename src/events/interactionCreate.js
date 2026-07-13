@@ -88,7 +88,9 @@ const {
   buildNotificationContent,
   buildUploadNotificationContent,
   resolveYouTubeChannelId,
+  updateAlert,
   pendingSetups,
+  pendingEdits,
 } = require("../utils/streamAlert");
 const { buildStreamAlertPage, buildPlatformButtons, PLATFORM_LABELS } = require("../commands/streamAlert");
 const { buildMarketEmbed, buildPortfolioEmbed, buildStockRow } = require("../commands/stock");
@@ -150,10 +152,13 @@ const COIN_DEV_ACTION_PREFIX = "coin-dev-action:";
 const COIN_DEV_MODAL_PREFIX = "coin-dev-modal:";
 const DEFAULT_VERIFY_MESSAGE = nya("아래 버튼을 눌러 서버 인증을 완료하세요.");
 const STREAMALERT_MODAL_ID = "streamalert:modal";
+const STREAMALERT_EDIT_MODAL_ID = "streamalert:edit:modal";
 const STREAMALERT_NOTIFCHANNEL_SELECT = "streamalert:notifchannel";
+const STREAMALERT_EDIT_NOTIFCHANNEL_SELECT = "streamalert:editnotifchannel";
 const STREAMALERT_NAV_PREFIX = "streamalert:nav:";
 const STREAMALERT_DELETE_PREFIX = "streamalert:delete:";
 const STREAMALERT_TEST_PREFIX = "streamalert:test:";
+const STREAMALERT_EDIT_PREFIX = "streamalert:edit:";
 const STREAMALERT_PLATFORM_BTN_PREFIX = "streamalert:platform:";
 const STREAMALERT_ACTION_PREFIX = "streamalert:action:";
 const STREAMALERT_LINK_PLACEHOLDERS = {
@@ -1789,6 +1794,35 @@ function buildStreamAlertModal(platform) {
   return modal;
 }
 
+function buildStreamAlertEditModal(alert) {
+  const modal = new ModalBuilder()
+    .setCustomId(STREAMALERT_EDIT_MODAL_ID)
+    .setTitle("방송 알림 수정");
+
+  const isUpload = alert.platform === "youtube_upload";
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId("text")
+        .setLabel(isUpload ? "알림 메시지 (새 영상 올라왔을 때 · 비우면 기본값)" : "알림 메시지 (방송 켜졌을 때 · 비우면 기본값)")
+        .setStyle(TextInputStyle.Paragraph)
+        .setValue(alert.customText || "")
+        .setRequired(false)
+        .setMaxLength(200),
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId("mention")
+        .setLabel("멘션 (없음 / everyone / here)")
+        .setStyle(TextInputStyle.Short)
+        .setValue(alert.mention === "none" ? "" : (alert.mention ?? ""))
+        .setRequired(false)
+        .setMaxLength(10),
+    ),
+  );
+  return modal;
+}
+
 async function handleStreamAlertPlatformButton(interaction) {
   const platform = interaction.customId.slice(STREAMALERT_PLATFORM_BTN_PREFIX.length);
   pendingSetups.set(interaction.user.id, { guildId: interaction.guild.id, platform });
@@ -1948,6 +1982,96 @@ async function handleStreamAlertActionButton(interaction) {
     await interaction.update(buildStreamAlertPage(alerts, 0));
     return;
   }
+
+  if (action === "editkeep") {
+    const pending = pendingEdits.get(interaction.user.id);
+    if (!pending) {
+      const alerts = getGuildAlerts(interaction.guild.id);
+      await interaction.update(buildStreamAlertPage(alerts, 0));
+      return;
+    }
+    pendingEdits.delete(interaction.user.id);
+    updateAlert(pending.guildId, pending.alertId, {
+      customText: pending.customText,
+      mention: pending.mention,
+    });
+    const alerts = getGuildAlerts(pending.guildId);
+    const idx = alerts.findIndex((a) => a.id === pending.alertId);
+    await interaction.update({
+      ...buildStreamAlertPage(alerts, idx >= 0 ? idx : 0),
+      content: nya("수정했습니다"),
+    });
+  }
+}
+
+async function handleStreamAlertEditButton(interaction) {
+  const alertId = interaction.customId.slice(STREAMALERT_EDIT_PREFIX.length);
+  const alerts = getGuildAlerts(interaction.guild.id);
+  const alert = alerts.find((a) => a.id === alertId);
+  if (!alert) {
+    await interaction.update(buildStreamAlertPage(alerts, 0));
+    return;
+  }
+  pendingEdits.set(interaction.user.id, { guildId: interaction.guild.id, alertId });
+  await interaction.showModal(buildStreamAlertEditModal(alert));
+}
+
+async function handleStreamAlertEditModal(interaction) {
+  const pending = pendingEdits.get(interaction.user.id);
+  if (!pending) {
+    const alerts = getGuildAlerts(interaction.guild.id);
+    await interaction.update(buildStreamAlertPage(alerts, 0));
+    return;
+  }
+
+  const customText = interaction.fields.getTextInputValue("text").trim();
+  const mentionRaw = interaction.fields.getTextInputValue("mention").trim().toLowerCase();
+  const mention = ["everyone", "here"].includes(mentionRaw) ? mentionRaw : "none";
+
+  pendingEdits.set(interaction.user.id, { ...pending, customText, mention });
+
+  const alerts = getGuildAlerts(pending.guildId);
+  const alert = alerts.find((a) => a.id === pending.alertId);
+
+  await interaction.update({
+    content: nya(`현재 알림 채널: <#${alert?.notifChannelId ?? "?"}>\n채널을 변경하려면 아래에서 선택하세요`),
+    embeds: [],
+    components: [
+      new ActionRowBuilder().addComponents(
+        new ChannelSelectMenuBuilder()
+          .setCustomId(STREAMALERT_EDIT_NOTIFCHANNEL_SELECT)
+          .setPlaceholder("변경할 채널 선택")
+          .addChannelTypes(ChannelType.GuildText),
+      ),
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId("streamalert:action:editkeep")
+          .setLabel("채널 유지")
+          .setStyle(ButtonStyle.Secondary),
+      ),
+    ],
+  });
+}
+
+async function handleStreamAlertEditChannelSelect(interaction) {
+  const pending = pendingEdits.get(interaction.user.id);
+  if (!pending) {
+    const alerts = getGuildAlerts(interaction.guild.id);
+    await interaction.update(buildStreamAlertPage(alerts, 0));
+    return;
+  }
+  pendingEdits.delete(interaction.user.id);
+  updateAlert(pending.guildId, pending.alertId, {
+    customText: pending.customText,
+    mention: pending.mention,
+    notifChannelId: interaction.values[0],
+  });
+  const alerts = getGuildAlerts(pending.guildId);
+  const idx = alerts.findIndex((a) => a.id === pending.alertId);
+  await interaction.update({
+    ...buildStreamAlertPage(alerts, idx >= 0 ? idx : 0),
+    content: nya("수정했습니다"),
+  });
 }
 
 async function handleRoleSelect(interaction) {
@@ -2019,6 +2143,11 @@ async function handleStringSelect(interaction) {
 async function handleChannelSelect(interaction) {
   if (interaction.customId === STREAMALERT_NOTIFCHANNEL_SELECT) {
     await handleStreamAlertChannelSelect(interaction);
+    return;
+  }
+
+  if (interaction.customId === STREAMALERT_EDIT_NOTIFCHANNEL_SELECT) {
+    await handleStreamAlertEditChannelSelect(interaction);
     return;
   }
 
@@ -2162,6 +2291,14 @@ async function handleButton(interaction) {
 
   if (interaction.customId.startsWith(STREAMALERT_TEST_PREFIX)) {
     await handleStreamAlertTestButton(interaction);
+    return;
+  }
+
+  if (
+    interaction.customId.startsWith(STREAMALERT_EDIT_PREFIX) &&
+    interaction.customId !== STREAMALERT_EDIT_MODAL_ID
+  ) {
+    await handleStreamAlertEditButton(interaction);
     return;
   }
 
@@ -3718,6 +3855,11 @@ async function showMessageModal(interaction, setup) {
 async function handleModalSubmit(interaction) {
   if (interaction.customId === STREAMALERT_MODAL_ID) {
     await handleStreamAlertModal(interaction);
+    return;
+  }
+
+  if (interaction.customId === STREAMALERT_EDIT_MODAL_ID) {
+    await handleStreamAlertEditModal(interaction);
     return;
   }
 
