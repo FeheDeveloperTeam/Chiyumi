@@ -136,7 +136,7 @@ module.exports = {
     checkAllStreams(client).catch(() => {});
     setInterval(() => checkAllStreams(client).catch(() => {}), 5 * 60 * 1000);
 
-    setInterval(() => rotatePresence(client), 3 * 60 * 1000);
+    setInterval(() => rotatePresence(client), 20 * 1000);
 
     scheduleDailyTasks();
     updateSupportMessages(client).catch(() => {});
