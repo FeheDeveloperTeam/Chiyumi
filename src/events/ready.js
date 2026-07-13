@@ -10,6 +10,16 @@ const { checkAllStreams } = require("../utils/streamAlert");
 const SHEETS_SYNC_INTERVAL_MS = 15 * 60 * 1000;
 const KST_TIMEZONE = "Asia/Seoul";
 
+const EXTRA_STATUSES = [
+  "방송 알림 감시 중이다냥 👀",
+  "코인 열심히 세는 중이다냥 🪙",
+  "/출석 잊지 말라냥 ✅",
+  "/끝말잇기 하러 오라냥 🎯",
+  "주식 시세 분석 중이다냥 📈",
+  "고양이는 원래 이렇게 바쁘다냥 😼",
+  "졸린데 일해야 한다냥 😿",
+];
+
 function updatePresence(client) {
   client.user.setPresence({
     status: "online",
@@ -20,6 +30,19 @@ function updatePresence(client) {
         state: nya(`${client.guilds.cache.size}개의 서버와 함께하는 중이다`),
       },
     ],
+  });
+}
+
+function rotatePresence(client) {
+  const all = [
+    nya(`${client.guilds.cache.size}개의 서버와 함께하는 중이다`),
+    `${client.guilds.cache.size}개의 서버 집사들 돌보는 중이다냥 🐾`,
+    ...EXTRA_STATUSES,
+  ];
+  const state = all[Math.floor(Math.random() * all.length)];
+  client.user.setPresence({
+    status: "online",
+    activities: [{ name: "status", type: ActivityType.Custom, state }],
   });
 }
 
@@ -112,6 +135,8 @@ module.exports = {
 
     checkAllStreams(client).catch(() => {});
     setInterval(() => checkAllStreams(client).catch(() => {}), 5 * 60 * 1000);
+
+    setInterval(() => rotatePresence(client), 3 * 60 * 1000);
 
     scheduleDailyTasks();
     updateSupportMessages(client).catch(() => {});
