@@ -26,6 +26,10 @@ function buildMenuEmbed() {
   return new EmbedBuilder()
     .setTitle("검열 설정")
     .setDescription(nya("욕설검열 또는 도배검열 중 설정할 항목을 선택하세요"))
+    .addFields({
+      name: "💡 로그 설정",
+      value: nya("검열로 삭제된 메시지를 기록하려면 /로그 명령어에서 로그 채널을 설정해주세요"),
+    })
     .setColor(0xe1aa74);
 }
 
@@ -51,6 +55,10 @@ function buildFilterEmbed(guildId, key) {
     .setDescription(
       nya(`${info.description}\n현재 상태: ${enabled ? "켜져 있습니다" : "꺼져 있습니다"}`),
     )
+    .addFields({
+      name: "💡 로그 설정",
+      value: nya("검열로 삭제된 메시지를 기록하려면 /로그 명령어에서 로그 채널을 설정해주세요"),
+    })
     .setColor(0xe1aa74);
 }
 
