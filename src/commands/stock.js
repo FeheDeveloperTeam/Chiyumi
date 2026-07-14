@@ -43,15 +43,29 @@ function buildPortfolioEmbed(userId) {
   }
 
   let totalValue = 0;
-  const lines = entries.map(([stockId, qty]) => {
+  let totalCost = 0;
+  const lines = entries.map(([stockId, { qty, avgPrice }]) => {
     const def = STOCK_DEFS.find((s) => s.id === stockId);
     const price = prices[stockId] ?? 0;
     const value = price * qty;
+    const cost = avgPrice * qty;
+    const pnl = value - cost;
+    const pnlPct = cost > 0 ? ((pnl / cost) * 100).toFixed(1) : "0.0";
+    const sign = pnl > 0 ? "+" : "";
+    const arrow = pnl > 0 ? "▲" : pnl < 0 ? "▼" : "━";
     totalValue += value;
-    return `**[${stockId}] ${def?.name ?? stockId}**\n${qty}주 × ${price.toLocaleString()}코인 = **${value.toLocaleString()}코인**`;
+    totalCost += cost;
+    return [
+      `**[${stockId}] ${def?.name ?? stockId}**`,
+      `${qty}주 × ${price.toLocaleString()}코인 = **${value.toLocaleString()}코인**`,
+      `평단 ${avgPrice.toLocaleString()}코인 | ${arrow} ${sign}${pnl.toLocaleString()}코인 (${sign}${pnlPct}%)`,
+    ].join("\n");
   });
 
-  lines.push(`\n**총 평가액: ${totalValue.toLocaleString()}코인**`);
+  const totalPnl = totalValue - totalCost;
+  const totalSign = totalPnl > 0 ? "+" : "";
+  const totalPnlPct = totalCost > 0 ? ((totalPnl / totalCost) * 100).toFixed(1) : "0.0";
+  lines.push(`\n**총 평가액: ${totalValue.toLocaleString()}코인** (${totalSign}${totalPnl.toLocaleString()}코인, ${totalSign}${totalPnlPct}%)`);
 
   return new EmbedBuilder()
     .setTitle("💼 내 포트폴리오")

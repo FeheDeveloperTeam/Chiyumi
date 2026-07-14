@@ -88,9 +88,20 @@ function updateDailyPrices() {
   return true;
 }
 
+function normalizeEntry(entry, currentPrice) {
+  if (typeof entry === "number") return { qty: entry, avgPrice: currentPrice };
+  return entry;
+}
+
 function getPortfolio(userId) {
   const portfolios = loadPortfolios();
-  return portfolios[userId] ?? {};
+  const raw = portfolios[userId] ?? {};
+  const prices = getCurrentPrices();
+  const result = {};
+  for (const [stockId, entry] of Object.entries(raw)) {
+    result[stockId] = normalizeEntry(entry, prices[stockId] ?? 0);
+  }
+  return result;
 }
 
 function getAllPortfolios() {
@@ -106,10 +117,19 @@ function buyStock(userId, stockId, quantity) {
   const totalCost = price * quantity;
   const portfolios = loadPortfolios();
   if (!portfolios[userId]) portfolios[userId] = {};
-  portfolios[userId][stockId] = (portfolios[userId][stockId] ?? 0) + quantity;
-  savePortfolios(portfolios);
 
-  return { success: true, price, totalCost };
+  const existing = portfolios[userId][stockId];
+  if (!existing) {
+    portfolios[userId][stockId] = { qty: quantity, avgPrice: price };
+  } else {
+    const norm = normalizeEntry(existing, price);
+    const newQty = norm.qty + quantity;
+    const newAvgPrice = Math.round((norm.qty * norm.avgPrice + quantity * price) / newQty);
+    portfolios[userId][stockId] = { qty: newQty, avgPrice: newAvgPrice };
+  }
+
+  savePortfolios(portfolios);
+  return { success: true, price, totalCost, avgPrice: portfolios[userId][stockId].avgPrice };
 }
 
 function sellStock(userId, stockId, quantity) {
@@ -119,22 +139,29 @@ function sellStock(userId, stockId, quantity) {
   if (quantity < 1) return { success: false, reason: "수량 오류" };
 
   const portfolios = loadPortfolios();
-  const held = portfolios[userId]?.[stockId] ?? 0;
-  if (held < quantity) return { success: false, reason: "보유량 부족" };
+  const existing = portfolios[userId]?.[stockId];
+  if (!existing) return { success: false, reason: "보유량 부족" };
+
+  const norm = normalizeEntry(existing, price);
+  if (norm.qty < quantity) return { success: false, reason: "보유량 부족" };
 
   const totalGain = price * quantity;
-  portfolios[userId][stockId] = held - quantity;
-  if (portfolios[userId][stockId] === 0) delete portfolios[userId][stockId];
+  const newQty = norm.qty - quantity;
+  if (newQty === 0) {
+    delete portfolios[userId][stockId];
+  } else {
+    portfolios[userId][stockId] = { qty: newQty, avgPrice: norm.avgPrice };
+  }
   savePortfolios(portfolios);
 
-  return { success: true, price, totalGain };
+  return { success: true, price, totalGain, avgPrice: norm.avgPrice };
 }
 
 function getPortfolioValue(userId) {
   const portfolio = getPortfolio(userId);
   const prices = getCurrentPrices();
   let total = 0;
-  for (const [stockId, qty] of Object.entries(portfolio)) {
+  for (const [stockId, { qty }] of Object.entries(portfolio)) {
     total += (prices[stockId] ?? 0) * qty;
   }
   return total;

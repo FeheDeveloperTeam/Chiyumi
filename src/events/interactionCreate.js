@@ -1112,7 +1112,7 @@ async function handleStockAction(interaction) {
   if (action === "sell") {
     const portfolio = getPortfolio(userId);
     const heldIds = Object.entries(portfolio)
-      .filter(([, qty]) => qty > 0)
+      .filter(([, e]) => e.qty > 0)
       .map(([id]) => id)
       .join(" / ") || "없음";
 
@@ -1192,7 +1192,7 @@ async function handleStockBuyModal(interaction) {
 
   const def = getStockDef(ticker);
   await interaction.reply({
-    content: nya(`**[${ticker}] ${def.name}** ${quantity}주를 ${result.totalCost.toLocaleString()}코인에 매수했습니다.\n잔액: ${(balance - result.totalCost).toLocaleString()}코인`),
+    content: nya(`**[${ticker}] ${def.name}** ${quantity}주를 ${result.totalCost.toLocaleString()}코인에 매수했습니다.\n평단가: ${result.avgPrice.toLocaleString()}코인 | 잔액: ${(balance - result.totalCost).toLocaleString()}코인`),
     ephemeral: true,
   });
 }
@@ -1234,9 +1234,11 @@ async function handleStockSellModal(interaction) {
   addBalance(userId, result.totalGain);
   const newBalance = getBalance(userId);
   const def = getStockDef(ticker);
+  const pnl = (result.price - result.avgPrice) * quantity;
+  const pnlSign = pnl > 0 ? "+" : "";
 
   await interaction.reply({
-    content: nya(`**[${ticker}] ${def.name}** ${quantity}주를 ${result.totalGain.toLocaleString()}코인에 매도했습니다.\n잔액: ${newBalance.toLocaleString()}코인`),
+    content: nya(`**[${ticker}] ${def.name}** ${quantity}주를 ${result.totalGain.toLocaleString()}코인에 매도했습니다.\n손익: ${pnlSign}${pnl.toLocaleString()}코인 | 잔액: ${newBalance.toLocaleString()}코인`),
     ephemeral: true,
   });
 }
