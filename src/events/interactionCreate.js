@@ -3428,16 +3428,19 @@ async function showGambleMult(interaction, game) {
     .setDescription(nya("위험 배율을 선택하세요. 배율이 높을수록 이기면 많이 벌지만 당첨 확률이 낮아집니다."))
     .addFields(
       ...GAMBLE_MULT_OPTIONS.map((opt) => {
-        const winChance = opt.luckPenalty > 0 ? `당첨 확률 약 ${Math.round((1 - opt.luckPenalty) * 100)}%` : "기본 당첨 확률";
+        const winChance = opt.luckPenalty > 0 ? `행운 패널티 -${Math.round(opt.luckPenalty * 100)}%` : "행운 패널티 없음";
         let value;
         if (isSlot) {
-          // 3개 일치: floor(심볼배율/2) × riskMult, 최소(🍒)=2, 최대(7️⃣)=25
+          // 2개 소당첨: floor(심볼배율/4), min(🍒)=1, max(7️⃣)=12
+          const m2min = 1 * opt.mult;
+          const m2max = 12 * opt.mult;
+          // 3개 당첨: floor(심볼배율/2), min(🍒)=2, max(7️⃣)=25
           const m3min = 2 * opt.mult;
           const m3max = 25 * opt.mult;
-          // 4개 일치(잭팟): 심볼배율 × riskMult, 최소(🍒)=4, 최대(7️⃣)=50
+          // 4개 잭팟: 심볼배율, min(🍒)=4, max(7️⃣)=50
           const m4min = 4 * opt.mult;
           const m4max = 50 * opt.mult;
-          value = `최소 ${opt.minBet.toLocaleString()}코인 · ${winChance}\n2개: 낙첨 · 3개: ×${m3min}~×${m3max} · 잭팟: ×${m4min}~×${m4max}`;
+          value = `최소 ${opt.minBet.toLocaleString()}코인 · ${winChance}\n2개: ×${m2min}~×${m2max} · 3개: ×${m3min}~×${m3max} · 잭팟: ×${m4min}~×${m4max}`;
         } else {
           value = `최소 ${opt.minBet.toLocaleString()}코인 · ${winChance}`;
         }
@@ -3593,9 +3596,9 @@ async function playSlotGame(interaction, userId, bet, riskMult = 1, luckPenalty 
 
   // 페이아웃 표: 선택된 riskMult 기준
   const payoutLine = [
-    `2개 일치: 낙첨`,
-    `3개 일치: ×${2 * riskMult} ~ ×${25 * riskMult}`,
-    `잭팟 (4개): ×${4 * riskMult} ~ ×${50 * riskMult}`,
+    `2개 소당첨: ×${1 * riskMult} ~ ×${12 * riskMult}`,
+    `3개 당첨: ×${2 * riskMult} ~ ×${25 * riskMult}`,
+    `4개 잭팟: ×${4 * riskMult} ~ ×${50 * riskMult}`,
   ].join(" · ");
 
   await slotWait(800);

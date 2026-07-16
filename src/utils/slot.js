@@ -8,10 +8,15 @@ const JACKPOT_MULTIPLIERS = {
 };
 const WIN_SYMBOLS = Object.keys(JACKPOT_MULTIPLIERS);
 
-// 7️⃣: 풀에 1개 (초희귀) / 나머지 WIN 심볼 4개씩 → 총 21개, 손실 심볼 없음
+// 희귀도별 풀 가중치 (낮은 배율 심볼일수록 많이 등장 → 당첨 확률 체감 상승)
+// 7️⃣:1 / 💎:2 / 🔔:3 / 🍇:5 / 🍋:7 / 🍒:9 → 총 27개
 const SYMBOL_POOL = [
   "7️⃣",
-  ...WIN_SYMBOLS.slice(1).flatMap((s) => [s, s, s, s]),
+  "💎", "💎",
+  "🔔", "🔔", "🔔",
+  "🍇", "🍇", "🍇", "🍇", "🍇",
+  "🍋", "🍋", "🍋", "🍋", "🍋", "🍋", "🍋",
+  "🍒", "🍒", "🍒", "🍒", "🍒", "🍒", "🍒", "🍒", "🍒",
 ];
 
 const HIDDEN_SYMBOL = "❓";
@@ -39,6 +44,13 @@ function spin() {
   for (const sym of WIN_SYMBOLS) {
     if (reels.filter((r) => r === sym).length === 3) {
       return { reels, resultText: "당첨", multiplier: Math.max(1, Math.floor(JACKPOT_MULTIPLIERS[sym] / 2)) };
+    }
+  }
+
+  // 소당첨: WIN 심볼 2개 일치 (희귀 심볼 우선)
+  for (const sym of WIN_SYMBOLS) {
+    if (reels.filter((r) => r === sym).length === 2) {
+      return { reels, resultText: "소당첨", multiplier: Math.max(1, Math.floor(JACKPOT_MULTIPLIERS[sym] / 4)) };
     }
   }
 
