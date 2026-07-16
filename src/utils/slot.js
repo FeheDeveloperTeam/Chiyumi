@@ -24,25 +24,23 @@ function wait(ms) {
 }
 
 function buildReelText(reels, revealedCount) {
-  return reels
-    .map((symbol, index) => (index < revealedCount ? symbol : HIDDEN_SYMBOL))
-    .join(" ");
+  const symbols = reels.map((symbol, index) => (index < revealedCount ? symbol : HIDDEN_SYMBOL));
+  return `[ ${symbols.join(" │ ")} ]`;
 }
 
 function spin() {
   const pick = () => SYMBOL_POOL[Math.floor(Math.random() * SYMBOL_POOL.length)];
-  const reels = [pick(), pick(), pick()];
+  const reels = [pick(), pick(), pick(), pick()];
 
-  const allSame = reels[0] === reels[1] && reels[1] === reels[2];
-
-  if (allSame && WIN_SYMBOLS.includes(reels[0])) {
+  // 잭팟: 4개 모두 같은 WIN 심볼
+  if (reels.every((r) => r === reels[0]) && WIN_SYMBOLS.includes(reels[0])) {
     return { reels, resultText: "잭팟", multiplier: JACKPOT_MULTIPLIERS[reels[0]] };
   }
 
+  // 당첨: WIN 심볼 3개 일치
   for (const sym of WIN_SYMBOLS) {
-    if (reels.filter((r) => r === sym).length === 2) {
-      const multiplier = Math.max(1, Math.floor(JACKPOT_MULTIPLIERS[sym] / 3));
-      return { reels, resultText: "당첨", multiplier };
+    if (reels.filter((r) => r === sym).length === 3) {
+      return { reels, resultText: "당첨", multiplier: Math.max(1, Math.floor(JACKPOT_MULTIPLIERS[sym] / 2)) };
     }
   }
 

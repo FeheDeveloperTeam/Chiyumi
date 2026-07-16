@@ -7,6 +7,45 @@ const {
 } = require("discord.js");
 const { nya } = require("../utils/nya");
 
+function buildGambleEmbed() {
+  return new EmbedBuilder()
+    .setTitle("도박장")
+    .setDescription(nya("치유미코인을 걸고 즐길 게임을 선택하세요\n게임 선택 후 배율(1배~5배)을 고를 수 있습니다"))
+    .addFields(
+      { name: "슬롯머신", value: nya("심볼 4개를 맞춰 배율만큼 획득 · 3개 일치 시 절반 배율") },
+      { name: "홀짝", value: nya("홀/짝을 맞춥니다. 3종 주사위, 꽝 있음 (기본 당첨 약 33%)") },
+      { name: "숫자맞추기", value: nya("1~10 중 하나를 맞추면 7배 획득 (기본 당첨 10%)") },
+      { name: "블랙잭", value: nya("딜러와 카드 합을 비교합니다. 동점 = 딜러 승") },
+      { name: "가위바위보", value: nya("치유미와 겨룹니다. 비기면 집 승 (기본 당첨 약 33%)") },
+    )
+    .setColor(0xe1aa74);
+}
+
+function buildGambleRow() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("gamble-action:slot")
+      .setLabel("슬롯머신")
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId("gamble-action:oddeven")
+      .setLabel("홀짝")
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId("gamble-action:numberguess")
+      .setLabel("숫자맞추기")
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId("gamble-action:blackjack")
+      .setLabel("블랙잭")
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId("gamble-action:rps")
+      .setLabel("가위바위보")
+      .setStyle(ButtonStyle.Primary),
+  );
+}
+
 module.exports = {
   category: "게임",
   data: new SlashCommandBuilder()
@@ -15,42 +54,10 @@ module.exports = {
     .setDescription(nya("치유미코인을 걸고 즐길 게임을 선택합니다"))
     .setDescriptionLocalizations({ ko: nya("치유미코인을 걸고 즐길 게임을 선택합니다") }),
 
+  buildGambleEmbed,
+  buildGambleRow,
+
   async execute(interaction) {
-    const embed = new EmbedBuilder()
-      .setTitle("도박장")
-      .setDescription(nya("치유미코인을 걸고 즐길 게임을 선택하세요"))
-      .addFields(
-        { name: "슬롯머신", value: nya("심볼 3개를 맞춰 배율만큼 획득합니다 (당첨 약 21%)") },
-        { name: "홀짝", value: nya("홀/짝을 맞춥니다. 3종 주사위, 꽝 있음 (당첨 약 33%)") },
-        { name: "숫자맞추기", value: nya("1~10 중 하나를 맞추면 7배 획득 (당첨 10%)") },
-        { name: "블랙잭", value: nya("딜러와 카드 합을 비교합니다. 동점 = 딜러 승") },
-        { name: "가위바위보", value: nya("치유미와 겨룹니다. 비기면 집 승 (당첨 약 33%)") },
-      )
-      .setColor(0xe1aa74);
-
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId("gamble-action:slot")
-        .setLabel("슬롯머신")
-        .setStyle(ButtonStyle.Primary),
-      new ButtonBuilder()
-        .setCustomId("gamble-action:oddeven")
-        .setLabel("홀짝")
-        .setStyle(ButtonStyle.Primary),
-      new ButtonBuilder()
-        .setCustomId("gamble-action:numberguess")
-        .setLabel("숫자맞추기")
-        .setStyle(ButtonStyle.Primary),
-      new ButtonBuilder()
-        .setCustomId("gamble-action:blackjack")
-        .setLabel("블랙잭")
-        .setStyle(ButtonStyle.Primary),
-      new ButtonBuilder()
-        .setCustomId("gamble-action:rps")
-        .setLabel("가위바위보")
-        .setStyle(ButtonStyle.Primary),
-    );
-
-    await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+    await interaction.reply({ embeds: [buildGambleEmbed()], components: [buildGambleRow()], ephemeral: true });
   },
 };
