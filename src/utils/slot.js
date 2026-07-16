@@ -1,11 +1,20 @@
 const JACKPOT_MULTIPLIERS = {
   "🍒": 4,
   "🍋": 5,
-  "🍇": 6,
-  "🔔": 7,
-  "💎": 10,
+  "🍇": 7,
+  "🔔": 10,
+  "💎": 20,
 };
-const SYMBOLS = Object.keys(JACKPOT_MULTIPLIERS);
+const WIN_SYMBOLS = Object.keys(JACKPOT_MULTIPLIERS);
+const LOSS_SYMBOLS = ["🍑", "🌙", "💀"];
+
+// 각 WIN 심볼 2개, 각 LOSS 심볼 2개 → 총 16개 풀
+// P(WIN 심볼) ≈ 62.5% / 전체 당첨 확률 ≈ 21%
+const SYMBOL_POOL = [
+  ...WIN_SYMBOLS.flatMap((s) => [s, s]),
+  ...LOSS_SYMBOLS.flatMap((s) => [s, s]),
+];
+
 const HIDDEN_SYMBOL = "❓";
 const REVEAL_DELAY_MS = 800;
 
@@ -19,38 +28,24 @@ function buildReelText(reels, revealedCount) {
     .join(" ");
 }
 
-function findPairSymbol(reels) {
-  if (reels[0] === reels[1]) return reels[0];
-  if (reels[1] === reels[2]) return reels[1];
-  return reels[0];
-}
-
 function spin() {
-  const reels = Array.from(
-    { length: 3 },
-    () => SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)],
-  );
+  const pick = () => SYMBOL_POOL[Math.floor(Math.random() * SYMBOL_POOL.length)];
+  const reels = [pick(), pick(), pick()];
 
-  const allMatch = reels[0] === reels[1] && reels[1] === reels[2];
-  const twoMatch =
-    !allMatch &&
-    (reels[0] === reels[1] || reels[1] === reels[2] || reels[0] === reels[2]);
+  const allSame = reels[0] === reels[1] && reels[1] === reels[2];
 
-  let multiplier;
-  let resultText;
-
-  if (allMatch) {
-    multiplier = JACKPOT_MULTIPLIERS[reels[0]];
-    resultText = "잭팟";
-  } else if (twoMatch) {
-    multiplier = Math.max(1, Math.floor(JACKPOT_MULTIPLIERS[findPairSymbol(reels)] / 2));
-    resultText = "당첨";
-  } else {
-    multiplier = null;
-    resultText = "낙첨";
+  if (allSame && WIN_SYMBOLS.includes(reels[0])) {
+    return { reels, resultText: "잭팟", multiplier: JACKPOT_MULTIPLIERS[reels[0]] };
   }
 
-  return { reels, resultText, multiplier };
+  for (const sym of WIN_SYMBOLS) {
+    if (reels.filter((r) => r === sym).length === 2) {
+      const multiplier = Math.max(1, Math.floor(JACKPOT_MULTIPLIERS[sym] / 3));
+      return { reels, resultText: "당첨", multiplier };
+    }
+  }
+
+  return { reels, resultText: "낙첨", multiplier: null };
 }
 
 module.exports = {

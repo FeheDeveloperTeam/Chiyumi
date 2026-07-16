@@ -96,7 +96,7 @@ const { buildStreamAlertPage, buildPlatformButtons, PLATFORM_LABELS } = require(
 const { buildMarketEmbed, buildPortfolioEmbed, buildStockRow } = require("../commands/stock");
 const { buildBankEmbed, buildBankRow } = require("../commands/bank");
 const { getStockDef, getCurrentPrices, getPortfolio, getPortfolioValue, clearPortfolio, buyStock, sellStock } = require("../utils/stocks");
-const { getAccount, getTotalOwed, deposit, withdraw, takeLoan, repayLoan, declareBankruptcy, MAX_LOAN, MIN_LOAN } = require("../utils/bank");
+const { getAccount, getTotalOwed, deposit, withdraw, takeLoan, repayLoan, declareBankruptcy, getRebirthCooldownMs, MAX_LOAN, MIN_LOAN } = require("../utils/bank");
 const {
   MIN_PARTY_SIZE: WORDCHAIN_MIN_SIZE,
   MAX_PARTY_SIZE: WORDCHAIN_MAX_SIZE,
@@ -116,6 +116,7 @@ const STATS_DETAIL_PREFIX = "stats-detail:";
 const STATS_FILTER_PREFIX = "stats-filter:";
 const GAMBLE_ACTION_PREFIX = "gamble-action:";
 const GAMBLE_MODAL_PREFIX = "gamble-modal:";
+const GAMBLE_MAX_BET = 50_000;
 const GAMBLE_TITLES = {
   slot: "슬롯머신",
   oddeven: "홀짝",
@@ -1334,6 +1335,17 @@ async function handleBankAction(interaction) {
   }
 
   if (action === "bankrupt") {
+    const cooldownMs = getRebirthCooldownMs(userId);
+    if (cooldownMs > 0) {
+      const hours = Math.floor(cooldownMs / 3_600_000);
+      const minutes = Math.floor((cooldownMs % 3_600_000) / 60_000);
+      await interaction.reply({
+        content: nya(`아직 환생할 수 없습니다. 다음 환생까지 **${hours}시간 ${minutes}분** 남았습니다.`),
+        ephemeral: true,
+      });
+      return;
+    }
+
     const acc = getAccount(userId);
     if (!acc.loan) {
       await interaction.reply({
@@ -1388,6 +1400,18 @@ async function handleBankAction(interaction) {
   }
 
   if (action === "bankrupt-confirm") {
+    const cooldownMs = getRebirthCooldownMs(userId);
+    if (cooldownMs > 0) {
+      const hours = Math.floor(cooldownMs / 3_600_000);
+      const minutes = Math.floor((cooldownMs % 3_600_000) / 60_000);
+      await interaction.update({
+        content: nya(`아직 환생할 수 없습니다. 다음 환생까지 **${hours}시간 ${minutes}분** 남았습니다.`),
+        embeds: [],
+        components: [],
+      });
+      return;
+    }
+
     const acc = getAccount(userId);
     if (!acc.loan) {
       await interaction.update({
@@ -3384,7 +3408,7 @@ async function showGambleModal(interaction, game) {
     .setCustomId("bet")
     .setLabel("베팅할 치유미코인 금액")
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder("예: 100")
+    .setPlaceholder(`예: 1000 (최대 ${GAMBLE_MAX_BET.toLocaleString()}코인)`)
     .setRequired(true);
   rows.push(new ActionRowBuilder().addComponents(betInput));
 
@@ -3403,6 +3427,14 @@ async function handleGambleModal(interaction, game) {
   if (!Number.isInteger(bet) || bet <= 0) {
     await interaction.followUp({
       content: nya("올바른 베팅 금액이 아닙니다.") + "\n(오류 코드: GAMBLE-001)",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  if (bet > GAMBLE_MAX_BET) {
+    await interaction.followUp({
+      content: nya(`최대 베팅 한도는 ${GAMBLE_MAX_BET.toLocaleString()}코인입니다.`) + "\n(오류 코드: GAMBLE-006)",
       ephemeral: true,
     });
     return;

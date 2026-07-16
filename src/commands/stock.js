@@ -33,7 +33,7 @@ function buildMarketEmbed() {
 function buildPortfolioEmbed(userId) {
   const portfolio = getPortfolio(userId);
   const prices = getCurrentPrices();
-  const entries = Object.entries(portfolio).filter(([, qty]) => qty > 0);
+  const entries = Object.entries(portfolio).filter(([, e]) => e.qty > 0);
 
   if (entries.length === 0) {
     return new EmbedBuilder()

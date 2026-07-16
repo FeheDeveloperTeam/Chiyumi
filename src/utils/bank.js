@@ -4,10 +4,11 @@ const path = require("node:path");
 const DATA_DIR = path.join(__dirname, "..", "..", "data");
 const BANK_FILE = path.join(DATA_DIR, "bank.json");
 
-const SAVINGS_INTEREST_RATE = 0.01; // 예금 하루 1%
-const LOAN_INTEREST_RATE = 0.05;    // 대출 하루 5%
+const SAVINGS_INTEREST_RATE = 0.01;
+const LOAN_INTEREST_RATE = 0.05;
 const MAX_LOAN = 50_000;
 const MIN_LOAN = 100;
+const REBIRTH_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const KST_TIMEZONE = "Asia/Seoul";
 
 function getKstDateString(date = new Date()) {
@@ -116,8 +117,16 @@ function declareBankruptcy(userId) {
   acc.savings = 0;
   acc.loan = null;
   acc.rebirths += 1;
+  acc.lastRebirthAt = Date.now();
   saveBank(bank);
   return acc.rebirths;
+}
+
+function getRebirthCooldownMs(userId) {
+  const bank = loadBank();
+  const acc = bank[userId];
+  if (!acc?.lastRebirthAt) return 0;
+  return Math.max(0, REBIRTH_COOLDOWN_MS - (Date.now() - acc.lastRebirthAt));
 }
 
 module.exports = {
@@ -125,6 +134,7 @@ module.exports = {
   LOAN_INTEREST_RATE,
   MAX_LOAN,
   MIN_LOAN,
+  REBIRTH_COOLDOWN_MS,
   getAccount,
   getAllAccounts,
   deposit,
@@ -133,5 +143,6 @@ module.exports = {
   takeLoan,
   repayLoan,
   declareBankruptcy,
+  getRebirthCooldownMs,
   applyDailyInterest,
 };
