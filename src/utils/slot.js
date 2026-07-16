@@ -1,17 +1,18 @@
 const JACKPOT_MULTIPLIERS = {
-  "🍒": 4,
-  "🍋": 5,
-  "🍇": 7,
-  "🔔": 10,
+  "7️⃣": 50,
   "💎": 20,
+  "🔔": 10,
+  "🍇": 7,
+  "🍋": 5,
+  "🍒": 4,
 };
 const WIN_SYMBOLS = Object.keys(JACKPOT_MULTIPLIERS);
 const LOSS_SYMBOLS = ["🍑", "🌙", "💀"];
 
-// 각 WIN 심볼 3개, 각 LOSS 심볼 2개 → 총 21개 풀
-// P(WIN 심볼) ≈ 71% / 전체 당첨 확률 ≈ 28%
+// 7️⃣: 풀에 1개 (초희귀) / 나머지 WIN 심볼 3개씩 / LOSS 심볼 2개씩 → 총 22개
 const SYMBOL_POOL = [
-  ...WIN_SYMBOLS.flatMap((s) => [s, s, s]),
+  "7️⃣",
+  ...WIN_SYMBOLS.slice(1).flatMap((s) => [s, s, s]),
   ...LOSS_SYMBOLS.flatMap((s) => [s, s]),
 ];
 
