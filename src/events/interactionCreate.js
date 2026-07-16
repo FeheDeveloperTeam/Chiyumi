@@ -3427,7 +3427,11 @@ async function showGambleMult(interaction, game) {
 
   const embed = new EmbedBuilder()
     .setTitle(GAMBLE_TITLES[game] ?? "도박")
-    .setDescription(nya("위험 배율을 선택하세요. 배율이 높을수록 이기면 더 많이 벌지만 최소 베팅도 높아집니다."))
+    .setDescription(nya(
+      isSlot
+        ? "위험 배율을 선택하세요. 배율이 높을수록 이기면 더 많이 벌지만 최소 베팅도 높아집니다.\n\n**📊 슬롯 당첨 확률 (4릴 기준)**\n잭팟 (4개 일치): 약 2% · 당첨 (3개): 약 22%\n소당첨 (2개): 약 60% · 낙첨: 약 16%"
+        : "위험 배율을 선택하세요. 배율이 높을수록 이기면 더 많이 벌지만 최소 베팅도 높아집니다."
+    ))
     .addFields(
       ...GAMBLE_MULT_OPTIONS.map((opt) => {
         let value;
