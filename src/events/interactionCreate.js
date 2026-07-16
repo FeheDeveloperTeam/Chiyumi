@@ -3603,14 +3603,20 @@ async function playSlotGame(interaction, userId, bet, riskMult = 1, luckPenalty 
   ].join(" · ");
 
   await slotWait(800);
-  await msg.edit({
-    embeds: [
-      buildEmbed(
-        reels.length,
-        nya(`${resultText}${multiplierText}! ${deltaText} 치유미코인 (현재 보유: ${newBalance.toLocaleString()}개)`),
-      ).addFields({ name: `📊 배당표 (${riskMult}배 위험도)`, value: payoutLine }),
-    ],
-  });
+
+  const finalEmbed = buildEmbed(
+    reels.length,
+    nya(`${resultText}${multiplierText}! ${deltaText} 치유미코인 (현재 보유: ${newBalance.toLocaleString()}개)`),
+  ).addFields({ name: `📊 배당표 (${riskMult}배 위험도)`, value: payoutLine });
+
+  if (resultText === "잭팟") {
+    finalEmbed
+      .setTitle("🎰 J A C K P O T 🎰")
+      .setDescription(`${buildSlotReelText(reels, reels.length)}\n\n✨ **${deltaText.replace("+", "")} 치유미코인 획득!** ✨`)
+      .setColor(0xffd700);
+  }
+
+  await msg.edit({ embeds: [finalEmbed] });
 }
 
 async function playOddEvenGame(interaction, userId, bet, riskMult = 1, luckPenalty = 0) {
