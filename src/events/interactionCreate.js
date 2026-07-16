@@ -3531,13 +3531,14 @@ async function playOddEvenGame(interaction, userId, bet) {
     return;
   }
 
-  const number = Math.floor(Math.random() * 100) + 1;
-  const isOdd = number % 2 === 1;
-  const won = (choice === "odd" && isOdd) || (choice === "even" && !isOdd);
+  // 1=홀, 2=짝, 3=꽝(집승) — 당첨 33%
+  const roll = Math.floor(Math.random() * 3) + 1;
+  const houseWin = roll === 3;
+  const rollLabel = roll === 1 ? "홀" : roll === 2 ? "짝" : "꽝";
+  const won = !houseWin && ((choice === "odd" && roll === 1) || (choice === "even" && roll === 2));
   const delta = won ? bet : -bet;
   const newBalance = addBalance(userId, delta);
   const deltaText = delta > 0 ? `+${delta}` : `${delta}`;
-  const resultLabel = isOdd ? "홀" : "짝";
 
   const embed = new EmbedBuilder()
     .setTitle("홀짝")
@@ -3545,7 +3546,7 @@ async function playOddEvenGame(interaction, userId, bet) {
       name: interaction.user.username,
       iconURL: interaction.user.displayAvatarURL(),
     })
-    .setDescription(nya(`숫자: ${number} (${resultLabel}) → ${won ? "승리" : "패배"}!`))
+    .setDescription(nya(`주사위: **${rollLabel}** → ${won ? "승리" : houseWin ? "꽝! (집 승)" : "패배"}!`))
     .addFields({
       name: "결과",
       value: nya(`${deltaText} 치유미코인 (현재 보유: ${newBalance}개)`),
@@ -3566,7 +3567,7 @@ async function playNumberGuessGame(interaction, userId, bet) {
 
   const answer = Math.floor(Math.random() * 10) + 1;
   const won = guess === answer;
-  const delta = won ? bet * 9 : -bet;
+  const delta = won ? bet * 7 : -bet;
   const newBalance = addBalance(userId, delta);
   const deltaText = delta > 0 ? `+${delta}` : `${delta}`;
 
@@ -3596,10 +3597,10 @@ async function playBlackjackGame(interaction, userId, bet) {
 
   if (isBlackjack(session.playerCards)) {
     const dealerBlackjack = isBlackjack(session.dealerCards);
-    const delta = dealerBlackjack ? 0 : Math.floor(bet * 1.5);
+    const delta = dealerBlackjack ? -bet : Math.floor(bet * 1.5);
     const newBalance = addBalance(userId, delta);
     const resultText = dealerBlackjack
-      ? `둘 다 블랙잭! 비겼습니다. 현재 보유: ${newBalance}개`
+      ? `둘 다 블랙잭! 딜러 승. ${bet} 치유미코인을 잃었습니다. 현재 보유: ${newBalance}개`
       : `블랙잭! ${delta} 치유미코인을 획득했습니다. 현재 보유: ${newBalance}개`;
 
     await interaction.followUp({
@@ -3639,19 +3640,19 @@ async function playRpsGame(interaction, userId, bet) {
   let resultText;
   let delta;
 
-  if (choiceRaw === botChoice) {
-    resultText = "비겼습니다";
-    delta = 0;
-  } else if (RPS_BEATS[choiceRaw] === botChoice) {
+  if (RPS_BEATS[choiceRaw] === botChoice) {
     resultText = "이겼습니다";
     delta = bet;
+  } else if (choiceRaw === botChoice) {
+    resultText = "비겼지만 집 승";
+    delta = -bet;
   } else {
     resultText = "졌습니다";
     delta = -bet;
   }
 
   const newBalance = addBalance(userId, delta);
-  const deltaText = delta > 0 ? `+${delta}` : delta < 0 ? `${delta}` : "±0";
+  const deltaText = delta > 0 ? `+${delta}` : `${delta}`;
 
   const embed = new EmbedBuilder()
     .setTitle("가위바위보")
@@ -3731,8 +3732,8 @@ async function handleBlackjackAction(interaction) {
     delta = session.bet;
     resultText = `승리! ${delta} 치유미코인을 획득했습니다.`;
   } else if (playerTotal === dealerTotal) {
-    delta = 0;
-    resultText = "비겼습니다.";
+    delta = -session.bet;
+    resultText = `동점이지만 딜러 승! ${session.bet} 치유미코인을 잃었습니다.`;
   } else {
     delta = -session.bet;
     resultText = `패배! ${session.bet} 치유미코인을 잃었습니다.`;

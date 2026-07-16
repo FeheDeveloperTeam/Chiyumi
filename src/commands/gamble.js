@@ -20,11 +20,11 @@ module.exports = {
       .setTitle("도박장")
       .setDescription(nya("치유미코인을 걸고 즐길 게임을 선택하세요"))
       .addFields(
-        { name: "슬롯머신", value: nya("심볼 3개를 맞춰 배율만큼 획득합니다") },
-        { name: "홀짝", value: nya("숫자의 홀/짝을 맞춥니다") },
-        { name: "숫자맞추기", value: nya("1부터 10 사이의 숫자를 맞춥니다") },
-        { name: "블랙잭", value: nya("딜러와 카드 합을 비교합니다") },
-        { name: "가위바위보", value: nya("치유미와 가위바위보로 승부를 겝니다") },
+        { name: "슬롯머신", value: nya("심볼 3개를 맞춰 배율만큼 획득합니다 (당첨 약 21%)") },
+        { name: "홀짝", value: nya("홀/짝을 맞춥니다. 3종 주사위, 꽝 있음 (당첨 약 33%)") },
+        { name: "숫자맞추기", value: nya("1~10 중 하나를 맞추면 7배 획득 (당첨 10%)") },
+        { name: "블랙잭", value: nya("딜러와 카드 합을 비교합니다. 동점 = 딜러 승") },
+        { name: "가위바위보", value: nya("치유미와 겨룹니다. 비기면 집 승 (당첨 약 33%)") },
       )
       .setColor(0xe1aa74);
 
