@@ -8,10 +8,10 @@ const JACKPOT_MULTIPLIERS = {
 const WIN_SYMBOLS = Object.keys(JACKPOT_MULTIPLIERS);
 const LOSS_SYMBOLS = ["🍑", "🌙", "💀"];
 
-// 각 WIN 심볼 2개, 각 LOSS 심볼 2개 → 총 16개 풀
-// P(WIN 심볼) ≈ 62.5% / 전체 당첨 확률 ≈ 21%
+// 각 WIN 심볼 3개, 각 LOSS 심볼 2개 → 총 21개 풀
+// P(WIN 심볼) ≈ 71% / 전체 당첨 확률 ≈ 28%
 const SYMBOL_POOL = [
-  ...WIN_SYMBOLS.flatMap((s) => [s, s]),
+  ...WIN_SYMBOLS.flatMap((s) => [s, s, s]),
   ...LOSS_SYMBOLS.flatMap((s) => [s, s]),
 ];
 
