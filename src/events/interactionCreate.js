@@ -3830,6 +3830,10 @@ async function handleBlackjackAction(interaction) {
     return;
   }
 
+  const bjOpts = bjSessionOptions.get(sessionId) ?? { luckPenalty: 0, riskMult: 1 };
+  deleteBjSession(sessionId);
+  bjSessionOptions.delete(sessionId);
+
   const dealerStands = DEALER_STANDS_AT[bjOpts.riskMult] ?? 17;
   while (handTotal(session.dealerCards) < dealerStands) {
     session.dealerCards.push(drawCard());
@@ -3837,9 +3841,6 @@ async function handleBlackjackAction(interaction) {
 
   const playerTotal = handTotal(session.playerCards);
   const dealerTotal = handTotal(session.dealerCards);
-  const bjOpts = bjSessionOptions.get(sessionId) ?? { luckPenalty: 0, riskMult: 1 };
-  deleteBjSession(sessionId);
-  bjSessionOptions.delete(sessionId);
 
   let delta;
   let resultText;
