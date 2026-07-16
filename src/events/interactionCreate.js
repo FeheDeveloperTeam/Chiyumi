@@ -49,7 +49,7 @@ const { buildWelcomeEmbed, buildWelcomeRows } = require("../commands/welcome");
 const { getCommandsByCategory, buildCategoryEmbed } = require("../commands/help");
 const { buildLevelUpEmbed, buildLevelUpRow } = require("../commands/rank");
 const { buildTicketEmbed, buildTicketRow } = require("../commands/ticket");
-const { buildPetEmbed, buildPetRow } = require("../commands/pet");
+const { buildPetEmbed, buildPetRow, petMessageTimeouts, PET_IDLE_TIMEOUT_MS } = require("../commands/pet");
 const { getAgeDays, getStage, getMoodText, performAction, setPetName, ACTIONS } = require("../utils/pets");
 const { isDeveloper } = require("../utils/devUser");
 const { isRestricted, getRestriction, restrictUser, unrestrictUser } = require("../utils/restrictions");
@@ -1564,6 +1564,16 @@ async function handleBankLoanModal(interaction) {
   });
 }
 
+function resetPetTimeout(message) {
+  const old = petMessageTimeouts.get(message.id);
+  if (old) clearTimeout(old);
+  const timeout = setTimeout(async () => {
+    await message.delete().catch(() => {});
+    petMessageTimeouts.delete(message.id);
+  }, PET_IDLE_TIMEOUT_MS);
+  petMessageTimeouts.set(message.id, timeout);
+}
+
 async function handlePetAction(interaction) {
   const [action, ownerId] = interaction.customId.slice(PET_ACTION_PREFIX.length).split(":");
 
@@ -1574,6 +1584,8 @@ async function handlePetAction(interaction) {
     });
     return;
   }
+
+  resetPetTimeout(interaction.message);
 
   if (action === "name") {
     const modal = new ModalBuilder()
@@ -3938,6 +3950,7 @@ async function handleModalSubmit(interaction) {
       embeds: [buildPetEmbed(pet, interaction.user.username)],
       components: [buildPetRow(ownerId)],
     });
+    if (interaction.message) resetPetTimeout(interaction.message);
     return;
   }
 

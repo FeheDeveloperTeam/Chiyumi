@@ -45,6 +45,9 @@ function buildPetRow(ownerId) {
   );
 }
 
+const PET_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+const petMessageTimeouts = new Map();
+
 module.exports = {
   category: "게임",
   data: new SlashCommandBuilder()
@@ -58,12 +61,21 @@ module.exports = {
   async execute(interaction) {
     const pet = getOrCreatePet(interaction.user.id);
 
-    await interaction.reply({
+    const msg = await interaction.reply({
       embeds: [buildPetEmbed(pet, interaction.user.username)],
       components: [buildPetRow(interaction.user.id)],
+      fetchReply: true,
     });
+
+    const timeout = setTimeout(async () => {
+      await msg.delete().catch(() => {});
+      petMessageTimeouts.delete(msg.id);
+    }, PET_IDLE_TIMEOUT_MS);
+    petMessageTimeouts.set(msg.id, timeout);
   },
 
   buildPetEmbed,
   buildPetRow,
+  petMessageTimeouts,
+  PET_IDLE_TIMEOUT_MS,
 };
