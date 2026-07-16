@@ -7,13 +7,11 @@ const JACKPOT_MULTIPLIERS = {
   "🍒": 4,
 };
 const WIN_SYMBOLS = Object.keys(JACKPOT_MULTIPLIERS);
-const LOSS_SYMBOLS = ["🍑", "🌙", "💀"];
 
-// 7️⃣: 풀에 1개 (초희귀) / 나머지 WIN 심볼 3개씩 / LOSS 심볼 2개씩 → 총 22개
+// 7️⃣: 풀에 1개 (초희귀) / 나머지 WIN 심볼 4개씩 → 총 21개, 손실 심볼 없음
 const SYMBOL_POOL = [
   "7️⃣",
-  ...WIN_SYMBOLS.slice(1).flatMap((s) => [s, s, s]),
-  ...LOSS_SYMBOLS.flatMap((s) => [s, s]),
+  ...WIN_SYMBOLS.slice(1).flatMap((s) => [s, s, s, s]),
 ];
 
 const HIDDEN_SYMBOL = "❓";

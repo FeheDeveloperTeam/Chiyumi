@@ -1573,7 +1573,7 @@ async function handleBankLoanModal(interaction) {
   });
 }
 
-const bjLuckPenalties = new Map();
+const bjSessionOptions = new Map();
 
 function resetPetTimeout(message) {
   const old = petMessageTimeouts.get(message.id);
@@ -3421,15 +3421,28 @@ async function showGambleMult(interaction, game) {
       .setStyle(ButtonStyle.Secondary),
   );
 
+  const isSlot = game === "slot";
+
   const embed = new EmbedBuilder()
     .setTitle(GAMBLE_TITLES[game] ?? "도박")
     .setDescription(nya("위험 배율을 선택하세요. 배율이 높을수록 이기면 많이 벌지만 당첨 확률이 낮아집니다."))
     .addFields(
-      ...GAMBLE_MULT_OPTIONS.map((opt) => ({
-        name: `${opt.mult}배`,
-        value: `최소 ${opt.minBet.toLocaleString()}코인 · ${opt.luckPenalty > 0 ? `당첨 확률 약 ${Math.round((1 - opt.luckPenalty) * 100)}%` : "기본 당첨 확률"}`,
-        inline: true,
-      })),
+      ...GAMBLE_MULT_OPTIONS.map((opt) => {
+        const winChance = opt.luckPenalty > 0 ? `당첨 확률 약 ${Math.round((1 - opt.luckPenalty) * 100)}%` : "기본 당첨 확률";
+        let value;
+        if (isSlot) {
+          // 3개 일치: floor(심볼배율/2) × riskMult, 최소(🍒)=2, 최대(7️⃣)=25
+          const m3min = 2 * opt.mult;
+          const m3max = 25 * opt.mult;
+          // 4개 일치(잭팟): 심볼배율 × riskMult, 최소(🍒)=4, 최대(7️⃣)=50
+          const m4min = 4 * opt.mult;
+          const m4max = 50 * opt.mult;
+          value = `최소 ${opt.minBet.toLocaleString()}코인 · ${winChance}\n2개: 낙첨 · 3개: ×${m3min}~×${m3max} · 잭팟: ×${m4min}~×${m4max}`;
+        } else {
+          value = `최소 ${opt.minBet.toLocaleString()}코인 · ${winChance}`;
+        }
+        return { name: `${opt.mult}배`, value, inline: false };
+      }),
     )
     .setColor(0xe1aa74);
 
@@ -3438,7 +3451,7 @@ async function showGambleMult(interaction, game) {
 
 async function showGambleModal(interaction, game, mult = 1) {
   const multOpt = GAMBLE_MULT_OPTIONS.find((o) => o.mult === mult) ?? GAMBLE_MULT_OPTIONS[0];
-  const maxNominal = Math.floor(GAMBLE_MAX_BET / mult);
+  const maxNominal = GAMBLE_MAX_BET;
 
   const modal = new ModalBuilder()
     .setCustomId(`${GAMBLE_MODAL_PREFIX}${game}:${mult}`)
@@ -3514,11 +3527,9 @@ async function handleGambleModal(interaction, game, riskMult = 1) {
     return;
   }
 
-  const effectiveBet = bet * riskMult;
-
-  if (effectiveBet > GAMBLE_MAX_BET) {
+  if (bet > GAMBLE_MAX_BET) {
     await interaction.followUp({
-      content: nya(`${riskMult}배 위험도에서 최대 베팅은 ${Math.floor(GAMBLE_MAX_BET / riskMult).toLocaleString()}코인입니다.`) + "\n(오류 코드: GAMBLE-006)",
+      content: nya(`최대 베팅은 ${GAMBLE_MAX_BET.toLocaleString()}코인입니다.`) + "\n(오류 코드: GAMBLE-006)",
       ephemeral: true,
     });
     return;
@@ -3527,9 +3538,9 @@ async function handleGambleModal(interaction, game, riskMult = 1) {
   const userId = interaction.user.id;
   const balance = getBalance(userId);
 
-  if (effectiveBet > balance) {
+  if (bet > balance) {
     await interaction.followUp({
-      content: nya(`보유 코인(${balance.toLocaleString()}개) 부족. ${riskMult}배 기준 필요: ${effectiveBet.toLocaleString()}코인`) + "\n(오류 코드: GAMBLE-002)",
+      content: nya(`보유 코인(${balance.toLocaleString()}개)이 부족합니다.`) + "\n(오류 코드: GAMBLE-002)",
       ephemeral: true,
     });
     return;
@@ -3537,20 +3548,20 @@ async function handleGambleModal(interaction, game, riskMult = 1) {
 
   const { luckPenalty } = multOpt;
 
-  if (game === "slot") { await playSlotGame(interaction, userId, effectiveBet, luckPenalty); return; }
-  if (game === "oddeven") { await playOddEvenGame(interaction, userId, effectiveBet, luckPenalty); return; }
-  if (game === "numberguess") { await playNumberGuessGame(interaction, userId, effectiveBet, luckPenalty); return; }
-  if (game === "blackjack") { await playBlackjackGame(interaction, userId, effectiveBet, luckPenalty); return; }
-  if (game === "rps") { await playRpsGame(interaction, userId, effectiveBet, luckPenalty); return; }
+  if (game === "slot") { await playSlotGame(interaction, userId, bet, riskMult, luckPenalty); return; }
+  if (game === "oddeven") { await playOddEvenGame(interaction, userId, bet, riskMult, luckPenalty); return; }
+  if (game === "numberguess") { await playNumberGuessGame(interaction, userId, bet, riskMult, luckPenalty); return; }
+  if (game === "blackjack") { await playBlackjackGame(interaction, userId, bet, riskMult, luckPenalty); return; }
+  if (game === "rps") { await playRpsGame(interaction, userId, bet, riskMult, luckPenalty); return; }
 }
 
-async function playSlotGame(interaction, userId, bet, luckPenalty = 0) {
+async function playSlotGame(interaction, userId, bet, riskMult = 1, luckPenalty = 0) {
   const { reels, resultText: baseResultText, multiplier: baseMult } = spinSlot();
 
   const luckyFlip = baseMult !== null && luckPenalty > 0 && Math.random() < luckPenalty;
   const multiplier = luckyFlip ? null : baseMult;
   const resultText = luckyFlip ? "낙첨" : baseResultText;
-  const delta = multiplier ? bet * multiplier : -bet;
+  const delta = multiplier ? bet * multiplier * riskMult : -bet;
 
   const buildEmbed = (revealedCount, resultValue = null) => {
     const embed = new EmbedBuilder()
@@ -3578,7 +3589,14 @@ async function playSlotGame(interaction, userId, bet, luckPenalty = 0) {
 
   const newBalance = addBalance(userId, delta);
   const deltaText = delta > 0 ? `+${delta.toLocaleString()}` : `${delta.toLocaleString()}`;
-  const multiplierText = multiplier ? ` (${multiplier}배)` : "";
+  const multiplierText = multiplier ? ` (슬롯 ${multiplier}배 × 위험도 ${riskMult}배)` : "";
+
+  // 페이아웃 표: 선택된 riskMult 기준
+  const payoutLine = [
+    `2개 일치: 낙첨`,
+    `3개 일치: ×${2 * riskMult} ~ ×${25 * riskMult}`,
+    `잭팟 (4개): ×${4 * riskMult} ~ ×${50 * riskMult}`,
+  ].join(" · ");
 
   await slotWait(800);
   await msg.edit({
@@ -3586,12 +3604,12 @@ async function playSlotGame(interaction, userId, bet, luckPenalty = 0) {
       buildEmbed(
         reels.length,
         nya(`${resultText}${multiplierText}! ${deltaText} 치유미코인 (현재 보유: ${newBalance.toLocaleString()}개)`),
-      ),
+      ).addFields({ name: `📊 배당표 (${riskMult}배 위험도)`, value: payoutLine }),
     ],
   });
 }
 
-async function playOddEvenGame(interaction, userId, bet, luckPenalty = 0) {
+async function playOddEvenGame(interaction, userId, bet, riskMult = 1, luckPenalty = 0) {
   const choiceRaw = interaction.fields.getTextInputValue("choice").trim();
   const choice = choiceRaw === "홀" ? "odd" : choiceRaw === "짝" ? "even" : null;
 
@@ -3606,7 +3624,7 @@ async function playOddEvenGame(interaction, userId, bet, luckPenalty = 0) {
   const rollLabel = roll === 1 ? "홀" : roll === 2 ? "짝" : "꽝";
   const baseWon = !houseWin && ((choice === "odd" && roll === 1) || (choice === "even" && roll === 2));
   const won = baseWon && !(luckPenalty > 0 && Math.random() < luckPenalty);
-  const delta = won ? bet : -bet;
+  const delta = won ? bet * riskMult : -bet;
   const newBalance = addBalance(userId, delta);
   const deltaText = delta > 0 ? `+${delta.toLocaleString()}` : `${delta.toLocaleString()}`;
 
@@ -3620,7 +3638,7 @@ async function playOddEvenGame(interaction, userId, bet, luckPenalty = 0) {
   await interaction.followUp({ embeds: [embed] });
 }
 
-async function playNumberGuessGame(interaction, userId, bet, luckPenalty = 0) {
+async function playNumberGuessGame(interaction, userId, bet, riskMult = 1, luckPenalty = 0) {
   const guessText = interaction.fields.getTextInputValue("guess").trim();
   const guess = Number(guessText);
 
@@ -3632,7 +3650,7 @@ async function playNumberGuessGame(interaction, userId, bet, luckPenalty = 0) {
   const answer = Math.floor(Math.random() * 10) + 1;
   const baseWon = guess === answer;
   const won = baseWon && !(luckPenalty > 0 && Math.random() < luckPenalty);
-  const delta = won ? bet * 7 : -bet;
+  const delta = won ? bet * 7 * riskMult : -bet;
   const newBalance = addBalance(userId, delta);
   const deltaText = delta > 0 ? `+${delta.toLocaleString()}` : `${delta.toLocaleString()}`;
 
@@ -3646,17 +3664,17 @@ async function playNumberGuessGame(interaction, userId, bet, luckPenalty = 0) {
   await interaction.followUp({ embeds: [embed] });
 }
 
-async function playBlackjackGame(interaction, userId, bet, luckPenalty = 0) {
+async function playBlackjackGame(interaction, userId, bet, riskMult = 1, luckPenalty = 0) {
   const { id, session } = createBjSession(
     userId,
     bet,
     interaction.user.username,
     interaction.user.displayAvatarURL(),
   );
-  bjLuckPenalties.set(id, luckPenalty);
+  bjSessionOptions.set(id, { luckPenalty, riskMult });
 
   if (isBlackjack(session.playerCards)) {
-    bjLuckPenalties.delete(id);
+    bjSessionOptions.delete(id);
     const dealerBlackjack = isBlackjack(session.dealerCards);
     let delta;
     let resultText;
@@ -3665,7 +3683,7 @@ async function playBlackjackGame(interaction, userId, bet, luckPenalty = 0) {
       resultText = `둘 다 블랙잭! 딜러 승. ${bet.toLocaleString()} 치유미코인을 잃었습니다.`;
     } else {
       const isWin = !(luckPenalty > 0 && Math.random() < luckPenalty);
-      delta = isWin ? Math.floor(bet * 1.5) : -bet;
+      delta = isWin ? Math.floor(bet * 1.5 * riskMult) : -bet;
       resultText = isWin
         ? `블랙잭! ${delta.toLocaleString()} 치유미코인을 획득했습니다.`
         : `블랙잭이지만 운이 없었습니다! ${bet.toLocaleString()} 치유미코인을 잃었습니다.`;
@@ -3695,7 +3713,7 @@ async function playBlackjackGame(interaction, userId, bet, luckPenalty = 0) {
   });
 }
 
-async function playRpsGame(interaction, userId, bet, luckPenalty = 0) {
+async function playRpsGame(interaction, userId, bet, riskMult = 1, luckPenalty = 0) {
   const choiceRaw = interaction.fields.getTextInputValue("choice").trim();
 
   if (!RPS_CHOICES.includes(choiceRaw)) {
@@ -3713,7 +3731,7 @@ async function playRpsGame(interaction, userId, bet, luckPenalty = 0) {
 
   if (actuallyWin) {
     resultText = "이겼습니다";
-    delta = bet;
+    delta = bet * riskMult;
   } else if (choiceRaw === botChoice) {
     resultText = "비겼지만 집 승";
     delta = -bet;
@@ -3762,7 +3780,7 @@ async function handleBlackjackAction(interaction) {
 
     if (handTotal(session.playerCards) > 21) {
       deleteBjSession(sessionId);
-      bjLuckPenalties.delete(sessionId);
+      bjSessionOptions.delete(sessionId);
       const newBalance = addBalance(session.userId, -session.bet);
       await interaction.update({
         embeds: [
@@ -3788,19 +3806,19 @@ async function handleBlackjackAction(interaction) {
 
   const playerTotal = handTotal(session.playerCards);
   const dealerTotal = handTotal(session.dealerCards);
-  const bjLuckPenalty = bjLuckPenalties.get(sessionId) ?? 0;
+  const bjOpts = bjSessionOptions.get(sessionId) ?? { luckPenalty: 0, riskMult: 1 };
   deleteBjSession(sessionId);
-  bjLuckPenalties.delete(sessionId);
+  bjSessionOptions.delete(sessionId);
 
   let delta;
   let resultText;
 
   if (dealerTotal > 21 || playerTotal > dealerTotal) {
-    if (bjLuckPenalty > 0 && Math.random() < bjLuckPenalty) {
+    if (bjOpts.luckPenalty > 0 && Math.random() < bjOpts.luckPenalty) {
       delta = -session.bet;
       resultText = `운이 없었습니다! ${session.bet.toLocaleString()} 치유미코인을 잃었습니다.`;
     } else {
-      delta = session.bet;
+      delta = session.bet * bjOpts.riskMult;
       resultText = `승리! ${delta.toLocaleString()} 치유미코인을 획득했습니다.`;
     }
   } else if (playerTotal === dealerTotal) {
