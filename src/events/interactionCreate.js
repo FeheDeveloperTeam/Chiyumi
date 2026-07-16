@@ -119,6 +119,8 @@ const GAMBLE_ACTION_PREFIX = "gamble-action:";
 const GAMBLE_MULT_PREFIX = "gamble-mult:";
 const GAMBLE_MODAL_PREFIX = "gamble-modal:";
 const GAMBLE_MAX_BET = 50_000;
+const SLOT_MIN_BET = 10;
+const SLOT_MAX_BET = 1_000;
 // 배율 옵션: mult=배율, minBet=최소베팅, luckPenalty=당첨 확률 감소율
 const GAMBLE_MULT_OPTIONS = [
   { mult: 1, minBet: 100,   luckPenalty: 0 },
@@ -3440,7 +3442,7 @@ async function showGambleMult(interaction, game) {
           // 4개 잭팟: 심볼배율, min(🍒)=4, max(7️⃣)=50
           const m4min = 4 * opt.mult;
           const m4max = 50 * opt.mult;
-          value = `최소 ${opt.minBet.toLocaleString()}코인 · ${winChance}\n2개: ×${m2min}~×${m2max} · 3개: ×${m3min}~×${m3max} · 잭팟: ×${m4min}~×${m4max}`;
+          value = `베팅 ${SLOT_MIN_BET}~${SLOT_MAX_BET.toLocaleString()}코인 · ${winChance}\n2개: ×${m2min}~×${m2max} · 3개: ×${m3min}~×${m3max} · 잭팟: ×${m4min}~×${m4max}`;
         } else {
           value = `최소 ${opt.minBet.toLocaleString()}코인 · ${winChance}`;
         }
@@ -3454,7 +3456,9 @@ async function showGambleMult(interaction, game) {
 
 async function showGambleModal(interaction, game, mult = 1) {
   const multOpt = GAMBLE_MULT_OPTIONS.find((o) => o.mult === mult) ?? GAMBLE_MULT_OPTIONS[0];
-  const maxNominal = GAMBLE_MAX_BET;
+  const isSlotModal = game === "slot";
+  const maxNominal = isSlotModal ? SLOT_MAX_BET : GAMBLE_MAX_BET;
+  const minNominal = isSlotModal ? SLOT_MIN_BET : multOpt.minBet;
 
   const modal = new ModalBuilder()
     .setCustomId(`${GAMBLE_MODAL_PREFIX}${game}:${mult}`)
@@ -3496,7 +3500,7 @@ async function showGambleModal(interaction, game, mult = 1) {
     .setCustomId("bet")
     .setLabel(`베팅할 치유미코인 금액 (${mult}배 위험도)`)
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder(`최소 ${multOpt.minBet.toLocaleString()} · 최대 ${maxNominal.toLocaleString()}코인`)
+    .setPlaceholder(`최소 ${minNominal.toLocaleString()} · 최대 ${maxNominal.toLocaleString()}코인`)
     .setRequired(true);
   rows.push(new ActionRowBuilder().addComponents(betInput));
 
@@ -3513,6 +3517,9 @@ async function handleGambleModal(interaction, game, riskMult = 1) {
   await interaction.deleteReply();
 
   const multOpt = GAMBLE_MULT_OPTIONS.find((o) => o.mult === riskMult) ?? GAMBLE_MULT_OPTIONS[0];
+  const isSlot = game === "slot";
+  const minBet = isSlot ? SLOT_MIN_BET : multOpt.minBet;
+  const maxBet = isSlot ? SLOT_MAX_BET : GAMBLE_MAX_BET;
 
   if (!Number.isInteger(bet) || bet <= 0) {
     await interaction.followUp({
@@ -3522,17 +3529,17 @@ async function handleGambleModal(interaction, game, riskMult = 1) {
     return;
   }
 
-  if (bet < multOpt.minBet) {
+  if (bet < minBet) {
     await interaction.followUp({
-      content: nya(`${riskMult}배 위험도에서 최소 베팅은 ${multOpt.minBet.toLocaleString()}코인입니다.`) + "\n(오류 코드: GAMBLE-007)",
+      content: nya(`최소 베팅은 ${minBet.toLocaleString()}코인입니다.`) + "\n(오류 코드: GAMBLE-007)",
       ephemeral: true,
     });
     return;
   }
 
-  if (bet > GAMBLE_MAX_BET) {
+  if (bet > maxBet) {
     await interaction.followUp({
-      content: nya(`최대 베팅은 ${GAMBLE_MAX_BET.toLocaleString()}코인입니다.`) + "\n(오류 코드: GAMBLE-006)",
+      content: nya(`최대 베팅은 ${maxBet.toLocaleString()}코인입니다.`) + "\n(오류 코드: GAMBLE-006)",
       ephemeral: true,
     });
     return;
