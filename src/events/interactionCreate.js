@@ -3561,8 +3561,8 @@ async function handleGambleModal(interaction, game, riskMult = 1) {
 async function playSlotGame(interaction, userId, bet, riskMult = 1, luckPenalty = 0) {
   const { reels, resultText: baseResultText, multiplier: baseMult } = spinSlot();
 
-  // 소당첨(2개 일치)은 luckPenalty 대상에서 제외 — 당첨/잭팟만 뒤집힘
-  const luckyFlip = baseMult !== null && baseResultText !== "소당첨" && luckPenalty > 0 && Math.random() < luckPenalty;
+  // luckPenalty는 3개 일치(당첨)에만 적용 — 소당첨/잭팟은 항상 보상
+  const luckyFlip = baseResultText === "당첨" && luckPenalty > 0 && Math.random() < luckPenalty;
   const multiplier = luckyFlip ? null : baseMult;
   const resultText = luckyFlip ? "낙첨" : baseResultText;
   const delta = multiplier ? bet * multiplier * riskMult : -bet;
