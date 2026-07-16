@@ -136,11 +136,13 @@ const GAMBLE_TITLES = {
   rps: "가위바위보",
 };
 const RPS_CHOICES = ["가위", "바위", "보"];
-const RPS_BEATS = {
-  가위: "보",
-  바위: "가위",
-  보: "바위",
-};
+const RPS_BEATS = { 가위: "보", 바위: "가위", 보: "바위" };
+const RPS_LOSES_TO = { 가위: "바위", 바위: "보", 보: "가위" };
+// 배율별 범위: 1~range 굴려서 1이 나와야 당첨 (range 클수록 당첨 확률 낮음)
+const ODDEVEN_WIN_RANGES = { 1: 2, 2: 3, 3: 4, 5: 6 };  // 50% / 33% / 25% / 17%
+const RPS_WIN_RANGES     = { 1: 3, 2: 4, 3: 5, 5: 7 };  // 33% / 25% / 20% / 14%
+// 블랙잭 딜러 스탠드 기준: 배율 높을수록 딜러가 더 높은 값에서 스탠드 → 플레이어 불리
+const DEALER_STANDS_AT   = { 1: 15, 2: 16, 3: 17, 5: 18 };
 const INQUIRY_ACTION_PREFIX = "inquiry-action:";
 const INQUIRY_MODAL_PREFIX = "inquiry-modal:";
 const INQUIRY_CHANNEL_ID = "1518461357735936000";
@@ -3424,14 +3426,20 @@ async function showGambleMult(interaction, game) {
   );
 
   const isSlot = game === "slot";
+  const isOddEven = game === "oddeven";
+  const isRps = game === "rps";
+  const isBj = game === "blackjack";
+
+  let multDesc = "위험 배율을 선택하세요. 배율이 높을수록 이기면 더 많이 벌지만";
+  if (isSlot)         multDesc += " 최소 베팅도 높아집니다.\n\n**📊 슬롯 당첨 확률 (4릴 기준)**\n잭팟 (4개 일치): 약 2% · 당첨 (3개): 약 22%\n소당첨 (2개): 약 60% · 낙첨: 약 16%";
+  else if (isOddEven) multDesc += " 당첨 확률이 낮아집니다.";
+  else if (isRps)     multDesc += " 당첨 확률이 낮아집니다.";
+  else if (isBj)      multDesc += " 딜러가 더 강해집니다.";
+  else                multDesc += " 최소 베팅도 높아집니다.";
 
   const embed = new EmbedBuilder()
     .setTitle(GAMBLE_TITLES[game] ?? "도박")
-    .setDescription(nya(
-      isSlot
-        ? "위험 배율을 선택하세요. 배율이 높을수록 이기면 더 많이 벌지만 최소 베팅도 높아집니다.\n\n**📊 슬롯 당첨 확률 (4릴 기준)**\n잭팟 (4개 일치): 약 2% · 당첨 (3개): 약 22%\n소당첨 (2개): 약 60% · 낙첨: 약 16%"
-        : "위험 배율을 선택하세요. 배율이 높을수록 이기면 더 많이 벌지만 최소 베팅도 높아집니다."
-    ))
+    .setDescription(nya(multDesc))
     .addFields(
       ...GAMBLE_MULT_OPTIONS.map((opt) => {
         let value;
@@ -3443,6 +3451,15 @@ async function showGambleMult(interaction, game) {
           const m4min = 4 * opt.mult;
           const m4max = 50 * opt.mult;
           value = `베팅 ${SLOT_MIN_BET}~${SLOT_MAX_BET.toLocaleString()}코인\n2개: ×${m2min}~×${m2max} · 3개: ×${m3min}~×${m3max} · 잭팟: ×${m4min}~×${m4max}`;
+        } else if (isOddEven) {
+          const prob = Math.round(100 / (ODDEVEN_WIN_RANGES[opt.mult] ?? 2));
+          value = `최소 ${opt.minBet.toLocaleString()}코인 · 당첨 확률 ${prob}%`;
+        } else if (isRps) {
+          const prob = Math.round(100 / (RPS_WIN_RANGES[opt.mult] ?? 3));
+          value = `최소 ${opt.minBet.toLocaleString()}코인 · 당첨 확률 ${prob}%`;
+        } else if (isBj) {
+          const stands = DEALER_STANDS_AT[opt.mult] ?? 17;
+          value = `최소 ${opt.minBet.toLocaleString()}코인 · 딜러 ${stands} 이상에서 스탠드`;
         } else {
           value = `최소 ${opt.minBet.toLocaleString()}코인`;
         }
@@ -3627,18 +3644,17 @@ async function playSlotGame(interaction, userId, bet, riskMult = 1, luckPenalty 
 
 async function playOddEvenGame(interaction, userId, bet, riskMult = 1, luckPenalty = 0) {
   const choiceRaw = interaction.fields.getTextInputValue("choice").trim();
-  const choice = choiceRaw === "홀" ? "odd" : choiceRaw === "짝" ? "even" : null;
-
-  if (!choice) {
+  if (choiceRaw !== "홀" && choiceRaw !== "짝") {
     await interaction.followUp({ content: nya("홀 또는 짝 중 하나를 입력해주세요.") + "\n(오류 코드: GAMBLE-003)", ephemeral: true });
     return;
   }
 
-  // 1=홀, 2=짝, 3=꽝(집승) — 기본 당첨 33%
-  const roll = Math.floor(Math.random() * 3) + 1;
-  const houseWin = roll === 3;
-  const rollLabel = roll === 1 ? "홀" : roll === 2 ? "짝" : "꽝";
-  const won = !houseWin && ((choice === "odd" && roll === 1) || (choice === "even" && roll === 2));
+  // 1~range 중 1이 나오면 봇이 유저와 같은 선택 → 당첨
+  const range = ODDEVEN_WIN_RANGES[riskMult] ?? 2;
+  const roll = Math.floor(Math.random() * range) + 1;
+  const botChoice = roll === 1 ? choiceRaw : (choiceRaw === "홀" ? "짝" : "홀");
+  const won = botChoice === choiceRaw;
+
   const delta = won ? bet * riskMult : -bet;
   const newBalance = addBalance(userId, delta);
   const deltaText = delta > 0 ? `+${delta.toLocaleString()}` : `${delta.toLocaleString()}`;
@@ -3646,7 +3662,7 @@ async function playOddEvenGame(interaction, userId, bet, riskMult = 1, luckPenal
   const embed = new EmbedBuilder()
     .setTitle("홀짝")
     .setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL() })
-    .setDescription(nya(`선택: **${choiceRaw}** · 주사위: **${rollLabel}** → ${won ? "승리" : houseWin ? "꽝! (집 승)" : "패배"}!`))
+    .setDescription(nya(`내 선택: **${choiceRaw}** · 치유미: **${botChoice}** → ${won ? "승리" : "패배"}!`))
     .addFields({ name: "결과", value: nya(`${deltaText} 치유미코인 (현재 보유: ${newBalance.toLocaleString()}개)`) })
     .setColor(0xe1aa74);
 
@@ -3732,17 +3748,21 @@ async function playRpsGame(interaction, userId, bet, riskMult = 1, luckPenalty =
     return;
   }
 
-  const botChoice = RPS_CHOICES[Math.floor(Math.random() * RPS_CHOICES.length)];
-
-  const actuallyWin = RPS_BEATS[choiceRaw] === botChoice;
+  // roll 1=승, 2=무(집 승), 3+=패 — range 클수록 당첨 확률 낮음
+  const range = RPS_WIN_RANGES[riskMult] ?? 3;
+  const roll = Math.floor(Math.random() * range) + 1;
+  const outcome = roll === 1 ? "win" : roll === 2 ? "tie" : "lose";
+  const botChoice = outcome === "win" ? RPS_BEATS[choiceRaw]
+                  : outcome === "tie" ? choiceRaw
+                  : RPS_LOSES_TO[choiceRaw];
 
   let resultText;
   let delta;
 
-  if (actuallyWin) {
+  if (outcome === "win") {
     resultText = "이겼습니다";
     delta = bet * riskMult;
-  } else if (choiceRaw === botChoice) {
+  } else if (outcome === "tie") {
     resultText = "비겼지만 집 승";
     delta = -bet;
   } else {
@@ -3810,7 +3830,8 @@ async function handleBlackjackAction(interaction) {
     return;
   }
 
-  while (handTotal(session.dealerCards) < 17) {
+  const dealerStands = DEALER_STANDS_AT[bjOpts.riskMult] ?? 17;
+  while (handTotal(session.dealerCards) < dealerStands) {
     session.dealerCards.push(drawCard());
   }
 
