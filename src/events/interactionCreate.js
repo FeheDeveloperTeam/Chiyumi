@@ -118,15 +118,14 @@ const STATS_FILTER_PREFIX = "stats-filter:";
 const GAMBLE_ACTION_PREFIX = "gamble-action:";
 const GAMBLE_MULT_PREFIX = "gamble-mult:";
 const GAMBLE_MODAL_PREFIX = "gamble-modal:";
-const GAMBLE_MAX_BET = 50_000;
-const SLOT_MIN_BET = 10;
-const SLOT_MAX_BET = 1_000;
-// 배율 옵션: mult=배율, minBet=최소베팅, luckPenalty=당첨 확률 감소율
+const GAMBLE_MIN_BET = 10;
+const GAMBLE_MAX_BET = 1_000;
+// 배율 옵션: mult=배율, luckPenalty=미사용(하위호환)
 const GAMBLE_MULT_OPTIONS = [
-  { mult: 1, minBet: 100,   luckPenalty: 0 },
-  { mult: 2, minBet: 500,   luckPenalty: 0.20 },
-  { mult: 3, minBet: 1_000, luckPenalty: 0.35 },
-  { mult: 5, minBet: 5_000, luckPenalty: 0.55 },
+  { mult: 1, minBet: 10, luckPenalty: 0 },
+  { mult: 2, minBet: 10, luckPenalty: 0 },
+  { mult: 3, minBet: 10, luckPenalty: 0 },
+  { mult: 5, minBet: 10, luckPenalty: 0 },
 ];
 const GAMBLE_TITLES = {
   slot: "슬롯머신",
@@ -139,10 +138,11 @@ const RPS_CHOICES = ["가위", "바위", "보"];
 const RPS_BEATS = { 가위: "보", 바위: "가위", 보: "바위" };
 const RPS_LOSES_TO = { 가위: "바위", 바위: "보", 보: "가위" };
 // 배율별 범위: 1~range 굴려서 1이 나와야 당첨 (range 클수록 당첨 확률 낮음)
-const ODDEVEN_WIN_RANGES = { 1: 2, 2: 3, 3: 4, 5: 6 };  // 50% / 33% / 25% / 17%
-const RPS_WIN_RANGES     = { 1: 3, 2: 4, 3: 5, 5: 7 };  // 33% / 25% / 20% / 14%
+const ODDEVEN_WIN_RANGES   = { 1: 2,  2: 3,  3: 6,  5: 10 }; // 50% / 33% / 17% / 10%
+const RPS_WIN_RANGES       = { 1: 3,  2: 4,  3: 7,  5: 12 }; // 33% / 25% / 14% / 8%
+const NUMBERGUESS_RANGES   = { 1: 10, 2: 16, 3: 25, 5: 40 }; // 10% / 6% / 4% / 2.5%
 // 블랙잭 딜러 스탠드 기준: 배율 높을수록 딜러가 더 높은 값에서 스탠드 → 플레이어 불리
-const DEALER_STANDS_AT   = { 1: 15, 2: 16, 3: 17, 5: 18 };
+const DEALER_STANDS_AT     = { 1: 15, 2: 16, 3: 17, 5: 18 };
 const INQUIRY_ACTION_PREFIX = "inquiry-action:";
 const INQUIRY_MODAL_PREFIX = "inquiry-modal:";
 const INQUIRY_CHANNEL_ID = "1518461357735936000";
@@ -3412,7 +3412,7 @@ async function showGambleMult(interaction, game) {
     ...GAMBLE_MULT_OPTIONS.map((opt) =>
       new ButtonBuilder()
         .setCustomId(`${GAMBLE_MULT_PREFIX}${game}:${opt.mult}`)
-        .setLabel(`${opt.mult}배 · ${opt.minBet.toLocaleString()}코인+`)
+        .setLabel(`${opt.mult}배`)
         .setStyle(
           opt.mult === 1 ? ButtonStyle.Secondary :
           opt.mult <= 2 ? ButtonStyle.Primary :
@@ -3429,13 +3429,22 @@ async function showGambleMult(interaction, game) {
   const isOddEven = game === "oddeven";
   const isRps = game === "rps";
   const isBj = game === "blackjack";
+  const isNumberGuess = game === "numberguess";
 
-  let multDesc = "위험 배율을 선택하세요. 배율이 높을수록 이기면 더 많이 벌지만";
-  if (isSlot)         multDesc += " 최소 베팅도 높아집니다.\n\n**📊 슬롯 당첨 확률 (4릴 기준)**\n잭팟 (4개 일치): 약 2% · 당첨 (3개): 약 22%\n소당첨 (2개): 약 60% · 낙첨: 약 16%";
-  else if (isOddEven) multDesc += " 당첨 확률이 낮아집니다.";
-  else if (isRps)     multDesc += " 당첨 확률이 낮아집니다.";
-  else if (isBj)      multDesc += " 딜러가 더 강해집니다.";
-  else                multDesc += " 최소 베팅도 높아집니다.";
+  let multDesc;
+  if (isSlot) {
+    multDesc = "배율을 선택하세요. 배율이 높을수록 당첨 시 더 많이 받지만, **3배부터는 빈 칸이 추가되어 당첨 확률도 크게 낮아집니다.**\n베팅 범위: 10~1,000코인";
+  } else if (isOddEven) {
+    multDesc = "배율을 선택하세요. 배율이 높을수록 이겼을 때 더 많이 받지만, **이길 확률이 낮아집니다.**";
+  } else if (isRps) {
+    multDesc = "배율을 선택하세요. 배율이 높을수록 이겼을 때 더 많이 받지만, **이길 확률이 낮아집니다.** 비기면 패배입니다.";
+  } else if (isBj) {
+    multDesc = "배율을 선택하세요. 배율이 높을수록 이겼을 때 더 많이 받지만, **딜러가 더 유리하게 플레이합니다.**\n버스트(21 초과) 시 베팅액의 1.5배 손실 · 이기면 수수료 10%";
+  } else if (isNumberGuess) {
+    multDesc = "배율을 선택하세요. 배율이 높을수록 맞혔을 때 더 많이 받지만, **숫자 범위가 넓어져 당첨 확률이 낮아집니다.**";
+  } else {
+    multDesc = "배율을 선택하세요. 배율이 높을수록 이겼을 때 더 많이 받지만, 위험도도 함께 높아집니다.";
+  }
 
   const embed = new EmbedBuilder()
     .setTitle(GAMBLE_TITLES[game] ?? "도박")
@@ -3450,18 +3459,26 @@ async function showGambleMult(interaction, game) {
           const m3max = 25 * opt.mult;
           const m4min = 4 * opt.mult;
           const m4max = 50 * opt.mult;
-          value = `베팅 ${SLOT_MIN_BET}~${SLOT_MAX_BET.toLocaleString()}코인\n2개: ×${m2min}~×${m2max} · 3개: ×${m3min}~×${m3max} · 잭팟: ×${m4min}~×${m4max}`;
+          const probNote = opt.mult >= 5 ? " (당첨 확률 약 1/3로 감소)" : opt.mult >= 3 ? " (당첨 확률 약 절반으로 감소)" : "";
+          value = `소당첨 (2개 일치): 베팅액 ×${m2min}~×${m2max}\n당첨 (3개 일치): 베팅액 ×${m3min}~×${m3max}\n잭팟 (4개 일치): 베팅액 ×${m4min}~×${m4max}${probNote}`;
         } else if (isOddEven) {
-          const prob = Math.round(100 / (ODDEVEN_WIN_RANGES[opt.mult] ?? 2));
-          value = `최소 ${opt.minBet.toLocaleString()}코인 · 당첨 확률 ${prob}%`;
+          const range = ODDEVEN_WIN_RANGES[opt.mult] ?? 2;
+          const prob = Math.round(100 / range);
+          value = `이길 확률 ${prob}% (${range}번 중 1번) · 이기면 베팅액 ×${opt.mult} 획득`;
         } else if (isRps) {
-          const prob = Math.round(100 / (RPS_WIN_RANGES[opt.mult] ?? 3));
-          value = `최소 ${opt.minBet.toLocaleString()}코인 · 당첨 확률 ${prob}%`;
+          const range = RPS_WIN_RANGES[opt.mult] ?? 3;
+          const prob = Math.round(100 / range);
+          value = `이길 확률 ${prob}% (${range}번 중 1번) · 이기면 베팅액 ×${opt.mult} 획득`;
         } else if (isBj) {
           const stands = DEALER_STANDS_AT[opt.mult] ?? 17;
-          value = `최소 ${opt.minBet.toLocaleString()}코인 · 딜러 ${stands} 이상에서 스탠드`;
+          const diff = opt.mult >= 5 ? "어려움" : opt.mult >= 3 ? "보통" : opt.mult >= 2 ? "쉬움" : "매우 쉬움";
+          value = `딜러: 합계 ${stands} 이상이면 멈춤 (${diff}) · 이기면 베팅액 ×${opt.mult} 획득`;
+        } else if (isNumberGuess) {
+          const range = NUMBERGUESS_RANGES[opt.mult] ?? 10;
+          const prob = (100 / range).toFixed(1);
+          value = `1~${range} 중 하나를 맞추면 베팅액 ×${7 * opt.mult} 획득 · 당첨 확률 ${prob}%`;
         } else {
-          value = `최소 ${opt.minBet.toLocaleString()}코인`;
+          value = `베팅 ${GAMBLE_MIN_BET}~${GAMBLE_MAX_BET.toLocaleString()}코인`;
         }
         return { name: `${opt.mult}배`, value, inline: false };
       }),
@@ -3473,9 +3490,8 @@ async function showGambleMult(interaction, game) {
 
 async function showGambleModal(interaction, game, mult = 1) {
   const multOpt = GAMBLE_MULT_OPTIONS.find((o) => o.mult === mult) ?? GAMBLE_MULT_OPTIONS[0];
-  const isSlotModal = game === "slot";
-  const maxNominal = isSlotModal ? SLOT_MAX_BET : GAMBLE_MAX_BET;
-  const minNominal = isSlotModal ? SLOT_MIN_BET : multOpt.minBet;
+  const minNominal = GAMBLE_MIN_BET;
+  const maxNominal = GAMBLE_MAX_BET;
 
   const modal = new ModalBuilder()
     .setCustomId(`${GAMBLE_MODAL_PREFIX}${game}:${mult}`)
@@ -3494,11 +3510,12 @@ async function showGambleModal(interaction, game, mult = 1) {
   }
 
   if (game === "numberguess") {
+    const ngRange = NUMBERGUESS_RANGES[mult] ?? 10;
     const guessInput = new TextInputBuilder()
       .setCustomId("guess")
-      .setLabel("1부터 10 사이의 숫자를 입력하세요")
+      .setLabel(`1부터 ${ngRange} 사이의 숫자를 입력하세요`)
       .setStyle(TextInputStyle.Short)
-      .setPlaceholder("예: 7")
+      .setPlaceholder(`1~${ngRange} 중 하나 (당첨 확률 ${(100 / ngRange).toFixed(1)}%)`)
       .setRequired(true);
     rows.push(new ActionRowBuilder().addComponents(guessInput));
   }
@@ -3534,9 +3551,8 @@ async function handleGambleModal(interaction, game, riskMult = 1) {
   await interaction.deleteReply();
 
   const multOpt = GAMBLE_MULT_OPTIONS.find((o) => o.mult === riskMult) ?? GAMBLE_MULT_OPTIONS[0];
-  const isSlot = game === "slot";
-  const minBet = isSlot ? SLOT_MIN_BET : multOpt.minBet;
-  const maxBet = isSlot ? SLOT_MAX_BET : GAMBLE_MAX_BET;
+  const minBet = GAMBLE_MIN_BET;
+  const maxBet = GAMBLE_MAX_BET;
 
   if (!Number.isInteger(bet) || bet <= 0) {
     await interaction.followUp({
@@ -3583,7 +3599,7 @@ async function handleGambleModal(interaction, game, riskMult = 1) {
 }
 
 async function playSlotGame(interaction, userId, bet, riskMult = 1, luckPenalty = 0) {
-  const { reels, resultText: baseResultText, multiplier: baseMult } = spinSlot();
+  const { reels, resultText: baseResultText, multiplier: baseMult } = spinSlot(riskMult);
 
   // 슬롯은 릴이 결과를 직접 보여주므로 luckPenalty 미적용 — 보이는 결과가 곧 최종 결과
   const multiplier = baseMult;
@@ -3672,13 +3688,14 @@ async function playOddEvenGame(interaction, userId, bet, riskMult = 1, luckPenal
 async function playNumberGuessGame(interaction, userId, bet, riskMult = 1, luckPenalty = 0) {
   const guessText = interaction.fields.getTextInputValue("guess").trim();
   const guess = Number(guessText);
+  const range = NUMBERGUESS_RANGES[riskMult] ?? 10;
 
-  if (!Number.isInteger(guess) || guess < 1 || guess > 10) {
-    await interaction.followUp({ content: nya("1부터 10 사이의 숫자를 입력해주세요.") + "\n(오류 코드: GAMBLE-004)", ephemeral: true });
+  if (!Number.isInteger(guess) || guess < 1 || guess > range) {
+    await interaction.followUp({ content: nya(`1부터 ${range} 사이의 숫자를 입력해주세요.`) + "\n(오류 코드: GAMBLE-004)", ephemeral: true });
     return;
   }
 
-  const answer = Math.floor(Math.random() * 10) + 1;
+  const answer = Math.floor(Math.random() * range) + 1;
   const won = guess === answer;
   const delta = won ? bet * 7 * riskMult : -bet;
   const newBalance = addBalance(userId, delta);
@@ -3712,8 +3729,8 @@ async function playBlackjackGame(interaction, userId, bet, riskMult = 1, luckPen
       delta = -bet;
       resultText = `둘 다 블랙잭! 딜러 승. ${bet.toLocaleString()} 치유미코인을 잃었습니다.`;
     } else {
-      delta = Math.floor(bet * 1.5 * riskMult);
-      resultText = `블랙잭! ${delta.toLocaleString()} 치유미코인을 획득했습니다.`;
+      delta = Math.floor(bet * 1.5 * riskMult * 0.9);
+      resultText = `블랙잭! ${delta.toLocaleString()} 치유미코인을 획득했습니다. (수수료 10%)`;
     }
     const newBalance = addBalance(userId, delta);
     await interaction.followUp({
@@ -3811,12 +3828,13 @@ async function handleBlackjackAction(interaction) {
     if (handTotal(session.playerCards) > 21) {
       deleteBjSession(sessionId);
       bjSessionOptions.delete(sessionId);
-      const newBalance = addBalance(session.userId, -session.bet);
+      const bustLoss = Math.ceil(session.bet * 1.5);
+      const newBalance = addBalance(session.userId, -bustLoss);
       await interaction.update({
         embeds: [
           buildBjEmbed(session, {
             revealDealer: true,
-            result: nya(`버스트! ${session.bet.toLocaleString()} 치유미코인을 잃었습니다. 현재 보유: ${newBalance.toLocaleString()}개`),
+            result: nya(`버스트! ${bustLoss.toLocaleString()} 치유미코인을 잃었습니다. (×1.5 패널티) 현재 보유: ${newBalance.toLocaleString()}개`),
           }),
         ],
         components: [],
@@ -3845,9 +3863,14 @@ async function handleBlackjackAction(interaction) {
   let delta;
   let resultText;
 
-  if (dealerTotal > 21 || playerTotal > dealerTotal) {
-    delta = session.bet * bjOpts.riskMult;
-    resultText = `승리! ${delta.toLocaleString()} 치유미코인을 획득했습니다.`;
+  const isDealerNatural = session.dealerCards.length === 2 && dealerTotal === 21;
+
+  if (isDealerNatural) {
+    delta = -(session.bet * 2);
+    resultText = `딜러 블랙잭! ${(session.bet * 2).toLocaleString()} 치유미코인을 잃었습니다. (×2 패널티)`;
+  } else if (dealerTotal > 21 || playerTotal > dealerTotal) {
+    delta = Math.floor(session.bet * bjOpts.riskMult * 0.9);
+    resultText = `승리! ${delta.toLocaleString()} 치유미코인을 획득했습니다. (수수료 10%)`;
   } else if (playerTotal === dealerTotal) {
     delta = -session.bet;
     resultText = `동점이지만 딜러 승! ${session.bet.toLocaleString()} 치유미코인을 잃었습니다.`;

@@ -80,7 +80,9 @@ async function checkYouTubeUpload(channelId) {
       title: (titleMatch?.[1] ?? "새 영상")
         .replace(/&amp;/g, "&")
         .replace(/&lt;/g, "<")
-        .replace(/&gt;/g, ">"),
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'"),
     };
   } catch {
     return null;
@@ -164,7 +166,10 @@ async function checkYouTubeLive(channelId) {
       },
     });
     const html = await res.text();
-    return html.includes('"isLiveBroadcast"') || html.includes('"hlsManifestUrl"');
+    // "hlsManifestUrl": 실제 방송 중일 때만 존재
+    // "isLive":true: ytInitialData에 방송 중일 때만 존재
+    // "isLiveBroadcast"는 예약된 방송(방송 전)에도 나타나므로 사용하지 않음
+    return html.includes('"hlsManifestUrl"') || html.includes('"isLive":true');
   } catch {
     return false;
   }

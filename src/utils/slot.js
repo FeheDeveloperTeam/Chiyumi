@@ -8,7 +8,7 @@ const JACKPOT_MULTIPLIERS = {
 };
 const WIN_SYMBOLS = Object.keys(JACKPOT_MULTIPLIERS);
 
-// 희귀도별 풀 가중치 (낮은 배율 심볼일수록 많이 등장 → 당첨 확률 체감 상승)
+// 희귀도별 풀 가중치 (낮은 배율 심볼일수록 많이 등장)
 // 7️⃣:1 / 💎:2 / 🔔:3 / 🍇:5 / 🍋:7 / 🍒:9 → 총 27개
 const SYMBOL_POOL = [
   "7️⃣",
@@ -18,6 +18,20 @@ const SYMBOL_POOL = [
   "🍋", "🍋", "🍋", "🍋", "🍋", "🍋", "🍋",
   "🍒", "🍒", "🍒", "🍒", "🍒", "🍒", "🍒", "🍒", "🍒",
 ];
+
+const BLANK = "⬛"; // 당첨 없는 빈 칸 심볼
+
+// 3배: 빈 칸 27개 추가 → 당첨 확률 약 절반으로 감소
+const SYMBOL_POOL_3X = [...SYMBOL_POOL, ...Array(27).fill(BLANK)];
+
+// 5배: 빈 칸 54개 추가 → 당첨 확률 약 1/3로 감소
+const SYMBOL_POOL_5X = [...SYMBOL_POOL, ...Array(54).fill(BLANK)];
+
+function getPool(riskMult) {
+  if (riskMult >= 5) return SYMBOL_POOL_5X;
+  if (riskMult >= 3) return SYMBOL_POOL_3X;
+  return SYMBOL_POOL;
+}
 
 const HIDDEN_SYMBOL = "❓";
 const REVEAL_DELAY_MS = 800;
@@ -31,8 +45,9 @@ function buildReelText(reels, revealedCount) {
   return `[ ${symbols.join(" │ ")} ]`;
 }
 
-function spin() {
-  const pick = () => SYMBOL_POOL[Math.floor(Math.random() * SYMBOL_POOL.length)];
+function spin(riskMult = 1) {
+  const pool = getPool(riskMult);
+  const pick = () => pool[Math.floor(Math.random() * pool.length)];
   const reels = [pick(), pick(), pick(), pick()];
 
   // 잭팟: 4개 모두 같은 WIN 심볼
