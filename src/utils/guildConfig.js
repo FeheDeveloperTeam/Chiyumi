@@ -172,6 +172,55 @@ function getTicketMessage(guildId) {
   return configs[guildId]?.ticketMessage ?? DEFAULT_TICKET_MESSAGE;
 }
 
+const DEFAULT_WARN_CONFIG = {
+  logChannelId: null,
+  maxCount: null,
+  thresholds: [],
+};
+
+function getWarnConfig(guildId) {
+  const configs = loadAll();
+  return { ...DEFAULT_WARN_CONFIG, ...(configs[guildId]?.warnConfig ?? {}) };
+}
+
+function setWarnThreshold(guildId, count, roleId, action) {
+  const configs = loadAll();
+  const current = configs[guildId] ?? {};
+  const warnConfig = { ...DEFAULT_WARN_CONFIG, ...(current.warnConfig ?? {}) };
+  warnConfig.thresholds = warnConfig.thresholds.filter((t) => t.count !== count);
+  warnConfig.thresholds.push({ count, roleId: roleId ?? null, action });
+  warnConfig.thresholds.sort((a, b) => a.count - b.count);
+  configs[guildId] = { ...current, warnConfig };
+  saveAll(configs);
+}
+
+function removeWarnThreshold(guildId, count) {
+  const configs = loadAll();
+  const current = configs[guildId] ?? {};
+  const warnConfig = { ...DEFAULT_WARN_CONFIG, ...(current.warnConfig ?? {}) };
+  warnConfig.thresholds = warnConfig.thresholds.filter((t) => t.count !== count);
+  configs[guildId] = { ...current, warnConfig };
+  saveAll(configs);
+}
+
+function setWarnMaxCount(guildId, maxCount) {
+  const configs = loadAll();
+  const current = configs[guildId] ?? {};
+  const warnConfig = { ...DEFAULT_WARN_CONFIG, ...(current.warnConfig ?? {}) };
+  warnConfig.maxCount = maxCount ?? null;
+  configs[guildId] = { ...current, warnConfig };
+  saveAll(configs);
+}
+
+function setWarnLogChannel(guildId, channelId) {
+  const configs = loadAll();
+  const current = configs[guildId] ?? {};
+  const warnConfig = { ...DEFAULT_WARN_CONFIG, ...(current.warnConfig ?? {}) };
+  warnConfig.logChannelId = channelId ?? null;
+  configs[guildId] = { ...current, warnConfig };
+  saveAll(configs);
+}
+
 function setWordChainChannel(guildId, channelId) {
   const configs = loadAll();
   configs[guildId] = { ...(configs[guildId] ?? {}), wordChainChannelId: channelId };
@@ -221,4 +270,9 @@ module.exports = {
   getWordChainChannelId,
   setSupportMessage,
   getAllConfigs,
+  getWarnConfig,
+  setWarnThreshold,
+  removeWarnThreshold,
+  setWarnMaxCount,
+  setWarnLogChannel,
 };
