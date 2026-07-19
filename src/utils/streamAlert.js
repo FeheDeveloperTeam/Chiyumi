@@ -3,6 +3,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 
 const DATA_FILE = path.join(__dirname, "../../data/streamAlerts.json");
+const SEEN_IDS_MAX = 30; // 저장할 최대 영상 ID 수
 
 function load() {
   if (!fs.existsSync(DATA_FILE)) return {};
@@ -42,6 +43,22 @@ function setLiveStatus(guildId, alertId, isLive) {
   save(data);
 }
 
+// 본 영상 ID 목록에 추가 (lastVideoId 단일값 → 집합으로 마이그레이션 포함)
+function addSeenVideoIds(guildId, alertId, newIds) {
+  const data = load();
+  const alert = data[guildId]?.find((a) => a.id === alertId);
+  if (!alert) return;
+  const existing = alert.seenVideoIds
+    ? new Set(alert.seenVideoIds)
+    : alert.lastVideoId
+    ? new Set([alert.lastVideoId])
+    : new Set();
+  for (const id of newIds) existing.add(id);
+  alert.seenVideoIds = [...existing].slice(-SEEN_IDS_MAX);
+  delete alert.lastVideoId; // 구버전 필드 제거
+  save(data);
+}
+
 async function resolveYouTubeChannelId(handle) {
   if (!handle.startsWith("@")) return handle;
   try {
@@ -61,31 +78,58 @@ async function resolveYouTubeChannelId(handle) {
   }
 }
 
+// RSS 피드에서 모든 영상 entry 반환
 async function checkYouTubeUpload(channelId) {
   try {
     const res = await fetch(
       `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`,
       { headers: { "User-Agent": "Mozilla/5.0" } },
     );
-    if (!res.ok) return null;
+    if (!res.ok) return [];
     const xml = await res.text();
-    const entryMatch = xml.match(/<entry>([\s\S]*?)<\/entry>/);
-    if (!entryMatch) return null;
-    const entry = entryMatch[1];
-    const videoIdMatch = entry.match(/<yt:videoId>([^<]+)<\/yt:videoId>/);
-    const titleMatch = entry.match(/<title>([^<]+)<\/title>/);
-    if (!videoIdMatch) return null;
-    return {
-      videoId: videoIdMatch[1],
-      title: (titleMatch?.[1] ?? "새 영상")
-        .replace(/&amp;/g, "&")
-        .replace(/&lt;/g, "<")
-        .replace(/&gt;/g, ">")
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'"),
-    };
+    const entries = [];
+    const entryRegex = /<entry>([\s\S]*?)<\/entry>/g;
+    let match;
+    while ((match = entryRegex.exec(xml)) !== null) {
+      const entry = match[1];
+      const videoIdMatch = entry.match(/<yt:videoId>([^<]+)<\/yt:videoId>/);
+      const titleMatch = entry.match(/<title>([^<]+)<\/title>/);
+      if (!videoIdMatch) continue;
+      entries.push({
+        videoId: videoIdMatch[1],
+        title: (titleMatch?.[1] ?? "새 영상")
+          .replace(/&amp;/g, "&")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'"),
+      });
+    }
+    return entries;
   } catch {
-    return null;
+    return [];
+  }
+}
+
+// 영상 페이지를 확인해 현재 라이브/예약 방송인지 판별
+// - liveBroadcastContent:"live"     → 방송 중
+// - liveBroadcastContent:"upcoming" → 예약된 방송
+// - liveBroadcastContent:"none"     → 일반 영상 (쇼츠·롱폼·종료된 라이브 아카이브)
+async function isVideoLiveOrUpcoming(videoId) {
+  try {
+    const res = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept-Language": "ko-KR,ko;q=0.9",
+      },
+    });
+    const html = await res.text();
+    return (
+      html.includes('"liveBroadcastContent":"live"') ||
+      html.includes('"liveBroadcastContent":"upcoming"')
+    );
+  } catch {
+    return false;
   }
 }
 
@@ -96,14 +140,6 @@ function updateAlert(guildId, alertId, updates) {
   Object.assign(alert, updates);
   save(data);
   return true;
-}
-
-function setLastVideoId(guildId, alertId, videoId) {
-  const data = load();
-  const alert = data[guildId]?.find((a) => a.id === alertId);
-  if (!alert) return;
-  alert.lastVideoId = videoId;
-  save(data);
 }
 
 function buildUploadNotificationContent(alert, videoInfo) {
@@ -229,19 +265,39 @@ async function checkAllStreams(client) {
     for (const alert of alerts) {
       try {
         if (alert.platform === "youtube_upload") {
-          const latest = await checkYouTubeUpload(alert.channelId);
-          if (!latest) continue;
-          if (alert.lastVideoId == null) {
-            setLastVideoId(guildId, alert.id, latest.videoId);
-          } else if (latest.videoId !== alert.lastVideoId) {
+          const entries = await checkYouTubeUpload(alert.channelId);
+          if (!entries.length) continue;
+
+          // lastVideoId(구버전) 또는 seenVideoIds(신버전)로 이미 본 ID 집합 구성
+          const seenIds = new Set(
+            alert.seenVideoIds ?? (alert.lastVideoId ? [alert.lastVideoId] : []),
+          );
+
+          if (seenIds.size === 0) {
+            // 첫 등록: 현재 영상 목록을 seenIds로만 저장하고 알림 미발송
+            addSeenVideoIds(guildId, alert.id, entries.map((e) => e.videoId));
+            continue;
+          }
+
+          // 처음 보는 영상만 추출
+          const newEntries = entries.filter((e) => !seenIds.has(e.videoId));
+
+          // 모든 현재 entry ID를 seenIds에 추가 (라이브 포함 — 아카이브 후 중복 알림 방지)
+          addSeenVideoIds(guildId, alert.id, entries.map((e) => e.videoId));
+
+          for (const entry of newEntries) {
+            // 현재 라이브 중이거나 예약된 방송이면 건너뜀 (쇼츠·롱폼만 알림)
+            const isLive = await isVideoLiveOrUpcoming(entry.videoId);
+            if (isLive) continue;
+
             const guild = client.guilds.cache.get(guildId);
             const channel = guild?.channels.cache.get(alert.notifChannelId);
             if (channel?.isTextBased()) {
-              await channel.send(buildUploadNotificationContent(alert, latest));
+              await channel.send(buildUploadNotificationContent(alert, entry));
             }
-            setLastVideoId(guildId, alert.id, latest.videoId);
           }
         } else {
+          // 라이브 방송 알림: offline→live 전환 시 1회만 발송
           const live = await checkIsLive(alert);
           if (live && !alert.isLive) {
             const guild = client.guilds.cache.get(guildId);
