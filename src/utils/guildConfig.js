@@ -66,6 +66,10 @@ async function sendLog(guild, embed) {
 const DEFAULT_WELCOME_OPTIONS = {
   joinEnabled: false,
   leaveEnabled: false,
+  showCreatedAt: false,    // 계정 생성일
+  showJoinedAt: false,     // 서버 입장일
+  showLeftAt: false,       // 퇴장 일시 (퇴장 메시지 전용)
+  showMemberCount: false,  // 현재 서버 인원수
 };
 
 const DEFAULT_JOIN_MESSAGE = "{유저}님이 {서버}에 입장했습니다";

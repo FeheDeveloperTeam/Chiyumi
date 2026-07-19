@@ -21,8 +21,31 @@ module.exports = {
       .setDescription(description)
       .setThumbnail(member.user.displayAvatarURL())
       .setColor(0xe1aa74)
-      .setFooter({ text: `현재 인원: ${member.guild.memberCount}명` })
       .setTimestamp();
+
+    const fields = [];
+    if (options.showCreatedAt) {
+      fields.push({
+        name: "📅 계정 생성일",
+        value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:F>`,
+        inline: true,
+      });
+    }
+    if (options.showJoinedAt) {
+      fields.push({
+        name: "🚪 서버 입장일",
+        value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:F>`,
+        inline: true,
+      });
+    }
+    if (options.showMemberCount) {
+      fields.push({
+        name: "👥 현재 인원",
+        value: `${member.guild.memberCount}명`,
+        inline: true,
+      });
+    }
+    if (fields.length) embed.addFields(fields);
 
     await channel.send({ embeds: [embed] }).catch(() => {});
   },
