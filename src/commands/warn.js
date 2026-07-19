@@ -53,7 +53,7 @@ function buildWarnEmbed(guildId) {
 
 function buildWarnRows() {
   const row1 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("warn-btn:give").setLabel("경고 주기").setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId("warn-btn:give").setLabel("경고 추가").setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId("warn-btn:remove").setLabel("경고 취소").setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId("warn-btn:check").setLabel("경고 조회").setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId("warn-btn:reset").setLabel("경고 초기화").setStyle(ButtonStyle.Secondary),

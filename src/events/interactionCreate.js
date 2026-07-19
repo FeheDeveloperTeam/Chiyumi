@@ -2342,7 +2342,8 @@ async function handleChannelSelect(interaction) {
     setWarnLogChannel(interaction.guild.id, channelId);
     await interaction.update({
       content: nya(`<#${channelId}>을 경고 로그 채널로 설정했습니다`),
-      components: [],
+      embeds: [buildWarnEmbed(interaction.guild.id)],
+      components: buildWarnRows(),
     });
     return;
   }
@@ -4492,16 +4493,10 @@ async function warnWizardSaveAndAdvance(interaction, state, key, roleId) {
       setWarnThreshold(state.guildId, c.count, c.roleId, c.action, c.duration);
     }
     warnWizardState.delete(key);
-    const summaryText = state.configs.map(warnWizardFormatStep).join("\n");
     return interaction.update({
-      embeds: [
-        new EmbedBuilder()
-          .setTitle("✅ 경고 설정 완료")
-          .setDescription(summaryText)
-          .setColor(0x57f287)
-          .setTimestamp(),
-      ],
-      components: [],
+      content: null,
+      embeds: [buildWarnEmbed(state.guildId)],
+      components: buildWarnRows(),
     });
   }
 
@@ -4886,6 +4881,8 @@ async function handleWarnModal(interaction) {
     const roleText = roleId ? `<@&${roleId}>` : "없음";
     return interaction.reply({
       content: `✅ 경고 **${count}회** 기준 설정\n역할: ${roleText} | 제재: **${WARN_ACTION_LABEL[action]}**`,
+      embeds: [buildWarnEmbed(interaction.guild.id)],
+      components: buildWarnRows(),
       ephemeral: true,
     });
   }
@@ -4896,7 +4893,12 @@ async function handleWarnModal(interaction) {
     if (!count || count < 1) return interaction.reply({ content: "횟수는 1 이상의 숫자를 입력해주세요.", ephemeral: true });
 
     removeWarnThreshold(interaction.guild.id, count);
-    return interaction.reply({ content: `✅ 경고 **${count}회** 기준을 제거했습니다.`, ephemeral: true });
+    return interaction.reply({
+      content: `✅ 경고 **${count}회** 기준을 제거했습니다.`,
+      embeds: [buildWarnEmbed(interaction.guild.id)],
+      components: buildWarnRows(),
+      ephemeral: true,
+    });
   }
 
   if (type === "max") {
@@ -4908,8 +4910,10 @@ async function handleWarnModal(interaction) {
     setWarnMaxCount(interaction.guild.id, maxCount);
     return interaction.reply({
       content: maxCount
-        ? `✅ 최대 경고 횟수를 **${maxCount}회**로 설정했습니다. (도달 시 자동 영구 밴)`
+        ? `✅ 최대 경고 횟수를 **${maxCount}회**로 설정했습니다.`
         : "✅ 최대 경고 횟수 설정을 해제했습니다.",
+      embeds: [buildWarnEmbed(interaction.guild.id)],
+      components: buildWarnRows(),
       ephemeral: true,
     });
   }
