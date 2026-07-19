@@ -4515,6 +4515,10 @@ async function handleWarnModal(interaction) {
       await logCh?.send({ embeds: [embed] }).catch(() => {});
     }
 
+    if (getLogOptions(interaction.guild.id).warnLog) {
+      await sendLog(interaction.guild, embed);
+    }
+
     if (effectiveAction === "kick") await member.kick(`경고 ${count}회: ${reason}`).catch(() => {});
     else if (effectiveAction === "ban") await member.ban({ reason: `경고 ${count}회: ${reason}` }).catch(() => {});
     return;

@@ -15,6 +15,7 @@ const OPTION_DEFS = [
   { key: "voiceLeave", label: "음성 채널 퇴장" },
   { key: "profanityFilter", label: "욕설 검열" },
   { key: "spamFilter", label: "도배 검열" },
+  { key: "warnLog", label: "경고" },
 ];
 
 function chunk(array, size) {

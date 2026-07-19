@@ -21,6 +21,7 @@ const DEFAULT_LOG_OPTIONS = {
   voiceLeave: false,
   profanityFilter: false,
   spamFilter: false,
+  warnLog: false,
 };
 
 function setLogChannel(guildId, channelId) {
