@@ -38,7 +38,14 @@ const {
   setWordChainChannel,
   getWordChainChannelId,
   setSupportMessage,
+  getWarnConfig,
+  setWarnThreshold,
+  removeWarnThreshold,
+  setWarnMaxCount,
+  setWarnLogChannel,
 } = require("../utils/guildConfig");
+const { getUserWarnings, addWarning, removeWarning, resetWarnings } = require("../utils/warnData");
+const { buildWarnEmbed, buildWarnRows } = require("../commands/warn");
 const { buildSupportEmbed } = require("../utils/supportInfo");
 const { buildLogContent, buildLogRows } = require("../commands/log");
 const {
@@ -187,6 +194,13 @@ const STREAMALERT_PLATFORM_NAMES = {
   chzzk: "치지직",
   soop: "SOOP",
 };
+
+const WARN_BTN_PREFIX = "warn-btn:";
+const WARN_CFG_PREFIX = "warn-cfg:";
+const WARN_MODAL_PREFIX = "warn-modal:";
+const WARN_LOG_CHANNEL_SELECT_ID = "warn-channel:logchannel";
+
+const WARN_ACTION_LABEL = { none: "없음", kick: "킥", ban: "영구 밴" };
 
 const CONSENT_AGREE_ID = "consent-action:agree";
 const TERMS_URL = "https://fehedeveloperteam.github.io/Chiyumi/terms.html";
@@ -2307,6 +2321,23 @@ async function handleChannelSelect(interaction) {
     return;
   }
 
+  if (interaction.customId === WARN_LOG_CHANNEL_SELECT_ID) {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({
+        content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
+        ephemeral: true,
+      });
+      return;
+    }
+    const channelId = interaction.values[0];
+    setWarnLogChannel(interaction.guild.id, channelId);
+    await interaction.update({
+      content: nya(`<#${channelId}>을 경고 로그 채널로 설정했습니다`),
+      components: [],
+    });
+    return;
+  }
+
   if (interaction.customId !== LOG_CHANNEL_SELECT_ID) return;
 
   if (!hasManageGuild(interaction)) {
@@ -2327,6 +2358,23 @@ async function handleChannelSelect(interaction) {
 }
 
 async function handleButton(interaction) {
+  if (interaction.customId.startsWith(WARN_BTN_PREFIX)) {
+    await handleWarnButton(interaction);
+    return;
+  }
+
+  if (interaction.customId.startsWith(WARN_CFG_PREFIX)) {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({
+        content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
+        ephemeral: true,
+      });
+      return;
+    }
+    await handleWarnCfgButton(interaction);
+    return;
+  }
+
   if (interaction.customId.startsWith(STREAMALERT_PLATFORM_BTN_PREFIX)) {
     await handleStreamAlertPlatformButton(interaction);
     return;
@@ -4117,6 +4165,11 @@ async function handleModalSubmit(interaction) {
     return;
   }
 
+  if (interaction.customId.startsWith(WARN_MODAL_PREFIX)) {
+    await handleWarnModal(interaction);
+    return;
+  }
+
   if (interaction.customId.startsWith(WELCOME_MODAL_PREFIX)) {
     const type = interaction.customId.slice(WELCOME_MODAL_PREFIX.length);
     await handleWelcomeMessageModal(interaction, type);
@@ -4281,4 +4334,307 @@ function buildSetupCustomId(prefix, setup, roleId = setup.roleId) {
   }
 
   return `${prefix}create:${roleId}`;
+}
+
+// ─── 경고 시스템 헬퍼 ───────────────────────────────────────────────────────
+
+function resolveWarnUserId(input) {
+  const match = input.match(/<@!?(\d+)>/);
+  return match ? match[1] : input.trim();
+}
+
+async function fetchWarnMember(guild, input) {
+  const id = resolveWarnUserId(input);
+  return guild.members.fetch(id).catch(() => null);
+}
+
+async function handleWarnButton(interaction) {
+  const action = interaction.customId.slice(WARN_BTN_PREFIX.length);
+
+  if (action === "give") {
+    const modal = new ModalBuilder().setCustomId("warn-modal:give").setTitle("경고 주기");
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId("유저").setLabel("유저 ID 또는 멘션 (@유저)").setStyle(TextInputStyle.Short).setRequired(true),
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId("이유").setLabel("경고 이유").setStyle(TextInputStyle.Short).setRequired(false).setPlaceholder("이유 없음"),
+      ),
+    );
+    return interaction.showModal(modal);
+  }
+
+  if (action === "remove") {
+    const modal = new ModalBuilder().setCustomId("warn-modal:remove").setTitle("경고 취소");
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId("유저").setLabel("유저 ID 또는 멘션 (@유저)").setStyle(TextInputStyle.Short).setRequired(true),
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId("개수").setLabel("취소할 경고 수").setStyle(TextInputStyle.Short).setRequired(false).setPlaceholder("기본값: 1"),
+      ),
+    );
+    return interaction.showModal(modal);
+  }
+
+  if (action === "check") {
+    const modal = new ModalBuilder().setCustomId("warn-modal:check").setTitle("경고 조회");
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId("유저").setLabel("유저 ID 또는 멘션 (@유저)").setStyle(TextInputStyle.Short).setRequired(true),
+      ),
+    );
+    return interaction.showModal(modal);
+  }
+
+  if (action === "reset") {
+    const modal = new ModalBuilder().setCustomId("warn-modal:reset").setTitle("경고 초기화");
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId("유저").setLabel("유저 ID 또는 멘션 (@유저)").setStyle(TextInputStyle.Short).setRequired(true),
+      ),
+    );
+    return interaction.showModal(modal);
+  }
+}
+
+async function handleWarnCfgButton(interaction) {
+  const action = interaction.customId.slice(WARN_CFG_PREFIX.length);
+
+  if (action === "add") {
+    const modal = new ModalBuilder().setCustomId("warn-modal:add").setTitle("경고 기준 추가/수정");
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId("횟수").setLabel("경고 횟수 (숫자)").setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder("예: 3"),
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId("행동").setLabel("행동").setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder("없음 / 킥 / 밴"),
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId("역할").setLabel("부여할 역할 ID 또는 멘션 (@역할, 없으면 빈칸)").setStyle(TextInputStyle.Short).setRequired(false),
+      ),
+    );
+    return interaction.showModal(modal);
+  }
+
+  if (action === "delete") {
+    const modal = new ModalBuilder().setCustomId("warn-modal:delete").setTitle("경고 기준 제거");
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId("횟수").setLabel("제거할 경고 횟수 기준 (숫자)").setStyle(TextInputStyle.Short).setRequired(true),
+      ),
+    );
+    return interaction.showModal(modal);
+  }
+
+  if (action === "max") {
+    const modal = new ModalBuilder().setCustomId("warn-modal:max").setTitle("최대 경고 횟수 설정");
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId("횟수").setLabel("최대 경고 횟수 (비워두면 설정 해제)").setStyle(TextInputStyle.Short).setRequired(false).setPlaceholder("예: 5"),
+      ),
+    );
+    return interaction.showModal(modal);
+  }
+
+  if (action === "logchannel") {
+    const channelSelect = new ChannelSelectMenuBuilder()
+      .setCustomId(WARN_LOG_CHANNEL_SELECT_ID)
+      .setPlaceholder("로그 채널을 선택하세요")
+      .setChannelTypes(ChannelType.GuildText);
+    return interaction.reply({
+      content: nya("경고 로그를 보낼 채널을 선택해주세요"),
+      components: [new ActionRowBuilder().addComponents(channelSelect)],
+      ephemeral: true,
+    });
+  }
+}
+
+async function handleWarnModal(interaction) {
+  const type = interaction.customId.slice(WARN_MODAL_PREFIX.length);
+
+  if (type === "give") {
+    const userInput = interaction.fields.getTextInputValue("유저");
+    const reason = interaction.fields.getTextInputValue("이유") || "이유 없음";
+
+    const member = await fetchWarnMember(interaction.guild, userInput);
+    if (!member) return interaction.reply({ content: "유저를 찾을 수 없어요.", ephemeral: true });
+    if (member.user.bot) return interaction.reply({ content: "봇에게는 경고를 줄 수 없어요!", ephemeral: true });
+    if (member.id === interaction.user.id) return interaction.reply({ content: "자기 자신에게 경고를 줄 수 없어요!", ephemeral: true });
+
+    const config = getWarnConfig(interaction.guild.id);
+    const current = getUserWarnings(interaction.guild.id, member.id);
+
+    if (config.maxCount !== null && current.count >= config.maxCount) {
+      return interaction.reply({
+        content: `⚠️ ${member} 님은 이미 최대 경고 횟수(${config.maxCount}회)에 도달했습니다.`,
+        ephemeral: true,
+      });
+    }
+
+    const { count } = addWarning(interaction.guild.id, member.id, reason, interaction.user.id);
+    const threshold = config.thresholds.find((t) => t.count === count);
+    const isMaxReached = config.maxCount !== null && count >= config.maxCount;
+
+    if (threshold?.roleId) {
+      const role = interaction.guild.roles.cache.get(threshold.roleId);
+      if (role) await member.roles.add(role).catch(() => {});
+    }
+
+    const effectiveAction = isMaxReached ? "ban" : (threshold?.action ?? null);
+
+    const embed = new EmbedBuilder()
+      .setTitle("⚠️ 경고 지급")
+      .setThumbnail(member.user.displayAvatarURL())
+      .addFields(
+        { name: "대상",      value: `${member}`,  inline: true },
+        { name: "현재 경고", value: `**${count}회**${config.maxCount ? ` / ${config.maxCount}회` : ""}`, inline: true },
+        { name: "담당자",    value: `${interaction.user}`, inline: true },
+        { name: "이유",      value: reason },
+      )
+      .setColor(0xffa500)
+      .setTimestamp();
+
+    if (threshold) {
+      const roleText = threshold.roleId
+        ? (interaction.guild.roles.cache.get(threshold.roleId)?.toString() ?? "역할 없음")
+        : "없음";
+      embed.addFields(
+        { name: "부여 역할", value: roleText, inline: true },
+        { name: "자동 제재", value: WARN_ACTION_LABEL[threshold.action] ?? "없음", inline: true },
+      );
+    }
+    if (isMaxReached && !threshold) {
+      embed.addFields({ name: "🚨 자동 제재", value: "최대 경고 도달 → 영구 밴" });
+    }
+
+    await interaction.reply({ embeds: [embed] });
+
+    if (config.logChannelId) {
+      const logCh = interaction.guild.channels.cache.get(config.logChannelId);
+      await logCh?.send({ embeds: [embed] }).catch(() => {});
+    }
+
+    if (effectiveAction === "kick") await member.kick(`경고 ${count}회: ${reason}`).catch(() => {});
+    else if (effectiveAction === "ban") await member.ban({ reason: `경고 ${count}회: ${reason}` }).catch(() => {});
+    return;
+  }
+
+  if (type === "remove") {
+    const userInput = interaction.fields.getTextInputValue("유저");
+    const amountStr = interaction.fields.getTextInputValue("개수");
+    const amount = Math.max(1, parseInt(amountStr) || 1);
+
+    const member = await fetchWarnMember(interaction.guild, userInput);
+    if (!member) return interaction.reply({ content: "유저를 찾을 수 없어요.", ephemeral: true });
+
+    const { count } = removeWarning(interaction.guild.id, member.id, amount);
+    return interaction.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle("✅ 경고 취소")
+          .addFields(
+            { name: "대상",      value: `${member}`, inline: true },
+            { name: "취소",      value: `${amount}회`, inline: true },
+            { name: "남은 경고", value: `${count}회`, inline: true },
+          )
+          .setColor(0x57f287)
+          .setTimestamp(),
+      ],
+      ephemeral: true,
+    });
+  }
+
+  if (type === "check") {
+    const userInput = interaction.fields.getTextInputValue("유저");
+    const userId = resolveWarnUserId(userInput);
+
+    let user;
+    try { user = await interaction.client.users.fetch(userId); }
+    catch { return interaction.reply({ content: "유저를 찾을 수 없어요.", ephemeral: true }); }
+
+    const { count, history } = getUserWarnings(interaction.guild.id, userId);
+    const config = getWarnConfig(interaction.guild.id);
+
+    const historyText =
+      history.length === 0
+        ? "없음"
+        : history.slice(-10).map((h) => `**${h.id}.** ${h.reason} · <t:${h.timestamp}:d> · <@${h.moderatorId}>`).join("\n");
+
+    return interaction.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle(`⚠️ ${user.username} 경고 내역`)
+          .setThumbnail(user.displayAvatarURL())
+          .addFields(
+            { name: "현재 경고", value: `${count}회${config.maxCount ? ` / 최대 ${config.maxCount}회` : ""}`, inline: true },
+            { name: "경고 내역 (최근 10개)", value: historyText },
+          )
+          .setColor(0xffa500)
+          .setTimestamp(),
+      ],
+      ephemeral: true,
+    });
+  }
+
+  if (type === "reset") {
+    const userInput = interaction.fields.getTextInputValue("유저");
+    const member = await fetchWarnMember(interaction.guild, userInput);
+    if (!member) return interaction.reply({ content: "유저를 찾을 수 없어요.", ephemeral: true });
+
+    resetWarnings(interaction.guild.id, member.id);
+    return interaction.reply({ content: `✅ ${member} 님의 경고를 모두 초기화했습니다.`, ephemeral: true });
+  }
+
+  if (type === "add") {
+    const countStr = interaction.fields.getTextInputValue("횟수");
+    const actionStr = interaction.fields.getTextInputValue("행동").trim();
+    const roleStr = interaction.fields.getTextInputValue("역할").trim();
+
+    const count = parseInt(countStr);
+    if (!count || count < 1) return interaction.reply({ content: "횟수는 1 이상의 숫자를 입력해주세요.", ephemeral: true });
+
+    const actionMap = { "없음": "none", "킥": "kick", "밴": "ban", "none": "none", "kick": "kick", "ban": "ban" };
+    const action = actionMap[actionStr];
+    if (!action) return interaction.reply({ content: '행동은 "없음", "킥", "밴" 중 하나를 입력해주세요.', ephemeral: true });
+
+    let roleId = null;
+    if (roleStr) {
+      const match = roleStr.match(/<@&(\d+)>/);
+      roleId = match ? match[1] : roleStr;
+      const role = interaction.guild.roles.cache.get(roleId);
+      if (!role) return interaction.reply({ content: "역할을 찾을 수 없어요. 역할 ID 또는 멘션을 확인해주세요.", ephemeral: true });
+    }
+
+    setWarnThreshold(interaction.guild.id, count, roleId, action);
+    const roleText = roleId ? `<@&${roleId}>` : "없음";
+    return interaction.reply({
+      content: `✅ 경고 **${count}회** 기준 설정\n역할: ${roleText} | 제재: **${WARN_ACTION_LABEL[action]}**`,
+      ephemeral: true,
+    });
+  }
+
+  if (type === "delete") {
+    const countStr = interaction.fields.getTextInputValue("횟수");
+    const count = parseInt(countStr);
+    if (!count || count < 1) return interaction.reply({ content: "횟수는 1 이상의 숫자를 입력해주세요.", ephemeral: true });
+
+    removeWarnThreshold(interaction.guild.id, count);
+    return interaction.reply({ content: `✅ 경고 **${count}회** 기준을 제거했습니다.`, ephemeral: true });
+  }
+
+  if (type === "max") {
+    const countStr = interaction.fields.getTextInputValue("횟수").trim();
+    const maxCount = countStr ? parseInt(countStr) : null;
+
+    if (countStr && (!maxCount || maxCount < 1)) return interaction.reply({ content: "횟수는 1 이상의 숫자를 입력해주세요.", ephemeral: true });
+
+    setWarnMaxCount(interaction.guild.id, maxCount);
+    return interaction.reply({
+      content: maxCount
+        ? `✅ 최대 경고 횟수를 **${maxCount}회**로 설정했습니다. (도달 시 자동 영구 밴)`
+        : "✅ 최대 경고 횟수 설정을 해제했습니다.",
+      ephemeral: true,
+    });
+  }
 }
