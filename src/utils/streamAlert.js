@@ -111,11 +111,11 @@ async function checkYouTubeUpload(channelId) {
   }
 }
 
-// 영상 페이지를 확인해 현재 라이브/예약 방송인지 판별
+// 영상 페이지를 확인해 라이브/예약/아카이브 여부 판별 (업로드 알림에서 제외할 대상)
 // - liveBroadcastContent:"live"     → 방송 중
 // - liveBroadcastContent:"upcoming" → 예약된 방송
-// - liveBroadcastContent:"none"     → 일반 영상 (쇼츠·롱폼·종료된 라이브 아카이브)
-async function isVideoLiveOrUpcoming(videoId) {
+// - isLiveBroadcast:true (JSON-LD)  → 종료된 라이브 아카이브
+async function isVideoLiveRelated(videoId) {
   try {
     const res = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
       headers: {
@@ -126,7 +126,8 @@ async function isVideoLiveOrUpcoming(videoId) {
     const html = await res.text();
     return (
       html.includes('"liveBroadcastContent":"live"') ||
-      html.includes('"liveBroadcastContent":"upcoming"')
+      html.includes('"liveBroadcastContent":"upcoming"') ||
+      html.includes('"isLiveBroadcast":true') // 아카이브된 라이브 스트림
     );
   } catch {
     return false;
@@ -268,16 +269,14 @@ async function checkAllStreams(client) {
           const entries = await checkYouTubeUpload(alert.channelId);
           if (!entries.length) continue;
 
-          // lastVideoId(구버전) 또는 seenVideoIds(신버전)로 이미 본 ID 집합 구성
-          const seenIds = new Set(
-            alert.seenVideoIds ?? (alert.lastVideoId ? [alert.lastVideoId] : []),
-          );
-
-          if (seenIds.size === 0) {
-            // 첫 등록: 현재 영상 목록을 seenIds로만 저장하고 알림 미발송
+          // seenVideoIds가 없으면 → 신규 등록이거나 구버전(lastVideoId)에서 마이그레이션
+          // 두 경우 모두 현재 RSS 전체를 시드만 하고 알림 미발송 (뭉탱이 알림 방지)
+          if (!alert.seenVideoIds) {
             addSeenVideoIds(guildId, alert.id, entries.map((e) => e.videoId));
             continue;
           }
+
+          const seenIds = new Set(alert.seenVideoIds);
 
           // 처음 보는 영상만 추출
           const newEntries = entries.filter((e) => !seenIds.has(e.videoId));
@@ -286,9 +285,9 @@ async function checkAllStreams(client) {
           addSeenVideoIds(guildId, alert.id, entries.map((e) => e.videoId));
 
           for (const entry of newEntries) {
-            // 현재 라이브 중이거나 예약된 방송이면 건너뜀 (쇼츠·롱폼만 알림)
-            const isLive = await isVideoLiveOrUpcoming(entry.videoId);
-            if (isLive) continue;
+            // 라이브 중·예약·아카이브된 라이브는 건너뜀 (쇼츠·롱폼만 알림)
+            const isLiveRelated = await isVideoLiveRelated(entry.videoId);
+            if (isLiveRelated) continue;
 
             const guild = client.guilds.cache.get(guildId);
             const channel = guild?.channels.cache.get(alert.notifChannelId);
