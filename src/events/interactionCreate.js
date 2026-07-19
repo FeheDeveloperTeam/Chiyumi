@@ -4739,6 +4739,18 @@ async function handleWarnModal(interaction) {
     const threshold = config.thresholds.find((t) => t.count === count);
     const isMaxReached = config.maxCount !== null && count >= config.maxCount;
 
+    // 이전 경고 기준 역할 제거
+    const prevRoleIds = config.thresholds
+      .filter((t) => t.count < count && t.roleId)
+      .map((t) => t.roleId);
+    for (const rid of prevRoleIds) {
+      if (member.roles.cache.has(rid)) {
+        const prevRole = interaction.guild.roles.cache.get(rid);
+        if (prevRole) await member.roles.remove(prevRole).catch(() => {});
+      }
+    }
+
+    // 현재 경고 기준 역할 부여
     if (threshold?.roleId) {
       const role = interaction.guild.roles.cache.get(threshold.roleId);
       if (role) await member.roles.add(role).catch(() => {});
