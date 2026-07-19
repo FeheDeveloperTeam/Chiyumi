@@ -2373,6 +2373,13 @@ async function handleButton(interaction) {
   }
 
   if (interaction.customId.startsWith(WARN_BTN_PREFIX)) {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({
+        content: nya("이 기능은 서버 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
+        ephemeral: true,
+      });
+      return;
+    }
     await handleWarnButton(interaction);
     return;
   }

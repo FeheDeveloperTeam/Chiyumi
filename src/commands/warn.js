@@ -76,7 +76,7 @@ module.exports = {
     .setNameLocalizations({ ko: "경고" })
     .setDescription("Warning system panel")
     .setDescriptionLocalizations({ ko: nya("경고 시스템 패널을 엽니다") })
-    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .setDMPermission(false),
 
   async execute(interaction) {
