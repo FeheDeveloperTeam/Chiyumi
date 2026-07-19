@@ -4582,7 +4582,7 @@ async function handleWarnWizardModal(interaction) {
     }
     const state = { guildId: interaction.guild.id, total, current: 1, pendingAction: null, pendingDuration: null, configs: [] };
     warnWizardState.set(key, state);
-    return interaction.reply({ embeds: [buildWizardStepEmbed(state)], components: buildWizardActionRows(), ephemeral: true });
+    return interaction.update({ content: null, embeds: [buildWizardStepEmbed(state)], components: buildWizardActionRows() });
   }
 
   // 뮤트 시간 직접 입력
@@ -4595,7 +4595,7 @@ async function handleWarnWizardModal(interaction) {
     if (ms > 28 * 24 * 60 * 60 * 1000) return interaction.reply({ content: "최대 28일까지 설정할 수 있어요.", ephemeral: true });
 
     state.pendingDuration = ms;
-    return interaction.reply({ embeds: [buildWizardRoleEmbed(state)], components: buildWizardRoleRows(), ephemeral: true });
+    return interaction.update({ content: null, embeds: [buildWizardRoleEmbed(state)], components: buildWizardRoleRows() });
   }
 }
 
@@ -4705,10 +4705,10 @@ async function handleWarnCfgButton(interaction) {
       .setCustomId(WARN_LOG_CHANNEL_SELECT_ID)
       .setPlaceholder("로그 채널을 선택하세요")
       .setChannelTypes(ChannelType.GuildText);
-    return interaction.reply({
+    return interaction.update({
       content: nya("경고 로그를 보낼 채널을 선택해주세요"),
+      embeds: [],
       components: [new ActionRowBuilder().addComponents(channelSelect)],
-      ephemeral: true,
     });
   }
 }
@@ -4800,19 +4800,10 @@ async function handleWarnModal(interaction) {
     if (!member) return interaction.reply({ content: "유저를 찾을 수 없어요.", ephemeral: true });
 
     const { count } = removeWarning(interaction.guild.id, member.id, amount);
-    return interaction.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setTitle("✅ 경고 취소")
-          .addFields(
-            { name: "대상",      value: `${member}`, inline: true },
-            { name: "취소",      value: `${amount}회`, inline: true },
-            { name: "남은 경고", value: `${count}회`, inline: true },
-          )
-          .setColor(0x57f287)
-          .setTimestamp(),
-      ],
-      ephemeral: true,
+    return interaction.update({
+      content: `✅ ${member} 님의 경고 ${amount}회를 취소했습니다. 남은 경고: **${count}회**`,
+      embeds: [buildWarnEmbed(interaction.guild.id)],
+      components: buildWarnRows(),
     });
   }
 
@@ -4854,7 +4845,11 @@ async function handleWarnModal(interaction) {
     if (!member) return interaction.reply({ content: "유저를 찾을 수 없어요.", ephemeral: true });
 
     resetWarnings(interaction.guild.id, member.id);
-    return interaction.reply({ content: `✅ ${member} 님의 경고를 모두 초기화했습니다.`, ephemeral: true });
+    return interaction.update({
+      content: `✅ ${member} 님의 경고를 모두 초기화했습니다.`,
+      embeds: [buildWarnEmbed(interaction.guild.id)],
+      components: buildWarnRows(),
+    });
   }
 
   if (type === "add") {
@@ -4879,11 +4874,10 @@ async function handleWarnModal(interaction) {
 
     setWarnThreshold(interaction.guild.id, count, roleId, action);
     const roleText = roleId ? `<@&${roleId}>` : "없음";
-    return interaction.reply({
+    return interaction.update({
       content: `✅ 경고 **${count}회** 기준 설정\n역할: ${roleText} | 제재: **${WARN_ACTION_LABEL[action]}**`,
       embeds: [buildWarnEmbed(interaction.guild.id)],
       components: buildWarnRows(),
-      ephemeral: true,
     });
   }
 
@@ -4893,11 +4887,10 @@ async function handleWarnModal(interaction) {
     if (!count || count < 1) return interaction.reply({ content: "횟수는 1 이상의 숫자를 입력해주세요.", ephemeral: true });
 
     removeWarnThreshold(interaction.guild.id, count);
-    return interaction.reply({
+    return interaction.update({
       content: `✅ 경고 **${count}회** 기준을 제거했습니다.`,
       embeds: [buildWarnEmbed(interaction.guild.id)],
       components: buildWarnRows(),
-      ephemeral: true,
     });
   }
 
@@ -4908,13 +4901,12 @@ async function handleWarnModal(interaction) {
     if (countStr && (!maxCount || maxCount < 1)) return interaction.reply({ content: "횟수는 1 이상의 숫자를 입력해주세요.", ephemeral: true });
 
     setWarnMaxCount(interaction.guild.id, maxCount);
-    return interaction.reply({
+    return interaction.update({
       content: maxCount
         ? `✅ 최대 경고 횟수를 **${maxCount}회**로 설정했습니다.`
         : "✅ 최대 경고 횟수 설정을 해제했습니다.",
       embeds: [buildWarnEmbed(interaction.guild.id)],
       components: buildWarnRows(),
-      ephemeral: true,
     });
   }
 }
