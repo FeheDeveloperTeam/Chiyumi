@@ -45,7 +45,7 @@ const {
   setWarnLogChannel,
 } = require("../utils/guildConfig");
 const { getUserWarnings, addWarning, removeWarning, resetWarnings } = require("../utils/warnData");
-const { buildWarnEmbed, buildWarnRows } = require("../commands/warn");
+const { buildWarnEmbed, buildWarnRows, formatDuration: warnFormatDuration } = require("../commands/warn");
 const { buildSupportEmbed } = require("../utils/supportInfo");
 const { buildLogContent, buildLogRows } = require("../commands/log");
 const {
@@ -199,8 +199,12 @@ const WARN_BTN_PREFIX = "warn-btn:";
 const WARN_CFG_PREFIX = "warn-cfg:";
 const WARN_MODAL_PREFIX = "warn-modal:";
 const WARN_LOG_CHANNEL_SELECT_ID = "warn-channel:logchannel";
+const WARN_WIZARD_PREFIX = "warn-wizard:";
+const WARN_WIZARD_ROLE_SELECT_ID = "warn-wizard:role-select";
 
-const WARN_ACTION_LABEL = { none: "없음", kick: "킥", ban: "영구 밴" };
+const WARN_ACTION_LABEL = { none: "없음", mute: "뮤트", kick: "킥", ban: "영구 밴" };
+
+const warnWizardState = new Map(); // `${userId}:${guildId}` → wizard state
 
 const CONSENT_AGREE_ID = "consent-action:agree";
 const TERMS_URL = "https://fehedeveloperteam.github.io/Chiyumi/terms.html";
@@ -2142,6 +2146,11 @@ async function handleStreamAlertEditChannelSelect(interaction) {
 }
 
 async function handleRoleSelect(interaction) {
+  if (interaction.customId === WARN_WIZARD_ROLE_SELECT_ID) {
+    await handleWarnWizardRoleSelect(interaction);
+    return;
+  }
+
   if (!interaction.customId.startsWith(VERIFY_SETUP_ROLE_SELECT_PREFIX)) return;
 
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
@@ -2358,6 +2367,11 @@ async function handleChannelSelect(interaction) {
 }
 
 async function handleButton(interaction) {
+  if (interaction.customId.startsWith(WARN_WIZARD_PREFIX)) {
+    await handleWarnWizardButton(interaction);
+    return;
+  }
+
   if (interaction.customId.startsWith(WARN_BTN_PREFIX)) {
     await handleWarnButton(interaction);
     return;
@@ -4170,6 +4184,11 @@ async function handleModalSubmit(interaction) {
     return;
   }
 
+  if (interaction.customId.startsWith(WARN_WIZARD_PREFIX)) {
+    await handleWarnWizardModal(interaction);
+    return;
+  }
+
   if (interaction.customId.startsWith(WELCOME_MODAL_PREFIX)) {
     const type = interaction.customId.slice(WELCOME_MODAL_PREFIX.length);
     await handleWelcomeMessageModal(interaction, type);
@@ -4336,6 +4355,248 @@ function buildSetupCustomId(prefix, setup, roleId = setup.roleId) {
   return `${prefix}create:${roleId}`;
 }
 
+// ─── 경고 마법사 ────────────────────────────────────────────────────────────
+
+function warnWizardKey(interaction) {
+  return `${interaction.user.id}:${interaction.guild.id}`;
+}
+
+function warnWizardFormatStep(c) {
+  const actionText =
+    c.action === "mute" && c.duration
+      ? `뮤트 (${warnFormatDuration(c.duration)})`
+      : WARN_ACTION_LABEL[c.action] ?? c.action;
+  const roleText = c.roleId ? `<@&${c.roleId}>` : "없음";
+  return `경고 **${c.count}회** → ${actionText} | 역할: ${roleText}`;
+}
+
+function buildWizardStepEmbed(state) {
+  const completedText =
+    state.configs.length > 0 ? state.configs.map(warnWizardFormatStep).join("\n") : "(아직 없음)";
+  return new EmbedBuilder()
+    .setTitle("⚠️ 경고 설정 마법사")
+    .addFields(
+      { name: `완료 (${state.configs.length}/${state.total})`, value: completedText },
+      { name: `경고 ${state.current}회 — 행동 선택`, value: "아래 버튼에서 이 경고 횟수에 적용할 행동을 선택하세요" },
+    )
+    .setColor(0xffa500);
+}
+
+function buildWizardActionRows() {
+  return [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("warn-wizard:action:none").setLabel("없음").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId("warn-wizard:action:mute").setLabel("뮤트 (타임아웃)").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId("warn-wizard:action:kick").setLabel("킥").setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId("warn-wizard:action:ban").setLabel("영구 밴").setStyle(ButtonStyle.Danger),
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("warn-wizard:cancel").setLabel("취소").setStyle(ButtonStyle.Secondary),
+    ),
+  ];
+}
+
+function buildWizardDurationEmbed(state) {
+  return new EmbedBuilder()
+    .setTitle("⚠️ 경고 설정 마법사")
+    .setDescription(`경고 **${state.current}회** — 뮤트 시간을 선택해주세요`)
+    .setColor(0xffa500);
+}
+
+function buildWizardDurationRows() {
+  const presets = [
+    ["10분",  10 * 60 * 1000],
+    ["30분",  30 * 60 * 1000],
+    ["1시간",  1 * 60 * 60 * 1000],
+    ["6시간",  6 * 60 * 60 * 1000],
+    ["12시간", 12 * 60 * 60 * 1000],
+    ["1일",   24 * 60 * 60 * 1000],
+    ["3일",    3 * 24 * 60 * 60 * 1000],
+    ["7일",    7 * 24 * 60 * 60 * 1000],
+  ];
+  return [
+    new ActionRowBuilder().addComponents(
+      ...presets.slice(0, 5).map(([label, ms]) =>
+        new ButtonBuilder().setCustomId(`warn-wizard:dur:${ms}`).setLabel(label).setStyle(ButtonStyle.Primary),
+      ),
+    ),
+    new ActionRowBuilder().addComponents(
+      ...presets.slice(5).map(([label, ms]) =>
+        new ButtonBuilder().setCustomId(`warn-wizard:dur:${ms}`).setLabel(label).setStyle(ButtonStyle.Primary),
+      ),
+      new ButtonBuilder().setCustomId("warn-wizard:dur:custom").setLabel("직접입력").setStyle(ButtonStyle.Secondary),
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("warn-wizard:cancel").setLabel("취소").setStyle(ButtonStyle.Secondary),
+    ),
+  ];
+}
+
+function buildWizardRoleEmbed(state) {
+  const actionText =
+    state.pendingAction === "mute" && state.pendingDuration
+      ? `뮤트 (${warnFormatDuration(state.pendingDuration)})`
+      : WARN_ACTION_LABEL[state.pendingAction] ?? state.pendingAction;
+  return new EmbedBuilder()
+    .setTitle("⚠️ 경고 설정 마법사")
+    .setDescription(
+      `경고 **${state.current}회** — ${actionText} 선택됨\n부여할 역할을 선택하거나 건너뛰세요`,
+    )
+    .setColor(0xffa500);
+}
+
+function buildWizardRoleRows() {
+  return [
+    new ActionRowBuilder().addComponents(
+      new RoleSelectMenuBuilder()
+        .setCustomId(WARN_WIZARD_ROLE_SELECT_ID)
+        .setPlaceholder("부여할 역할 선택"),
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("warn-wizard:skip-role").setLabel("역할 없이 다음").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId("warn-wizard:cancel").setLabel("취소").setStyle(ButtonStyle.Secondary),
+    ),
+  ];
+}
+
+function parseWarnDuration(input) {
+  const s = input.trim();
+  const match = s.match(/^(\d+(?:\.\d+)?)\s*(분|시간|일|주|m|h|d|w)?$/i);
+  if (!match) return null;
+  const num = parseFloat(match[1]);
+  const unit = (match[2] ?? "분").toLowerCase();
+  const mult = { 분: 60000, m: 60000, 시간: 3600000, h: 3600000, 일: 86400000, d: 86400000, 주: 604800000, w: 604800000 };
+  return mult[unit] ? Math.floor(num * mult[unit]) : null;
+}
+
+async function warnWizardSaveAndAdvance(interaction, state, key, roleId) {
+  state.configs.push({
+    count: state.current,
+    action: state.pendingAction,
+    duration: state.pendingDuration ?? null,
+    roleId: roleId ?? null,
+  });
+  state.pendingAction = null;
+  state.pendingDuration = null;
+  state.current += 1;
+
+  if (state.current > state.total) {
+    for (const c of state.configs) {
+      setWarnThreshold(state.guildId, c.count, c.roleId, c.action, c.duration);
+    }
+    warnWizardState.delete(key);
+    const summaryText = state.configs.map(warnWizardFormatStep).join("\n");
+    return interaction.update({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle("✅ 경고 설정 완료")
+          .setDescription(summaryText)
+          .setColor(0x57f287)
+          .setTimestamp(),
+      ],
+      components: [],
+    });
+  }
+
+  return interaction.update({
+    embeds: [buildWizardStepEmbed(state)],
+    components: buildWizardActionRows(),
+  });
+}
+
+async function handleWarnWizardButton(interaction) {
+  const customId = interaction.customId;
+  const key = warnWizardKey(interaction);
+
+  if (customId === "warn-wizard:cancel") {
+    warnWizardState.delete(key);
+    return interaction.update({ content: "경고 설정 마법사가 취소됐습니다.", embeds: [], components: [] });
+  }
+
+  const state = warnWizardState.get(key);
+  if (!state) {
+    return interaction.update({
+      content: "⚠️ 세션이 만료됐어요. `/경고` 커맨드를 다시 실행해주세요.",
+      embeds: [],
+      components: [],
+    });
+  }
+
+  // 행동 선택
+  if (customId.startsWith("warn-wizard:action:")) {
+    const action = customId.split(":")[2];
+    state.pendingAction = action;
+    if (action === "mute") {
+      return interaction.update({ embeds: [buildWizardDurationEmbed(state)], components: buildWizardDurationRows() });
+    }
+    return interaction.update({ embeds: [buildWizardRoleEmbed(state)], components: buildWizardRoleRows() });
+  }
+
+  // 뮤트 시간 선택 (프리셋)
+  if (customId.startsWith("warn-wizard:dur:")) {
+    const durPart = customId.split(":")[2];
+    if (durPart === "custom") {
+      const modal = new ModalBuilder().setCustomId("warn-wizard:dur-custom").setTitle("뮤트 시간 직접 입력");
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId("기간")
+            .setLabel("기간 입력")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setPlaceholder("예: 30분, 2시간, 1일, 7일"),
+        ),
+      );
+      return interaction.showModal(modal);
+    }
+    state.pendingDuration = parseInt(durPart);
+    return interaction.update({ embeds: [buildWizardRoleEmbed(state)], components: buildWizardRoleRows() });
+  }
+
+  // 역할 건너뛰기
+  if (customId === "warn-wizard:skip-role") {
+    return warnWizardSaveAndAdvance(interaction, state, key, null);
+  }
+}
+
+async function handleWarnWizardRoleSelect(interaction) {
+  const key = warnWizardKey(interaction);
+  const state = warnWizardState.get(key);
+  if (!state) {
+    return interaction.update({ content: "⚠️ 세션이 만료됐어요. `/경고` 커맨드를 다시 실행해주세요.", embeds: [], components: [] });
+  }
+  return warnWizardSaveAndAdvance(interaction, state, key, interaction.values[0] ?? null);
+}
+
+async function handleWarnWizardModal(interaction) {
+  const customId = interaction.customId;
+  const key = warnWizardKey(interaction);
+
+  // 총 횟수 입력 → 마법사 시작
+  if (customId === "warn-wizard:count") {
+    const total = parseInt(interaction.fields.getTextInputValue("횟수"));
+    if (!total || total < 1 || total > 10) {
+      return interaction.reply({ content: "횟수는 1~10 사이의 숫자를 입력해주세요.", ephemeral: true });
+    }
+    const state = { guildId: interaction.guild.id, total, current: 1, pendingAction: null, pendingDuration: null, configs: [] };
+    warnWizardState.set(key, state);
+    return interaction.reply({ embeds: [buildWizardStepEmbed(state)], components: buildWizardActionRows(), ephemeral: true });
+  }
+
+  // 뮤트 시간 직접 입력
+  if (customId === "warn-wizard:dur-custom") {
+    const state = warnWizardState.get(key);
+    if (!state) return interaction.reply({ content: "⚠️ 세션이 만료됐어요.", ephemeral: true });
+
+    const ms = parseWarnDuration(interaction.fields.getTextInputValue("기간"));
+    if (!ms || ms < 60000) return interaction.reply({ content: "올바른 기간을 입력해주세요. (예: 30분, 2시간, 1일)", ephemeral: true });
+    if (ms > 28 * 24 * 60 * 60 * 1000) return interaction.reply({ content: "최대 28일까지 설정할 수 있어요.", ephemeral: true });
+
+    state.pendingDuration = ms;
+    return interaction.reply({ embeds: [buildWizardRoleEmbed(state)], components: buildWizardRoleRows(), ephemeral: true });
+  }
+}
+
 // ─── 경고 시스템 헬퍼 ───────────────────────────────────────────────────────
 
 function resolveWarnUserId(input) {
@@ -4401,17 +4662,17 @@ async function handleWarnButton(interaction) {
 async function handleWarnCfgButton(interaction) {
   const action = interaction.customId.slice(WARN_CFG_PREFIX.length);
 
-  if (action === "add") {
-    const modal = new ModalBuilder().setCustomId("warn-modal:add").setTitle("경고 기준 추가/수정");
+  if (action === "wizard") {
+    const modal = new ModalBuilder().setCustomId("warn-wizard:count").setTitle("경고 기준 설정 마법사");
     modal.addComponents(
       new ActionRowBuilder().addComponents(
-        new TextInputBuilder().setCustomId("횟수").setLabel("경고 횟수 (숫자)").setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder("예: 3"),
-      ),
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder().setCustomId("행동").setLabel("행동").setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder("없음 / 킥 / 밴"),
-      ),
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder().setCustomId("역할").setLabel("부여할 역할 ID 또는 멘션 (@역할, 없으면 빈칸)").setStyle(TextInputStyle.Short).setRequired(false),
+        new TextInputBuilder()
+          .setCustomId("횟수")
+          .setLabel("몇 회까지 설정할까요?")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setPlaceholder("예: 3 → 경고 1회·2회·3회 순서대로 설정")
+          .setMaxLength(2),
       ),
     );
     return interaction.showModal(modal);
@@ -4521,6 +4782,10 @@ async function handleWarnModal(interaction) {
 
     if (effectiveAction === "kick") await member.kick(`경고 ${count}회: ${reason}`).catch(() => {});
     else if (effectiveAction === "ban") await member.ban({ reason: `경고 ${count}회: ${reason}` }).catch(() => {});
+    else if (effectiveAction === "mute") {
+      const duration = threshold?.duration ?? 3600000;
+      await member.timeout(duration, `경고 ${count}회: ${reason}`).catch(() => {});
+    }
     return;
   }
 

@@ -184,12 +184,12 @@ function getWarnConfig(guildId) {
   return { ...DEFAULT_WARN_CONFIG, ...(configs[guildId]?.warnConfig ?? {}) };
 }
 
-function setWarnThreshold(guildId, count, roleId, action) {
+function setWarnThreshold(guildId, count, roleId, action, duration = null) {
   const configs = loadAll();
   const current = configs[guildId] ?? {};
   const warnConfig = { ...DEFAULT_WARN_CONFIG, ...(current.warnConfig ?? {}) };
   warnConfig.thresholds = warnConfig.thresholds.filter((t) => t.count !== count);
-  warnConfig.thresholds.push({ count, roleId: roleId ?? null, action });
+  warnConfig.thresholds.push({ count, roleId: roleId ?? null, action, duration: duration ?? null });
   warnConfig.thresholds.sort((a, b) => a.count - b.count);
   configs[guildId] = { ...current, warnConfig };
   saveAll(configs);

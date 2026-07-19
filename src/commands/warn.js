@@ -9,7 +9,17 @@ const {
 const { nya } = require("../utils/nya");
 const { getWarnConfig } = require("../utils/guildConfig");
 
-const ACTION_LABEL = { none: "없음", kick: "킥", ban: "영구 밴" };
+const ACTION_LABEL = { none: "없음", mute: "뮤트", kick: "킥", ban: "영구 밴" };
+
+function formatDuration(ms) {
+  if (!ms) return "?";
+  const mins = Math.floor(ms / 60000);
+  if (mins < 60) return `${mins}분`;
+  const hours = Math.floor(ms / 3600000);
+  if (hours < 24) return `${hours}시간`;
+  const days = Math.floor(ms / 86400000);
+  return `${days}일`;
+}
 
 function buildWarnEmbed(guildId) {
   const config = getWarnConfig(guildId);
@@ -17,11 +27,15 @@ function buildWarnEmbed(guildId) {
   const maxText = config.maxCount ? `${config.maxCount}회 도달 시 영구 밴` : "설정 안 됨";
   const thresholdText =
     config.thresholds.length === 0
-      ? "설정 없음 — [기준 추가] 버튼으로 추가하세요"
+      ? "설정 없음 — [마법사로 설정] 버튼으로 추가하세요"
       : config.thresholds
           .map((t) => {
             const roleText = t.roleId ? `<@&${t.roleId}>` : "없음";
-            return `경고 **${t.count}회** → 역할: ${roleText} | 제재: **${ACTION_LABEL[t.action] ?? "없음"}**`;
+            const actionText =
+              t.action === "mute" && t.duration
+                ? `뮤트 (${formatDuration(t.duration)})`
+                : ACTION_LABEL[t.action] ?? "없음";
+            return `경고 **${t.count}회** → 역할: ${roleText} | 제재: **${actionText}**`;
           })
           .join("\n");
 
@@ -46,7 +60,7 @@ function buildWarnRows() {
   );
 
   const row2 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("warn-cfg:add").setLabel("기준 추가/수정").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("warn-cfg:wizard").setLabel("마법사로 설정").setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId("warn-cfg:delete").setLabel("기준 제거").setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId("warn-cfg:max").setLabel("최대 횟수").setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId("warn-cfg:logchannel").setLabel("로그 채널").setStyle(ButtonStyle.Secondary),
@@ -75,4 +89,5 @@ module.exports = {
 
   buildWarnEmbed,
   buildWarnRows,
+  formatDuration,
 };
