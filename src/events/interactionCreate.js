@@ -42,7 +42,6 @@ const {
   setWarnThreshold,
   removeWarnThreshold,
   setWarnMaxCount,
-  setWarnLogChannel,
 } = require("../utils/guildConfig");
 const { getUserWarnings, addWarning, removeWarning, resetWarnings } = require("../utils/warnData");
 const { buildWarnEmbed, buildWarnRows, formatDuration: warnFormatDuration } = require("../commands/warn");
@@ -198,7 +197,6 @@ const STREAMALERT_PLATFORM_NAMES = {
 const WARN_BTN_PREFIX = "warn-btn:";
 const WARN_CFG_PREFIX = "warn-cfg:";
 const WARN_MODAL_PREFIX = "warn-modal:";
-const WARN_LOG_CHANNEL_SELECT_ID = "warn-channel:logchannel";
 const WARN_WIZARD_PREFIX = "warn-wizard:";
 const WARN_WIZARD_ROLE_SELECT_ID = "warn-wizard:role-select";
 
@@ -2326,24 +2324,6 @@ async function handleChannelSelect(interaction) {
       content: nya(`${channel}에 운영 안내를 게시했습니다. 운영 시간 시작(10:00)·종료(19:00) KST에 자동으로 수정됩니다.`),
       embeds: [],
       components: [],
-    });
-    return;
-  }
-
-  if (interaction.customId === WARN_LOG_CHANNEL_SELECT_ID) {
-    if (!hasManageGuild(interaction)) {
-      await interaction.reply({
-        content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
-        ephemeral: true,
-      });
-      return;
-    }
-    const channelId = interaction.values[0];
-    setWarnLogChannel(interaction.guild.id, channelId);
-    await interaction.update({
-      content: nya(`<#${channelId}>을 경고 로그 채널로 설정했습니다`),
-      embeds: [buildWarnEmbed(interaction.guild.id)],
-      components: buildWarnRows(),
     });
     return;
   }
@@ -4700,17 +4680,6 @@ async function handleWarnCfgButton(interaction) {
     return interaction.showModal(modal);
   }
 
-  if (action === "logchannel") {
-    const channelSelect = new ChannelSelectMenuBuilder()
-      .setCustomId(WARN_LOG_CHANNEL_SELECT_ID)
-      .setPlaceholder("로그 채널을 선택하세요")
-      .setChannelTypes(ChannelType.GuildText);
-    return interaction.update({
-      content: nya("경고 로그를 보낼 채널을 선택해주세요"),
-      embeds: [],
-      components: [new ActionRowBuilder().addComponents(channelSelect)],
-    });
-  }
 }
 
 async function handleWarnModal(interaction) {
@@ -4784,11 +4753,6 @@ async function handleWarnModal(interaction) {
     }
 
     await interaction.reply({ embeds: [embed] });
-
-    if (config.logChannelId) {
-      const logCh = interaction.guild.channels.cache.get(config.logChannelId);
-      await logCh?.send({ embeds: [embed] }).catch(() => {});
-    }
 
     if (getLogOptions(interaction.guild.id).warnLog) {
       await sendLog(interaction.guild, embed);

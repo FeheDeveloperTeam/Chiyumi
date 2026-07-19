@@ -23,7 +23,6 @@ function formatDuration(ms) {
 
 function buildWarnEmbed(guildId) {
   const config = getWarnConfig(guildId);
-  const logText = config.logChannelId ? `<#${config.logChannelId}>` : "설정 안 됨";
   const maxText = config.maxCount ? `${config.maxCount}회 도달 시 영구 밴` : "설정 안 됨";
   const thresholdText =
     config.thresholds.length === 0
@@ -43,9 +42,7 @@ function buildWarnEmbed(guildId) {
     .setTitle("⚠️ 경고 시스템")
     .setDescription(nya("버튼으로 경고를 지급·관리하거나 기준을 설정할 수 있습니다"))
     .addFields(
-      { name: "로그 채널", value: logText, inline: true },
-      { name: "최대 경고 횟수", value: maxText, inline: true },
-      { name: "​", value: "​", inline: true },
+      { name: "최대 경고 횟수", value: maxText },
       { name: "경고 기준", value: thresholdText },
     )
     .setColor(0xffa500);
@@ -63,7 +60,6 @@ function buildWarnRows() {
     new ButtonBuilder().setCustomId("warn-cfg:wizard").setLabel("마법사로 설정").setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId("warn-cfg:delete").setLabel("기준 제거").setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId("warn-cfg:max").setLabel("최대 횟수").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId("warn-cfg:logchannel").setLabel("로그 채널").setStyle(ButtonStyle.Secondary),
   );
 
   return [row1, row2];
