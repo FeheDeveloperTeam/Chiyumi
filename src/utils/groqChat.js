@@ -84,7 +84,7 @@ async function askGroq(channelId, userId, userMessage) {
   const history = getHistory(channelId);
 
   const isDev = userId === DEVELOPER_ID;
-  const userLabel = isDev ? "페헤님(나를 만들어주신 분)" : "집사";
+  const userLabel = isDev ? "페헤(나를 만들어주신 분)" : "집사";
   history.push({ role: "user", content: `${userLabel}: ${userMessage}` });
   trimHistory(history);
 
