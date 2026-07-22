@@ -1,7 +1,12 @@
 const Groq = require("groq-sdk");
+const OpenAI = require("openai");
 const { containsProfanity } = require("./profanityFilter");
 
-const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const openrouterClient = new OpenAI({
+  baseURL: "https://openrouter.ai/api/v1",
+  apiKey: process.env.OPENROUTER_API_KEY,
+});
 
 const HARMFUL_PATTERNS = [
   "섹", "야동", "포르노", "성관계", "자위", "음란", "성기", "강간", "성폭행",
@@ -108,18 +113,33 @@ async function askGroq(channelId, userId, userMessage) {
   history.push({ role: "user", content: `${userLabel}: ${userMessage}` });
   trimHistory(history);
 
+  const messages = [{ role: "system", content: SYSTEM_PROMPT }, ...history];
   let response;
   try {
-    response = await client.chat.completions.create({
+    response = await groqClient.chat.completions.create({
       model: "llama-3.3-70b-versatile",
-      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...history],
+      messages,
       max_tokens: 300,
       temperature: 0.9,
     });
-  } catch (err) {
-    history.pop();
-    if (err?.status === 429) return "지금 채팅 한도가 꽉 찼냥... 무료 버전이라 어쩔 수 없냥ㅠ 관리자한테 문의해달라냥!";
-    return "지금 말하기가 어렵냥... 잠깐 후에 다시 말 걸어줘냥!";
+  } catch (groqErr) {
+    if (groqErr?.status === 429 && process.env.OPENROUTER_API_KEY) {
+      try {
+        response = await openrouterClient.chat.completions.create({
+          model: "meta-llama/llama-3.3-70b-instruct",
+          messages,
+          max_tokens: 300,
+          temperature: 0.9,
+        });
+      } catch (orErr) {
+        history.pop();
+        return "지금 채팅 한도가 꽉 찼냥... 잠깐 후에 다시 말 걸어줘냥!";
+      }
+    } else {
+      history.pop();
+      if (groqErr?.status === 429) return "지금 채팅 한도가 꽉 찼냥... 무료 버전이라 어쩔 수 없냥ㅠ 관리자한테 문의해달라냥!";
+      return "지금 말하기가 어렵냥... 잠깐 후에 다시 말 걸어줘냥!";
+    }
   }
 
   const raw = response.choices[0]?.message?.content?.trim() ?? "";
