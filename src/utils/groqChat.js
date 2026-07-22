@@ -1,4 +1,4 @@
-const Groq = require("groq-sdk");
+﻿const Groq = require("groq-sdk");
 const { containsProfanity } = require("./profanityFilter");
 
 const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
@@ -93,9 +93,6 @@ function trimHistory(history) {
   while (history.length > MAX_HISTORY) history.splice(0, 2);
 }
 
-// 히라가나(぀-ヿ), 카타카나 확장(ㇰ-ㇿ),
-// 한자(一-鿿), CJK호환(豈-﫿), 반각카타카나(･-ﾟ) 제거
-// 한국어 자모(㄰-㆏)·음절(가-힣)은 이 범위 밖이라 유지됨
 const FOREIGN_RE = /[぀-ヿㇰ-ㇿ一-鿿豈-﫿･-ﾟ]/g;
 
 async function askGroq(channelId, userId, userMessage) {
