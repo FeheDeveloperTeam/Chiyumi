@@ -159,6 +159,10 @@ async function askGroq(channelId, userId, userMessage) {
     .replace(/([!?~.])\s*냥\s*$/g, "냥$1")
     .replace(/ 냥([!?~.\s]|$)/g, "냥$1");
 
+  if (!reply.replace(/[!?~.\s…ㅠㅜ,]/g, "")) {
+    return "그런 말은 못 해줘요냥! 😾";
+  }
+
   history.push({ role: "assistant", content: reply });
 
   return reply;
