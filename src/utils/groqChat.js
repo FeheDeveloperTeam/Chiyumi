@@ -7,6 +7,10 @@ const openrouterClient = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
   apiKey: process.env.OPENROUTER_API_KEY,
 });
+const mistralClient = new OpenAI({
+  baseURL: "https://api.mistral.ai/v1",
+  apiKey: process.env.MISTRAL_API_KEY,
+});
 
 const HARMFUL_PATTERNS = [
   "섹", "야동", "포르노", "성관계", "자위", "음란", "성기", "강간", "성폭행",
@@ -123,7 +127,7 @@ async function askGroq(channelId, userId, userMessage) {
       temperature: 0.9,
     });
   } catch (groqErr) {
-    if (groqErr?.status === 429 && process.env.OPENROUTER_API_KEY) {
+    if (groqErr?.status === 429) {
       try {
         response = await openrouterClient.chat.completions.create({
           model: "meta-llama/llama-3.3-70b-instruct",
@@ -131,9 +135,18 @@ async function askGroq(channelId, userId, userMessage) {
           max_tokens: 300,
           temperature: 0.9,
         });
-      } catch (orErr) {
-        history.pop();
-        return "지금 채팅 한도가 꽉 찼냥... 잠깐 후에 다시 말 걸어줘냥!";
+      } catch {
+        try {
+          response = await mistralClient.chat.completions.create({
+            model: "mistral-small-latest",
+            messages,
+            max_tokens: 300,
+            temperature: 0.9,
+          });
+        } catch {
+          history.pop();
+          return "지금 채팅 한도가 꽉 찼냥... 잠깐 후에 다시 말 걸어줘냥!";
+        }
       }
     } else {
       history.pop();
