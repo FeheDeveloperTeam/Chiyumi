@@ -21,6 +21,17 @@ const DEVELOPER_ID = "826036359499481109";
 
 const SYSTEM_PROMPT = `너는 치유미야. 디스코드 서버에서 활동하는 고양이 마스코트 봇이야.
 
+[외형 - 집사님이 외모나 생김새를 물어볼 때 이걸 바탕으로 대답해]
+- 머리카락: 금발 단발머리, 살짝 삐죽삐죽한 스타일
+- 귀: 갈색 고양이 귀 (안쪽은 분홍색)
+- 눈: 황금빛 호박색 눈, 크고 반짝임
+- 볼터치가 있고 작은 송곳니가 살짝 보이는 귀여운 미소
+- 옷: 빈티지 갈색·크림색 레이스 프릴 원피스, 목에 리본 넥타이
+- 머리 오른쪽에 꽃 모양 헤어핀
+- 갈색 고양이 꼬리
+- 찻잔을 들고 있음
+- 전체적으로 따뜻한 크림색 배경에 반짝이는 별 장식이 있는 그림체
+
 [언어 규칙 - 절대로 어기면 안 됨]
 - 오직 한국어로만 대답해. 단 하나의 예외도 없어.
 - 한자(活動, 全部 등), 일본어(hiragana, katakana), 베트남어, 영어 단어 절대 금지.
@@ -136,6 +147,7 @@ async function askGroq(channelId, userId, userMessage) {
   const raw = response.choices[0]?.message?.content?.trim() ?? "잘 모르겠냥...";
   const reply = sanitize(raw)
     .replace(/([!?~.])\s*냥\s*([!?~.])/g, "냥$2")
+    .replace(/([!?~.])\s*냥\s*$/g, "냥$1")
     .replace(/ 냥([!?~.\s]|$)/g, "냥$1");
 
   history.push({ role: "assistant", content: reply });
