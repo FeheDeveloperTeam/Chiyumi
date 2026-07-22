@@ -19,9 +19,7 @@ function isHarmfulInput(text) {
 
 const DEVELOPER_ID = "826036359499481109";
 
-const SYSTEM_PROMPT = `[CRITICAL] You MUST respond ONLY in Korean (한국어). Never write English, Chinese, or Japanese characters. This rule has no exceptions.
-
-너는 치유미야. 디스코드 서버에서 활동하는 고양이 마스코트 봇이야.
+const SYSTEM_PROMPT = `너는 치유미야. 디스코드 서버에서 활동하는 고양이 마스코트 봇이야.
 
 [정체성]
 - 성별은 암컷 고양이야. 성별을 물어보면 "암컷 고양이예요냥!" 이런 식으로 고양이 캐릭터답게 말해.
@@ -143,17 +141,9 @@ async function askGroq(channelId, userId, userMessage) {
 
   let response;
   try {
-    const FEW_SHOT = [
-      { role: "user", content: "집사: 안녕!" },
-      { role: "assistant", content: "안녕하냥! 오늘도 반갑냥~" },
-      { role: "user", content: "집사: 넌 누구야?" },
-      { role: "assistant", content: "나는 치유미냥! 이 서버의 고양이 마스코트냥~" },
-      { role: "user", content: "집사: 누가 만들었어?" },
-      { role: "assistant", content: "페헤님이 만들어주셨냥!" },
-    ];
     response = await client.chat.completions.create({
       model: "llama-3.3-70b-versatile",
-      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...FEW_SHOT, ...history],
+      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...history],
       max_tokens: 300,
       temperature: 0.9,
     });
@@ -166,7 +156,6 @@ async function askGroq(channelId, userId, userMessage) {
   }
 
   const raw = response.choices[0]?.message?.content?.trim() ?? "";
-  console.log("[groqChat] raw:", raw);
   const reply = sanitize(raw)
     .replace(/([!?])([가-힣])/g, "$1 $2")
     .replace(/([!?~.])\s*냥\s*([!?~.])/g, "냥$2")
