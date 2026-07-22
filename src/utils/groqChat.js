@@ -166,6 +166,7 @@ async function askGroq(channelId, userId, userMessage) {
   }
 
   const raw = response.choices[0]?.message?.content?.trim() ?? "";
+  console.log("[groqChat] raw:", raw);
   const reply = sanitize(raw)
     .replace(/([!?])([가-힣])/g, "$1 $2")
     .replace(/([!?~.])\s*냥\s*([!?~.])/g, "냥$2")
