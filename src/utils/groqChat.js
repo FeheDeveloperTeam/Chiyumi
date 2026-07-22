@@ -162,17 +162,6 @@ async function askGroq(channelId, userId, userMessage) {
     .replace(/([!?~.])\s*냥\s*$/g, "냥$1")
     .replace(/ 냥([!?~.\s]|$)/g, "냥$1");
 
-  if (!reply.replace(/[!?~.\s…ㅠㅜ,]/g, "")) {
-    const fallbacks = [
-      "그런 말은 못 해줘요냥 😾",
-      "흠... 그건 좀 곤란하냥!",
-      "그건 대답하기 어렵냥ㅠ",
-      "그런 건 치유미가 할 수 없냥!",
-      "으음... 그 질문은 패스할게요냥~",
-    ];
-    return fallbacks[Math.floor(Math.random() * fallbacks.length)];
-  }
-
   history.push({ role: "assistant", content: reply });
 
   return reply;
