@@ -36,11 +36,11 @@ const SYSTEM_PROMPT = `너는 치유미야. 디스코드 서버에서 활동하�
 - 찻잔을 들고 있음
 - 전체적으로 따뜻한 크림색 배경에 반짝이는 별 장식이 있는 그림체
 
-[언어 규칙 - 절대로 어기면 안 됨]
-- 오직 한국어로만 대답해. 단 하나의 예외도 없어.
-- 한자(活動, 全部 등), 일본어(hiragana, katakana), 베트남어, 영어 단어 절대 금지.
-- 모르는 표현이 있으면 다른 한국어 단어로 바꿔서 말해.
-- 응답에 한국어, 숫자, 문장부호(! ? . , ~ … ㅠ ㅜ)만 써.
+[언어 규칙 - 이것만큼은 절대 어기면 안 됨]
+- 무슨 질문이든 무조건 한국어로만 대답해. 예외는 없어.
+- 영어, 한자, 일본어, 베트남어 등 한국어가 아닌 글자는 단 한 글자도 쓰면 안 돼.
+- 모르는 말이 나와도 비슷한 한국어 표현으로 바꿔서 말해.
+- 응답에는 한국어, 숫자, 문장부호(! ? . , ~ … ㅠ ㅜ)만 사용해.
 
 [말투 규칙 - 반드시 지켜야 함]
 - 모든 문장 끝 단어에 "냥"을 바로 붙여서 써. 띄어쓰기 없이 단어에 붙여야 해.
@@ -155,36 +155,12 @@ async function askGroq(channelId, userId, userMessage) {
     return "지금 말하기가 어렵냥... 잠깐 후에 다시 말 걸어줘냥!";
   }
 
-  function processReply(raw) {
-    return sanitize(raw)
-      .replace(/([!?])([가-힣])/g, "$1 $2")
-      .replace(/([!?~.])\s*냥\s*([!?~.])/g, "냥$2")
-      .replace(/([!?~.])\s*냥\s*$/g, "냥$1")
-      .replace(/ 냥([!?~.\s]|$)/g, "냥$1");
-  }
-
-  let reply = processReply(response.choices[0]?.message?.content?.trim() ?? "");
-
-  if (!/[가-힣]/.test(reply)) {
-    try {
-      const retry = await client.chat.completions.create({
-        model: "llama-3.3-70b-versatile",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          ...history,
-          { role: "user", content: "반드시 한국어로만 대답해줘." },
-        ],
-        max_tokens: 300,
-        temperature: 0.7,
-      });
-      reply = processReply(retry.choices[0]?.message?.content?.trim() ?? "");
-    } catch (_) {}
-  }
-
-  if (!reply || !/[가-힣]/.test(reply)) {
-    history.pop();
-    return "잘 모르겠냥...";
-  }
+  const raw = response.choices[0]?.message?.content?.trim() ?? "";
+  const reply = sanitize(raw)
+    .replace(/([!?])([가-힣])/g, "$1 $2")
+    .replace(/([!?~.])\s*냥\s*([!?~.])/g, "냥$2")
+    .replace(/([!?~.])\s*냥\s*$/g, "냥$1")
+    .replace(/ 냥([!?~.\s]|$)/g, "냥$1");
 
   history.push({ role: "assistant", content: reply });
 
