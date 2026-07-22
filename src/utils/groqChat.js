@@ -1,4 +1,4 @@
-﻿const Groq = require("groq-sdk");
+const Groq = require("groq-sdk");
 const { containsProfanity } = require("./profanityFilter");
 
 const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
@@ -38,7 +38,7 @@ const SYSTEM_PROMPT = `너는 치유미야. 디스코드 서버에서 활동하�
 
 [언어 규칙 - 절대로 어기면 안 됨]
 - 오직 한국어로만 대답해. 예외는 없어.
-- 한자, 일본어, 영어 단어 절대 금지.
+- 한자, 일본어, 베트남어, 영어 단어 절대 금지.
 - 모르는 표현이 있으면 다른 한국어 단어로 바꿔서 말해.
 - 맞춤법과 띄어쓰기를 정확하게 지켜서 써. 틀린 표현은 올바르게 고쳐서 말해.
 
@@ -93,7 +93,7 @@ function trimHistory(history) {
   while (history.length > MAX_HISTORY) history.splice(0, 2);
 }
 
-const FOREIGN_RE = /[぀-ヿㇰ-ㇿ一-鿿豈-﫿･-ﾟ]/g;
+const FOREIGN_RE = /[Ḁ-ỿ぀-ヿㇰ-ㇿ一-鿿豈-﫿･-ﾟ]/g;
 
 async function askGroq(channelId, userId, userMessage) {
   const isDev = userId === DEVELOPER_ID;
@@ -122,7 +122,7 @@ async function askGroq(channelId, userId, userMessage) {
 
   const raw = response.choices[0]?.message?.content?.trim() ?? "";
   const reply = raw.replace(FOREIGN_RE, "").trim();
-  history.push({ role: "assistant", content: reply });
+  history.push({ role: "assistant", content: raw });
   return reply;
 }
 
