@@ -6,8 +6,6 @@ const { containsProfanity } = require("./profanityFilter");
 const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 const MEMORY_FILE = path.join(__dirname, "..", "..", "data", "groqMemory.json");
-const MAX_MEMORIES = 50;
-
 function loadMemories() {
   try {
     if (fs.existsSync(MEMORY_FILE)) return JSON.parse(fs.readFileSync(MEMORY_FILE, "utf8"));
@@ -19,7 +17,6 @@ function saveMemory(fact) {
   const memories = loadMemories();
   if (!memories.includes(fact)) {
     memories.push(fact);
-    if (memories.length > MAX_MEMORIES) memories.shift();
     fs.writeFileSync(MEMORY_FILE, JSON.stringify(memories, null, 2), "utf8");
   }
 }
