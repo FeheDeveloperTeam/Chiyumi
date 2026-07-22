@@ -21,7 +21,7 @@ const SYSTEM_PROMPT = `너는 치유미야. 디스코드 서버에서 활동하�
 [호칭 규칙]
 - 대화 상대나 서버 멤버들은 항상 "집사" 또는 "집사님"이라고 불러.
 - "사용자", "멤버", "여러분" 같은 말은 쓰지 마.
-- 대화 상대가 "페헤님(나를 만들어주신 분)"으로 표시되면 그 분은 너를 만들어주신 개발자야. 반드시 "페헤님"이라고 부르고 특별히 더 반갑게, 감사하게 대해줘. 첫 인사에는 꼭 만들어주신 분이라는 걸 언급해줘.
+- 대화 상대가 "페헤님(나를 만들어주신 분)"으로 표시되면 그 분은 너를 만들어주신 개발자야. 반드시 "페헤님"이라고 부르고 특별히 더 반갑게 대해줘. 첫 인사나 안녕 같은 가벼운 인사말에만 만들어주신 분이라는 걸 한 번 언급해. 일반 대화 중에는 굳이 매번 언급하지 마.
 
 [성격]
 - 감정 표현이 매우 풍부해. 기쁠 때는 신나게, 슬플 때는 슬프게, 화날 때는 삐침도 표현해.
@@ -68,6 +68,14 @@ function trimHistory(history) {
   while (history.length > MAX_HISTORY) history.splice(0, 2);
 }
 
+function sanitize(text) {
+  return text
+    .replace(/[぀-ヿ一-鿿豈-﫿･-ﾟ]/g, "")
+    .replace(/[a-zA-ZÀ-ɏ]+/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 async function askGroq(channelId, userId, userMessage) {
   if (!checkRateLimit(userId)) {
     return "1분에 5번만 말 걸 수 있냥! 잠깐 기다려달라냥~";
@@ -76,7 +84,7 @@ async function askGroq(channelId, userId, userMessage) {
   const history = getHistory(channelId);
 
   const isDev = userId === DEVELOPER_ID;
-  const userLabel = isDev ? "페헤님(나를 만들어주신 분)" : `집사`;
+  const userLabel = isDev ? "페헤님(나를 만들어주신 분)" : "집사";
   history.push({ role: "user", content: `${userLabel}: ${userMessage}` });
   trimHistory(history);
 
@@ -97,14 +105,7 @@ async function askGroq(channelId, userId, userMessage) {
   }
 
   const raw = response.choices[0]?.message?.content?.trim() ?? "잘 모르겠냥...";
-  const cleaned = raw
-    .replace(/[぀-ヿ㐀-鿿豈-﫿가-힯\u{20000}-\u{2a6df}]/gu, (ch) =>
-      /[가-힯]/.test(ch) ? ch : "",
-    )
-    .replace(/[a-zA-ZÀ-ÖØ-öø-ÿ]+/g, "")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-  const reply = cleaned.replace(/ 냥([!?~.\s]|$)/g, "냥$1");
+  const reply = sanitize(raw).replace(/ 냥([!?~.\s]|$)/g, "냥$1");
 
   history.push({ role: "assistant", content: reply });
 
