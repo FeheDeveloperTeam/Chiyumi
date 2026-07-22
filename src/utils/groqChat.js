@@ -50,12 +50,21 @@ async function askGroq(channelId, userId, userMessage) {
   history.push({ role: "user", content: `${userLabel}: ${userMessage}` });
   trimHistory(history);
 
-  const response = await client.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
-    messages: [{ role: "system", content: SYSTEM_PROMPT }, ...history],
-    max_tokens: 300,
-    temperature: 0.9,
-  });
+  let response;
+  try {
+    response = await client.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...history],
+      max_tokens: 300,
+      temperature: 0.9,
+    });
+  } catch (err) {
+    history.pop();
+    if (err?.status === 429) {
+      return "지금 채팅 한도가 꽉 찼냥... 무료 버전이라 어쩔 수 없냥ㅠ 관리자한테 문의해달라냥!";
+    }
+    return "지금 말하기가 어렵냥... 잠깐 후에 다시 말 걸어줘냥!";
+  }
 
   const raw = response.choices[0]?.message?.content?.trim() ?? "잘 모르겠냥...";
   const reply = raw.replace(/ 냥([!?~.\s]|$)/g, "냥$1");
