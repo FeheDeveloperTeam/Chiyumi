@@ -5,7 +5,7 @@ const { isRealWord } = require("./wordchainDict");
 
 const MIN_PARTY_SIZE = 2;
 const MAX_PARTY_SIZE = 8;
-const TURN_DURATION_MS = 20_000;
+const TURN_DURATION_MS = 15_000;
 const BOT_THINK_DELAY_MS = 1500;
 const THREAD_DELETE_DELAY_MS = 20_000;
 const RESULT_MESSAGE_DELETE_DELAY_MS = 20_000;
