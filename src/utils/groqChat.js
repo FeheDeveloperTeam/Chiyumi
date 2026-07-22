@@ -1,7 +1,28 @@
 const Groq = require("groq-sdk");
+const fs = require("node:fs");
+const path = require("node:path");
 const { containsProfanity } = require("./profanityFilter");
 
 const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+const MEMORY_FILE = path.join(__dirname, "..", "..", "data", "groqMemory.json");
+const MAX_MEMORIES = 50;
+
+function loadMemories() {
+  try {
+    if (fs.existsSync(MEMORY_FILE)) return JSON.parse(fs.readFileSync(MEMORY_FILE, "utf8"));
+  } catch {}
+  return [];
+}
+
+function saveMemory(fact) {
+  const memories = loadMemories();
+  if (!memories.includes(fact)) {
+    memories.push(fact);
+    if (memories.length > MAX_MEMORIES) memories.shift();
+    fs.writeFileSync(MEMORY_FILE, JSON.stringify(memories, null, 2), "utf8");
+  }
+}
 
 const HARMFUL_PATTERNS = [
   "섹", "야동", "포르노", "성관계", "자위", "음란", "성기", "강간", "성폭행",
@@ -97,11 +118,23 @@ function trimHistory(history) {
 
 const FOREIGN_RE = /[a-zA-ZḀ-ỿ぀-ヿㇰ-ㇿ一-鿿豈-﫿･-ﾟ]/g;
 
+const REMEMBER_RE = /기억해\s*(?:둬|줘)/;
+
 async function askGroq(channelId, userId, userMessage) {
   const isDev = userId === DEVELOPER_ID;
 
   if (!checkRateLimit(userId)) return "1분에 5번만 말 걸 수 있냥! 잠깐 기다려달라냥~";
   if (!isDev && isHarmfulInput(userMessage)) return "그런 말은 나한테 하면 안 됩니다냥! 착하게 대화해줘야 한다냥 😾";
+
+  if (REMEMBER_RE.test(userMessage)) {
+    const fact = userMessage.replace(REMEMBER_RE, "").trim().replace(/[,!?~\s]+$/, "").trim();
+    if (fact) saveMemory(fact);
+  }
+
+  const memories = loadMemories();
+  const memoryBlock = memories.length > 0
+    ? `\n\n[기억 - 집사들이 알려준 정보, 대화할 때 자연스럽게 활용해]\n` + memories.map(m => `- ${m}`).join("\n")
+    : "";
 
   const history = getHistory(channelId);
   const userLabel = isDev ? "페헤님" : "집사";
@@ -112,7 +145,7 @@ async function askGroq(channelId, userId, userMessage) {
   try {
     response = await client.chat.completions.create({
       model: "llama-3.3-70b-versatile",
-      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...history],
+      messages: [{ role: "system", content: SYSTEM_PROMPT + memoryBlock }, ...history],
       max_tokens: 300,
       temperature: 0.9,
     });
