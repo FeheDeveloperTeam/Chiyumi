@@ -8,29 +8,9 @@ const { addBalance } = require("../utils/credits");
 const { announceLevelUp } = require("../utils/levelUpAnnounce");
 const { hasAgreed } = require("../utils/consent");
 const { handleMessage: handleWordChainMessage } = require("../utils/wordchainGame");
+const { askGroq } = require("../utils/groqChat");
 
 const CALL_NAME_PATTERN = /^유미야[,!~]?\s*(.*)$/s;
-
-const RULES = [
-  { keywords: ["안녕"], reply: "안녕하세요" },
-  { keywords: ["사랑해"], reply: "저도 사랑해요" },
-  { keywords: ["이름"], reply: "제 이름은 치유미예요" },
-  { keywords: ["코인"], reply: "코인이 궁금하면 /코인 명령어를 사용해보세요" },
-  { keywords: ["고마워", "감사"], reply: "천만에요" },
-  { keywords: ["잘자", "잘 자"], reply: "잘 자요, 좋은 꿈 꿔요" },
-  { keywords: ["뭐해"], reply: "서버를 지키고 있어요" },
-];
-
-const DEFAULT_REPLY = "무슨 말인지 잘 모르겠어요";
-const EMPTY_CALL_REPLY = "네, 불러주셨어요?";
-
-function findReply(message) {
-  const rule = RULES.find(({ keywords }) =>
-    keywords.some((keyword) => message.includes(keyword)),
-  );
-
-  return rule ? rule.reply : DEFAULT_REPLY;
-}
 
 async function handleProfanity(message) {
   await message.delete().catch(() => {});
@@ -132,12 +112,11 @@ module.exports = {
     if (!match) return;
 
     const rest = match[1].trim();
+    const input = rest || "불렀어?";
 
-    if (!rest) {
-      await message.reply(nya(EMPTY_CALL_REPLY));
-      return;
-    }
+    await message.channel.sendTyping().catch(() => {});
 
-    await message.reply(nya(findReply(rest)));
+    const reply = await askGroq(message.channel.id, message.author.id, input).catch(() => "지금 말하기가 어렵냥...");
+    await message.reply(reply);
   },
 };
