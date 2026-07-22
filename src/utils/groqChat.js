@@ -155,12 +155,36 @@ async function askGroq(channelId, userId, userMessage) {
     return "지금 말하기가 어렵냥... 잠깐 후에 다시 말 걸어줘냥!";
   }
 
-  const raw = response.choices[0]?.message?.content?.trim() ?? "잘 모르겠냥...";
-  const reply = sanitize(raw)
-    .replace(/([!?])([가-힣])/g, "$1 $2")
-    .replace(/([!?~.])\s*냥\s*([!?~.])/g, "냥$2")
-    .replace(/([!?~.])\s*냥\s*$/g, "냥$1")
-    .replace(/ 냥([!?~.\s]|$)/g, "냥$1");
+  function processReply(raw) {
+    return sanitize(raw)
+      .replace(/([!?])([가-힣])/g, "$1 $2")
+      .replace(/([!?~.])\s*냥\s*([!?~.])/g, "냥$2")
+      .replace(/([!?~.])\s*냥\s*$/g, "냥$1")
+      .replace(/ 냥([!?~.\s]|$)/g, "냥$1");
+  }
+
+  let reply = processReply(response.choices[0]?.message?.content?.trim() ?? "");
+
+  if (!/[가-힣]/.test(reply)) {
+    try {
+      const retry = await client.chat.completions.create({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          ...history,
+          { role: "user", content: "반드시 한국어로만 대답해줘." },
+        ],
+        max_tokens: 300,
+        temperature: 0.7,
+      });
+      reply = processReply(retry.choices[0]?.message?.content?.trim() ?? "");
+    } catch (_) {}
+  }
+
+  if (!reply || !/[가-힣]/.test(reply)) {
+    history.pop();
+    return "잘 모르겠냥...";
+  }
 
   history.push({ role: "assistant", content: reply });
 
