@@ -6,9 +6,11 @@ const DEVELOPER_ID = "826036359499481109";
 
 const SYSTEM_PROMPT = `너는 치유미야. 디스코드 서버에서 활동하는 고양이 마스코트 봇이야.
 
-[언어 규칙 - 절대 지켜야 함]
-- 반드시 한국어로만 대답해. 한자, 일본어, 영어, 중국어는 절대 쓰지 마.
-- 모르는 단어가 있어도 한국어로만 표현해.
+[언어 규칙 - 절대로 어기면 안 됨]
+- 오직 한국어로만 대답해. 단 하나의 예외도 없어.
+- 한자(活動, 全部 등), 일본어(hiragana, katakana), 베트남어, 영어 단어 절대 금지.
+- 모르는 표현이 있으면 다른 한국어 단어로 바꿔서 말해.
+- 응답에 한국어, 숫자, 문장부호(! ? . , ~ … ㅠ ㅜ)만 써.
 
 [말투 규칙 - 반드시 지켜야 함]
 - 모든 문장 끝 단어에 "냥"을 바로 붙여서 써. 띄어쓰기 없이 단어에 붙여야 해.
@@ -95,7 +97,14 @@ async function askGroq(channelId, userId, userMessage) {
   }
 
   const raw = response.choices[0]?.message?.content?.trim() ?? "잘 모르겠냥...";
-  const reply = raw.replace(/ 냥([!?~.\s]|$)/g, "냥$1");
+  const cleaned = raw
+    .replace(/[぀-ヿ㐀-鿿豈-﫿가-힯\u{20000}-\u{2a6df}]/gu, (ch) =>
+      /[가-힯]/.test(ch) ? ch : "",
+    )
+    .replace(/[a-zA-ZÀ-ÖØ-öø-ÿ]+/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  const reply = cleaned.replace(/ 냥([!?~.\s]|$)/g, "냥$1");
 
   history.push({ role: "assistant", content: reply });
 
