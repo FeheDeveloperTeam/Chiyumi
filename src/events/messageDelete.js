@@ -1,11 +1,18 @@
 const { Events, EmbedBuilder } = require("discord.js");
 const { sendLog, getLogOptions } = require("../utils/guildConfig");
+const { getPartyByMessageId, removeParty } = require("../utils/wordchainGame");
 
 module.exports = {
   name: Events.MessageDelete,
   async execute(message) {
     if (!message.guild) return;
-    if (message.author?.bot) return;
+
+    // 끝말잇기 파티 모집 메시지 삭제 시 파티 자동 해체
+    if (message.author?.bot) {
+      const party = getPartyByMessageId(message.id);
+      if (party) removeParty(party.partyId);
+      return;
+    }
 
     const options = getLogOptions(message.guild.id);
     if (!options.messageDelete) return;

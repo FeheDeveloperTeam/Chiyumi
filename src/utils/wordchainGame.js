@@ -54,6 +54,13 @@ function removeParty(partyId) {
   parties.delete(partyId);
 }
 
+function getPartyByMessageId(messageId) {
+  for (const party of parties.values()) {
+    if (party.messageId === messageId) return party;
+  }
+  return null;
+}
+
 function shuffle(array) {
   const result = [...array];
   for (let i = result.length - 1; i > 0; i -= 1) {
@@ -306,6 +313,7 @@ module.exports = {
   setPartyMessageId,
   joinParty,
   removeParty,
+  getPartyByMessageId,
   startGame,
   handleMessage,
   getGame,
