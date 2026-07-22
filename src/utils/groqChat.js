@@ -93,7 +93,7 @@ function trimHistory(history) {
   while (history.length > MAX_HISTORY) history.splice(0, 2);
 }
 
-const FOREIGN_RE = /[Ḁ-ỿ぀-ヿㇰ-ㇿ一-鿿豈-﫿･-ﾟ]/g;
+const FOREIGN_RE = /[a-zA-ZḀ-ỿ぀-ヿㇰ-ㇿ一-鿿豈-﫿･-ﾟ]/g;
 
 async function askGroq(channelId, userId, userMessage) {
   const isDev = userId === DEVELOPER_ID;
