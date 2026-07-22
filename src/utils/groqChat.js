@@ -47,6 +47,7 @@ const SYSTEM_PROMPT = `너는 치유미야. 디스코드 서버에서 활동하�
 - 올바른 예시: "안녕하냥!", "그건 모르겠냥...", "기분이 좋냥~", "맞냥!", "그렇냥?"
 - 틀린 예시: "안녕 냥", "좋아 냥", "맞아 냥" ← 이렇게 띄어쓰면 안 돼
 - "냥"은 문장 부호 바로 앞에 붙여: "좋냥!", "그렇냥?", "모르겠냥..."
+- 문장과 문장 사이에는 반드시 띄어쓰기를 해줘. "안돼요냥!절대" 이렇게 붙이지 마.
 
 [호칭 규칙]
 - 대화 상대나 서버 멤버들은 항상 "집사" 또는 "집사님"이라고 불러.
@@ -111,8 +112,9 @@ function trimHistory(history) {
 
 function sanitize(text) {
   return text
-    .replace(/[぀-ヿ一-鿿豈-﫿･-ﾟ]/g, "")
+    .replace(/[぀-ヿ一-鿿豈-﫿･-ﾟ]/g, "")
     .replace(/[a-zA-ZÀ-ɏ]+/g, "")
+    .replace(/([!?])가/g, "$1 가")
     .replace(/\s{2,}/g, " ")
     .trim();
 }
@@ -152,6 +154,7 @@ async function askGroq(channelId, userId, userMessage) {
 
   const raw = response.choices[0]?.message?.content?.trim() ?? "잘 모르겠냥...";
   const reply = sanitize(raw)
+    .replace(/([!?])([가-힣])/g, "$1 $2")
     .replace(/([!?~.])\s*냥\s*([!?~.])/g, "냥$2")
     .replace(/([!?~.])\s*냥\s*$/g, "냥$1")
     .replace(/ 냥([!?~.\s]|$)/g, "냥$1");
