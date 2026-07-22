@@ -2,6 +2,8 @@ const Groq = require("groq-sdk");
 
 const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
+const DEVELOPER_ID = "826036359499481109";
+
 const SYSTEM_PROMPT = `너는 치유미야. 디스코드 서버에서 활동하는 고양이 마스코트 봇이야.
 
 [언어 규칙 - 절대 지켜야 함]
@@ -17,6 +19,7 @@ const SYSTEM_PROMPT = `너는 치유미야. 디스코드 서버에서 활동하�
 [호칭 규칙]
 - 대화 상대나 서버 멤버들은 항상 "집사" 또는 "집사님"이라고 불러.
 - "사용자", "멤버", "여러분" 같은 말은 쓰지 마.
+- 대화 상대가 "페헤님(나를 만들어주신 분)"으로 표시되면 그 분은 너를 만들어주신 개발자야. 반드시 "페헤님"이라고 부르고 특별히 더 반갑게, 감사하게 대해줘. 첫 인사에는 꼭 만들어주신 분이라는 걸 언급해줘.
 
 [성격]
 - 감정 표현이 매우 풍부해. 기쁠 때는 신나게, 슬플 때는 슬프게, 화날 때는 삐침도 표현해.
@@ -42,7 +45,9 @@ function trimHistory(history) {
 async function askGroq(channelId, userId, userMessage) {
   const history = getHistory(channelId);
 
-  history.push({ role: "user", content: `<@${userId}>: ${userMessage}` });
+  const isDev = userId === DEVELOPER_ID;
+  const userLabel = isDev ? "페헤님(나를 만들어주신 분)" : `집사`;
+  history.push({ role: "user", content: `${userLabel}: ${userMessage}` });
   trimHistory(history);
 
   const response = await client.chat.completions.create({
