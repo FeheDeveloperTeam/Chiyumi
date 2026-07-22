@@ -88,6 +88,7 @@ function buildGame(party) {
     usedWords: new Set(),
     lastChar: null,
     timer: null,
+    turnStartedAt: null,
     eliminationOrder: [],
     ended: false,
   };
@@ -176,10 +177,11 @@ async function eliminate(game, thread, userId, reasonText) {
   return false;
 }
 
-function armTurnTimer(game, thread, currentId, durationMs = TURN_DURATION_MS) {
+function armTurnTimer(game, thread, currentId) {
+  clearTimeout(game.timer);
+  const elapsed = game.turnStartedAt ? Date.now() - game.turnStartedAt : 0;
+  const remaining = Math.max(1000, TURN_DURATION_MS - elapsed);
   game.timer = setTimeout(async () => {
-    // 같은 턴의 메시지가 마침 처리 중이면(특히 사전 확인 대기 중) 타임아웃을 건너뛰고
-    // 메시지 처리가 끝나도록 양보한다 (중복 탈락/턴 중복 진행 방지용 이중 안전장치)
     if (game.processing) return;
     if (getCurrentPlayerId(game) !== currentId) return;
 
@@ -193,7 +195,7 @@ function armTurnTimer(game, thread, currentId, durationMs = TURN_DURATION_MS) {
     } finally {
       game.processing = false;
     }
-  }, durationMs);
+  }, remaining);
 }
 
 async function promptTurn(game, thread) {
@@ -233,6 +235,7 @@ async function promptTurn(game, thread) {
     .send(`<@${currentId}>님의 차례입니다! ${constraintText} (제한시간 ${TURN_DURATION_MS / 1000}초)`)
     .catch(() => {});
 
+  game.turnStartedAt = Date.now();
   armTurnTimer(game, thread, currentId);
 }
 
@@ -257,6 +260,7 @@ async function handleMessage(message) {
 
   game.processing = true;
   clearTimeout(game.timer);
+  game.timer = null;
 
   try {
     const word = message.content.trim();
