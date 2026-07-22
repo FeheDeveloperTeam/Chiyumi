@@ -35,7 +35,7 @@ async function askGroq(channelId, userId, userMessage) {
   trimHistory(history);
 
   const response = await client.chat.completions.create({
-    model: "meta-llama/llama-4-scout-17b-16e-instruct",
+    model: "llama-3.3-70b-versatile",
     messages: [{ role: "system", content: SYSTEM_PROMPT }, ...history],
     max_tokens: 300,
     temperature: 0.9,
