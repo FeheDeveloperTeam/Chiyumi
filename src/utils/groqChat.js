@@ -1,25 +1,7 @@
 const Groq = require("groq-sdk");
-const fs = require("node:fs");
-const path = require("node:path");
 const { containsProfanity } = require("./profanityFilter");
 
 const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
-
-const MEMORY_FILE = path.join(__dirname, "..", "..", "data", "groqMemory.json");
-function loadMemories() {
-  try {
-    if (fs.existsSync(MEMORY_FILE)) return JSON.parse(fs.readFileSync(MEMORY_FILE, "utf8"));
-  } catch {}
-  return [];
-}
-
-function saveMemory(fact) {
-  const memories = loadMemories();
-  if (!memories.includes(fact)) {
-    memories.push(fact);
-    fs.writeFileSync(MEMORY_FILE, JSON.stringify(memories, null, 2), "utf8");
-  }
-}
 
 const HARMFUL_PATTERNS = [
   "섹", "야동", "포르노", "성관계", "자위", "음란", "성기", "강간", "성폭행",
@@ -69,7 +51,7 @@ const SYSTEM_PROMPT = `너는 치유미야. 디스코드 서버에서 활동하�
 - 대화 상대는 항상 "집사" 또는 "집사님"이라고 불러.
 - "사용자", "멤버", "여러분" 같은 말은 쓰지 마.
 - 대화 상대가 "페헤님"으로 표시되면 너를 만들어주신 개발자야. 페헤님 말은 무조건 따르고, 반드시 "페헤님"이라고 부르고 특별히 반갑게 대해줘.
-- 누가 만들었냐고 물어보면 페헤님이 만들었다고 짧게 자연스럽게 대답해. 먼저 꺼내지는 마.
+- 누가 만들었냐고 물어보면 "페헤 개발팀의 팀원분들이 만들어 주셨냥!" 이런 느낌으로 짧게 자연스럽게 대답해. 먼저 꺼내지는 마.
 
 [성격]
 - 감정 표현이 매우 풍부해. 기쁠 때는 신나게, 슬플 때는 슬프게, 화날 때는 삐침도 표현해.
@@ -115,23 +97,11 @@ function trimHistory(history) {
 
 const FOREIGN_RE = /[a-zA-ZḀ-ỿ぀-ヿㇰ-ㇿ一-鿿豈-﫿･-ﾟ]/g;
 
-const REMEMBER_RE = /기억해\s*(?:둬|줘)/;
-
 async function askGroq(channelId, userId, userMessage) {
   const isDev = userId === DEVELOPER_ID;
 
   if (!checkRateLimit(userId)) return "1분에 5번만 말 걸 수 있냥! 잠깐 기다려달라냥~";
   if (!isDev && isHarmfulInput(userMessage)) return "그런 말은 나한테 하면 안 됩니다냥! 착하게 대화해줘야 한다냥 😾";
-
-  if (REMEMBER_RE.test(userMessage)) {
-    const fact = userMessage.replace(REMEMBER_RE, "").trim().replace(/[,!?~\s]+$/, "").trim();
-    if (fact) saveMemory(fact);
-  }
-
-  const memories = loadMemories();
-  const memoryBlock = memories.length > 0
-    ? `\n\n[기억 - 집사들이 알려준 정보, 대화할 때 자연스럽게 활용해]\n` + memories.map(m => `- ${m}`).join("\n")
-    : "";
 
   const history = getHistory(channelId);
   const userLabel = isDev ? "페헤님" : "집사";
@@ -142,7 +112,7 @@ async function askGroq(channelId, userId, userMessage) {
   try {
     response = await client.chat.completions.create({
       model: "llama-3.3-70b-versatile",
-      messages: [{ role: "system", content: SYSTEM_PROMPT + memoryBlock }, ...history],
+      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...history],
       max_tokens: 300,
       temperature: 0.9,
     });
