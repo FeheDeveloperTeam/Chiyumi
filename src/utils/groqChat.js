@@ -33,6 +33,30 @@ const SYSTEM_PROMPT = `너는 치유미야. 디스코드 서버에서 활동하�
 const histories = new Map();
 const MAX_HISTORY = 20;
 
+const RATE_LIMIT_PER_MIN = 5;
+const userCallCount = new Map();
+
+function checkRateLimit(userId) {
+  if (userId === DEVELOPER_ID) return true;
+
+  const now = Date.now();
+  const entry = userCallCount.get(userId) ?? { count: 0, resetAt: now + 60_000 };
+
+  if (now > entry.resetAt) {
+    entry.count = 0;
+    entry.resetAt = now + 60_000;
+  }
+
+  if (entry.count >= RATE_LIMIT_PER_MIN) {
+    userCallCount.set(userId, entry);
+    return false;
+  }
+
+  entry.count += 1;
+  userCallCount.set(userId, entry);
+  return true;
+}
+
 function getHistory(channelId) {
   if (!histories.has(channelId)) histories.set(channelId, []);
   return histories.get(channelId);
@@ -43,6 +67,10 @@ function trimHistory(history) {
 }
 
 async function askGroq(channelId, userId, userMessage) {
+  if (!checkRateLimit(userId)) {
+    return "1분에 5번만 말 걸 수 있냥! 잠깐 기다려달라냥~";
+  }
+
   const history = getHistory(channelId);
 
   const isDev = userId === DEVELOPER_ID;
