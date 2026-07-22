@@ -172,7 +172,9 @@ async function askGroq(channelId, userId, userMessage) {
     .replace(/([!?~.])\s*냥\s*$/g, "냥$1")
     .replace(/ 냥([!?~.\s]|$)/g, "냥$1");
 
-  history.push({ role: "assistant", content: reply });
+  // raw를 저장해야 AI가 자신의 원본 응답 맥락을 이어받음
+  // sanitized reply를 저장하면 기호만 남은 오염된 history가 쌓임
+  history.push({ role: "assistant", content: raw });
 
   return reply;
 }
