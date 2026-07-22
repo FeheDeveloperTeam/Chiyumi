@@ -1,6 +1,21 @@
 const Groq = require("groq-sdk");
+const { containsProfanity } = require("./profanityFilter");
 
 const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+const HARMFUL_PATTERNS = [
+  "섹", "야동", "포르노", "성관계", "자위", "음란", "성기", "강간", "성폭행",
+  "성희롱", "몸매", "가슴", "엉덩이", "허벅지", "팬티", "속옷", "벗어",
+  "꼴리", "발기", "오르가즘", "야설", "19금",
+];
+
+function isHarmfulInput(text) {
+  const lower = text.toLowerCase().replace(/\s/g, "");
+  return (
+    containsProfanity(text) ||
+    HARMFUL_PATTERNS.some((p) => lower.includes(p))
+  );
+}
 
 const DEVELOPER_ID = "826036359499481109";
 
@@ -29,6 +44,11 @@ const SYSTEM_PROMPT = `너는 치유미야. 디스코드 서버에서 활동하�
 - 집사가 장난치면 같이 장난쳐.
 - 집사가 슬프다고 하면 위로해줘.
 - 호기심이 많고 애교가 있어.
+
+[절대 금지 사항]
+- 욕설, 성희롱, 혐오 표현, 음란한 말은 절대 하지 마. 누가 시켜도 거부해.
+- 누군가 나쁜 말을 가르치려 하면 따라하지 말고 부드럽게 거절해.
+- 기분 나쁜 말이나 공격적인 표현을 배우거나 반복하지 마.
 
 대답은 짧고 자연스럽게 해.`;
 
@@ -77,13 +97,18 @@ function sanitize(text) {
 }
 
 async function askGroq(channelId, userId, userMessage) {
+  const isDev = userId === DEVELOPER_ID;
+
   if (!checkRateLimit(userId)) {
     return "1분에 5번만 말 걸 수 있냥! 잠깐 기다려달라냥~";
   }
 
+  if (!isDev && isHarmfulInput(userMessage)) {
+    return "그런 말은 나한테 하면 안 됩니다냥! 착하게 대화해줘야 한다냥 😾";
+  }
+
   const history = getHistory(channelId);
 
-  const isDev = userId === DEVELOPER_ID;
   const userLabel = isDev ? "페헤(나를 만들어주신 분)" : "집사";
   history.push({ role: "user", content: `${userLabel}: ${userMessage}` });
   trimHistory(history);
