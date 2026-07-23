@@ -48,13 +48,6 @@ module.exports = {
       .setCustomId(`announce-modal:${channel.id}:${mention}`)
       .setTitle("공지 작성");
 
-    const titleInput = new TextInputBuilder()
-      .setCustomId("title")
-      .setLabel("공지 제목 (선택)")
-      .setStyle(TextInputStyle.Short)
-      .setMaxLength(256)
-      .setRequired(false);
-
     const contentInput = new TextInputBuilder()
       .setCustomId("content")
       .setLabel("공지 내용")
@@ -63,7 +56,6 @@ module.exports = {
       .setRequired(true);
 
     modal.addComponents(
-      new ActionRowBuilder().addComponents(titleInput),
       new ActionRowBuilder().addComponents(contentInput),
     );
 

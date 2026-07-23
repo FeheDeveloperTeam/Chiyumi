@@ -4098,7 +4098,6 @@ async function handleAnnounceModal(interaction) {
     .slice(ANNOUNCE_MODAL_PREFIX.length)
     .split(":");
 
-  const title = interaction.fields.getTextInputValue("title").trim();
   const content = interaction.fields.getTextInputValue("content");
 
   const channel = interaction.guild.channels.cache.get(channelId);
@@ -4112,7 +4111,6 @@ async function handleAnnounceModal(interaction) {
   }
 
   const embed = new EmbedBuilder().setDescription(content).setColor(0xe1aa74).setTimestamp();
-  if (title) embed.setTitle(title);
 
   const mentionContent =
     mention === "everyone" ? "@everyone" : mention === "here" ? "@here" : undefined;
