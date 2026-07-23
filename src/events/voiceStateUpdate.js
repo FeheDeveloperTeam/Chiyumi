@@ -29,7 +29,7 @@ module.exports = {
         .setColor(0xe1aa74)
         .setTimestamp();
 
-      await sendLog(guild, embed);
+      await sendLog(guild, embed, "voiceJoin");
       return;
     }
 
@@ -45,7 +45,7 @@ module.exports = {
         .setColor(0xed4245)
         .setTimestamp();
 
-      await sendLog(guild, embed);
+      await sendLog(guild, embed, "voiceLeave");
       return;
     }
 
@@ -66,7 +66,7 @@ module.exports = {
         .setColor(0xe1aa74)
         .setTimestamp();
 
-      await sendLog(guild, embed);
+      await sendLog(guild, embed, "voiceJoin");
     }
   },
 };

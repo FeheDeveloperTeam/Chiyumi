@@ -34,6 +34,6 @@ module.exports = {
       .setColor(0xed4245)
       .setTimestamp();
 
-    await sendLog(message.guild, embed);
+    await sendLog(message.guild, embed, "messageDelete");
   },
 };

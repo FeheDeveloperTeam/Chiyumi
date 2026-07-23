@@ -6,7 +6,7 @@ const {
   SlashCommandBuilder,
 } = require("discord.js");
 const { nya } = require("../utils/nya");
-const { getLogChannelId, getLogOptions } = require("../utils/guildConfig");
+const { getLogChannelId, getLogOptions, getLogTypeChannels } = require("../utils/guildConfig");
 
 const OPTION_DEFS = [
   { key: "messageDelete", label: "메시지 삭제" },
@@ -27,12 +27,16 @@ function chunk(array, size) {
 }
 
 function buildLogContent(guildId) {
-  const channelId = getLogChannelId(guildId);
-  const channelText = channelId ? `<#${channelId}>` : "설정 안 됨";
+  const defaultId = getLogChannelId(guildId);
+  const defaultText = defaultId ? `<#${defaultId}>` : "설정 안 됨";
+  const typeChannels = getLogTypeChannels(guildId);
 
-  return nya(
-    `현재 로그 채널: ${channelText}\n아래 버튼으로 채널과 로그 종류를 설정하세요.`,
-  );
+  const typeLines = OPTION_DEFS.map(({ key, label }) => {
+    const chId = typeChannels[key];
+    return `${label}: ${chId ? `<#${chId}>` : "(기본 채널)"}`;
+  }).join("\n");
+
+  return nya(`기본 채널: ${defaultText}\n\n${typeLines}\n\n아래 버튼으로 채널과 로그 종류를 설정하세요.`);
 }
 
 function buildLogRows(guildId) {
@@ -41,7 +45,11 @@ function buildLogRows(guildId) {
   const topRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("log-action:channel")
-      .setLabel("채널 설정")
+      .setLabel("기본 채널 설정")
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId("log-action:per-channel")
+      .setLabel("채널별 설정")
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId("log-action:test")

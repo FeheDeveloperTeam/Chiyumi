@@ -54,8 +54,27 @@ function setLogOption(guildId, key, enabled) {
   saveAll(configs);
 }
 
-async function sendLog(guild, embed) {
-  const channelId = getLogChannelId(guild.id);
+function setLogTypeChannel(guildId, type, channelId) {
+  const configs = loadAll();
+  const current = configs[guildId] ?? {};
+  configs[guildId] = {
+    ...current,
+    logTypeChannels: { ...(current.logTypeChannels ?? {}), [type]: channelId },
+  };
+  saveAll(configs);
+}
+
+function getLogTypeChannels(guildId) {
+  const configs = loadAll();
+  return configs[guildId]?.logTypeChannels ?? {};
+}
+
+async function sendLog(guild, embed, type = null) {
+  let channelId = null;
+  if (type) {
+    channelId = getLogTypeChannels(guild.id)[type] ?? null;
+  }
+  if (!channelId) channelId = getLogChannelId(guild.id);
   if (!channelId) return;
 
   const channel = guild.channels.cache.get(channelId);
@@ -247,6 +266,8 @@ function getAllConfigs() {
 module.exports = {
   setLogChannel,
   getLogChannelId,
+  setLogTypeChannel,
+  getLogTypeChannels,
   sendLog,
   getLogOptions,
   setLogOption,

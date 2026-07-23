@@ -28,6 +28,6 @@ module.exports = {
       .setColor(0xe1aa74)
       .setTimestamp();
 
-    await sendLog(newMessage.guild, embed);
+    await sendLog(newMessage.guild, embed, "messageEdit");
   },
 };

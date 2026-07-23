@@ -36,7 +36,7 @@ async function handleProfanity(message) {
     .setColor(0xed4245)
     .setTimestamp();
 
-  await sendLog(message.guild, embed);
+  await sendLog(message.guild, embed, "profanityFilter");
 }
 
 async function handleSpam(message) {
@@ -63,7 +63,7 @@ async function handleSpam(message) {
     .setColor(0xed4245)
     .setTimestamp();
 
-  await sendLog(message.guild, embed);
+  await sendLog(message.guild, embed, "spamFilter");
 }
 
 module.exports = {
