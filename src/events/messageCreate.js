@@ -195,20 +195,27 @@ module.exports = {
           buildEarthquakeMapImage().catch((e) => { console.log("[지진/지도] 실패:", e?.message); return null; }),
         ]);
 
-        await message.reply(formatEarthquakeResponse(quakes));
+        // 규모에 따라 색상·제목 결정
+        const hasBig  = quakes.some((q) => q.magnitude >= 4.0);
+        const hasMid  = quakes.some((q) => q.magnitude >= 3.0);
+        const color   = hasBig ? 0xe67e22 : hasMid ? 0xfee75c : 0x57f287;
+        const title   = hasBig ? "⚠️ 지진 발생 현황 (최근 7일)" :
+                        hasMid ? "⚠️ 지진 발생 현황 (최근 7일)" :
+                                 "✅ 지진 발생 현황 (최근 7일)";
 
-        if (mapBuf) {
-          const mapEmbed = new EmbedBuilder()
-            .setColor(0xed4245)
-            .setTitle("🔴 지진 발생 현황 (최근 30일 · 기상청)")
-            .setImage("attachment://earthquake_map.png")
-            .setFooter({ text: "출처: 기상청 지진정보 조회서비스 · CARTO" })
-            .setTimestamp();
-          await message.channel.send({
-            embeds: [mapEmbed],
-            files:  [new AttachmentBuilder(mapBuf, { name: "earthquake_map.png" })],
-          });
-        }
+        const embed = new EmbedBuilder()
+          .setColor(color)
+          .setTitle(title)
+          .setDescription(formatEarthquakeResponse(quakes))
+          .setFooter({ text: "출처: USGS · 기상청 지진정보 조회서비스 · CARTO" })
+          .setTimestamp();
+
+        if (mapBuf) embed.setImage("attachment://earthquake_map.png");
+
+        await message.reply({
+          embeds: [embed],
+          files:  mapBuf ? [new AttachmentBuilder(mapBuf, { name: "earthquake_map.png" })] : [],
+        });
       } catch (err) {
         console.log("[지진] 에러:", err?.message);
         await message.reply("지진 정보를 가져오지 못했냥... 잠깐 후에 다시 물어봐달라냥ㅠ");
