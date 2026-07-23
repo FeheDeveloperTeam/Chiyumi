@@ -191,7 +191,7 @@ module.exports = {
       await message.channel.sendTyping().catch(() => {});
       try {
         const [quakes, mapBuf] = await Promise.all([
-          getRecentEarthquakes(),
+          getRecentEarthquakes().catch((e) => { console.log("[지진/USGS] 실패:", e?.message); return []; }),
           buildEarthquakeMapImage().catch((e) => { console.log("[지진/지도] 실패:", e?.message); return null; }),
         ]);
 

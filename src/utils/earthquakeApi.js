@@ -8,8 +8,12 @@ async function getRecentEarthquakes() {
     `&minlatitude=33&maxlatitude=43&minlongitude=124&maxlongitude=132` +
     `&starttime=${since}`;
 
-  const res  = await fetch(url);
+  const ctrl = new AbortController();
+  const t    = setTimeout(() => ctrl.abort(), 10000);
+  const res  = await fetch(url, { signal: ctrl.signal, headers: { "User-Agent": "ChiyumiBot/1.0" } });
+  clearTimeout(t);
   const json = await res.json();
+  console.log("[지진] USGS 응답:", res.status, "건수:", json?.features?.length ?? 0);
 
   return (json?.features ?? []).map((f) => ({
     magnitude: f.properties.mag,
