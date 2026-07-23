@@ -21,6 +21,7 @@ const { getBalance, getAllBalances, addBalance, setBalance, STARTING_BALANCE } =
 const {
   sendLog,
   setLogChannel,
+  getLogChannelId,
   getLogOptions,
   setLogOption,
   setWelcomeChannel,
@@ -47,7 +48,7 @@ const {
 const { getUserWarnings, addWarning, removeWarning, resetWarnings } = require("../utils/warnData");
 const { buildWarnEmbed, buildWarnRows, formatDuration: warnFormatDuration } = require("../commands/warn");
 const { buildSupportEmbed } = require("../utils/supportInfo");
-const { buildLogContent, buildLogRows } = require("../commands/log");
+const { buildLogContent, buildLogRows, OPTION_DEFS: LOG_OPTION_DEFS } = require("../commands/log");
 const {
   buildFilterEmbed: buildCensorFilterEmbed,
   buildFilterRow: buildCensorFilterRow,
@@ -165,6 +166,7 @@ const VERIFY_MODAL_PREFIX = "verify-modal:";
 const ANNOUNCE_MODAL_PREFIX = "announce-modal:";
 const LOG_ACTION_PREFIX = "log-action:";
 const LOG_TOGGLE_PREFIX = "log-toggle:";
+const LOG_TEST_PREFIX = "log-test:";
 const LOG_CHANNEL_SELECT_ID = "log-channel-select";
 const WELCOME_ACTION_PREFIX = "welcome-action:";
 const WELCOME_TOGGLE_PREFIX = "welcome-toggle:";
@@ -2440,6 +2442,149 @@ async function handleButton(interaction) {
       return;
     }
 
+    if (action === "test") {
+      const testButtons = LOG_OPTION_DEFS.map(({ key, label }) =>
+        new ButtonBuilder()
+          .setCustomId(`${LOG_TEST_PREFIX}${key}`)
+          .setLabel(label)
+          .setStyle(ButtonStyle.Secondary),
+      );
+      const testRows = [];
+      for (let i = 0; i < testButtons.length; i += 5) {
+        testRows.push(new ActionRowBuilder().addComponents(...testButtons.slice(i, i + 5)));
+      }
+      const backRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId("log-action:back")
+          .setLabel("돌아가기")
+          .setStyle(ButtonStyle.Primary),
+      );
+      await interaction.update({
+        content: nya("테스트할 로그 유형을 선택하세요."),
+        components: [...testRows, backRow],
+      });
+      return;
+    }
+
+    if (action === "back") {
+      await interaction.update({
+        content: buildLogContent(interaction.guild.id),
+        components: buildLogRows(interaction.guild.id),
+      });
+      return;
+    }
+
+    return;
+  }
+
+  if (interaction.customId.startsWith(LOG_TEST_PREFIX)) {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({
+        content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const channelId = getLogChannelId(interaction.guild.id);
+    if (!channelId) {
+      await interaction.reply({
+        content: nya("로그 채널이 설정되어 있지 않습니다. 먼저 채널을 설정해주세요."),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const logChannel = interaction.guild.channels.cache.get(channelId);
+    if (!logChannel) {
+      await interaction.reply({
+        content: nya("설정된 로그 채널을 찾을 수 없습니다."),
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const type = interaction.customId.slice(LOG_TEST_PREFIX.length);
+    const user = interaction.user;
+    const channel = interaction.channel;
+    const now = Math.floor(Date.now() / 1000);
+
+    const TEST_SUFFIX = " *(🧪 테스트)*";
+    let embed;
+
+    if (type === "messageDelete") {
+      embed = new EmbedBuilder()
+        .setTitle("메시지 삭제" + TEST_SUFFIX)
+        .addFields(
+          { name: "작성자", value: `${user}`, inline: true },
+          { name: "채널", value: `${channel}`, inline: true },
+          { name: "내용", value: "테스트 메시지입니다." },
+        )
+        .setColor(0xed4245).setTimestamp();
+    } else if (type === "messageEdit") {
+      embed = new EmbedBuilder()
+        .setTitle("메시지 수정" + TEST_SUFFIX)
+        .addFields(
+          { name: "작성자", value: `${user}`, inline: true },
+          { name: "채널", value: `${channel}`, inline: true },
+          { name: "이전 내용", value: "수정 전 메시지입니다." },
+          { name: "변경된 내용", value: "수정 후 메시지입니다." },
+        )
+        .setColor(0xe1aa74).setTimestamp();
+    } else if (type === "voiceJoin") {
+      embed = new EmbedBuilder()
+        .setTitle("음성 채널 입장" + TEST_SUFFIX)
+        .addFields(
+          { name: "사용자", value: `${user}`, inline: true },
+          { name: "채널", value: "(테스트 채널)", inline: true },
+        )
+        .setColor(0xe1aa74).setTimestamp();
+    } else if (type === "voiceLeave") {
+      embed = new EmbedBuilder()
+        .setTitle("음성 채널 퇴장" + TEST_SUFFIX)
+        .addFields(
+          { name: "사용자", value: `${user}`, inline: true },
+          { name: "채널", value: "(테스트 채널)", inline: true },
+        )
+        .setColor(0xed4245).setTimestamp();
+    } else if (type === "profanityFilter") {
+      embed = new EmbedBuilder()
+        .setTitle("욕설 검열" + TEST_SUFFIX)
+        .addFields(
+          { name: "작성자", value: `${user}`, inline: true },
+          { name: "채널", value: `${channel}`, inline: true },
+          { name: "내용", value: "(욕설이 포함된 메시지)" },
+        )
+        .setColor(0xed4245).setTimestamp();
+    } else if (type === "spamFilter") {
+      embed = new EmbedBuilder()
+        .setTitle("도배 검열" + TEST_SUFFIX)
+        .addFields(
+          { name: "작성자", value: `${user}`, inline: true },
+          { name: "채널", value: `${channel}`, inline: true },
+          { name: "내용", value: "(도배 메시지)" },
+        )
+        .setColor(0xed4245).setTimestamp();
+    } else if (type === "warnLog") {
+      embed = new EmbedBuilder()
+        .setTitle("⚠️ 경고 지급" + TEST_SUFFIX)
+        .setThumbnail(user.displayAvatarURL())
+        .addFields(
+          { name: "대상",      value: `${user}`,  inline: true },
+          { name: "현재 경고", value: "**1회**",   inline: true },
+          { name: "담당자",    value: `${user}`,  inline: true },
+          { name: "이유",      value: "테스트" },
+        )
+        .setColor(0xffa500).setTimestamp();
+    }
+
+    if (!embed) return;
+
+    await logChannel.send({ embeds: [embed] }).catch(() => {});
+    await interaction.reply({
+      content: nya(`${logChannel} 채널에 테스트 메시지를 보냈습니다`),
+      ephemeral: true,
+    });
     return;
   }
 

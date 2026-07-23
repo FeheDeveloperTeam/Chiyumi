@@ -38,10 +38,16 @@ function buildLogContent(guildId) {
 function buildLogRows(guildId) {
   const options = getLogOptions(guildId);
 
-  const channelButton = new ButtonBuilder()
-    .setCustomId("log-action:channel")
-    .setLabel("채널 설정")
-    .setStyle(ButtonStyle.Primary);
+  const topRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("log-action:channel")
+      .setLabel("채널 설정")
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId("log-action:test")
+      .setLabel("테스트")
+      .setStyle(ButtonStyle.Secondary),
+  );
 
   const toggleButtons = OPTION_DEFS.map(({ key, label }) =>
     new ButtonBuilder()
@@ -54,10 +60,11 @@ function buildLogRows(guildId) {
     new ActionRowBuilder().addComponents(...group),
   );
 
-  return [new ActionRowBuilder().addComponents(channelButton), ...toggleRows];
+  return [topRow, ...toggleRows];
 }
 
 module.exports = {
+  OPTION_DEFS,
   category: "관리",
   data: new SlashCommandBuilder()
     .setName("log")
