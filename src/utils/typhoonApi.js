@@ -193,53 +193,58 @@ async function getActiveTyphoons() {
   return result;
 }
 
-// ── 응답 포맷 ─────────────────────────────────────────────────
+// ── 임베드 옵션 빌더 ─────────────────────────────────────────
 const TARGET_LABEL = {
   korea: "🇰🇷 한국 방향 ⚠️",
   japan: "🇯🇵 일본 방향",
   china: "🇨🇳 중국 방향",
-  other: "기타 방향",
 };
 
-function formatTyphoonResponse(typhoons) {
-  if (!typhoons.length) {
-    return "현재 한반도 주변 3,500km 이내에 활동 중인 태풍은 없냥! 😸 안전한 날씨다냥~";
-  }
-
-  const koreaBound = typhoons.filter((t) => t.target === "korea");
-  const others     = typhoons.filter((t) => t.target !== "korea");
-
-  const lines = [];
-
-  // 한국 방향 태풍 우선 강조
-  if (koreaBound.length) {
-    lines.push("⚠️ **한국 방향으로 접근 중인 태풍이 있냥!**\n");
-    for (const t of koreaBound) lines.push(typhoonBlock(t));
-  } else {
-    lines.push("✅ **현재 한국 방향으로 오는 태풍은 없냥~**");
-  }
-
-  // 중국·일본 방향 태풍
-  const nearbyOthers = others.filter((t) => t.target === "japan" || t.target === "china");
-  if (nearbyOthers.length) {
-    lines.push(koreaBound.length ? "\n**주변 태풍 현황:**" : "\n**주변 태풍 현황 (참고):**");
-    for (const t of nearbyOthers) lines.push(typhoonBlock(t));
-  }
-
-  lines.push("\n출처: IBTrACS (NOAA) · 6시간 단위 갱신");
-  return lines.join("\n");
-}
-
-function typhoonBlock(t) {
+function typhoonField(t) {
   const name  = t.name ? `태풍 ${t.name}` : "무명 태풍";
-  const dir   = TARGET_LABEL[t.target] ?? "기타";
+  const dir   = TARGET_LABEL[t.target] ?? "기타 방향";
   const arrow = t.movingNorth ? "↑ 북상 중" : "→ 진행 중";
-  return (
-    `\n**🌀 ${name}** (${t.intensity}) — ${dir}\n` +
-    `├ 위치: 북위 ${t.lat.toFixed(1)}° / 동경 ${t.lon.toFixed(1)}°\n` +
-    `├ 최대풍속: ${t.windMs} m/s (${t.windKt}kt) · ${arrow}\n` +
-    `└ 서울까지: 약 ${t.distFromSeoul.toLocaleString()}km`
-  );
+  return {
+    name:  `🌀 ${name} (${t.intensity}) — ${dir}`,
+    value: [
+      `📍 위치: 북위 ${t.lat.toFixed(1)}° / 동경 ${t.lon.toFixed(1)}°`,
+      `💨 최대풍속: ${t.windMs} m/s (${t.windKt}kt) · ${arrow}`,
+      `📏 서울까지: 약 ${t.distFromSeoul.toLocaleString()}km`,
+    ].join("\n"),
+    inline: false,
+  };
 }
 
-module.exports = { getActiveTyphoons, formatTyphoonResponse };
+function buildTyphoonEmbedOptions(typhoons) {
+  if (!typhoons.length) {
+    return {
+      color:       0x57f287,
+      title:       "🌐 서태평양 태풍 현황",
+      description: "현재 한반도 주변 3,500km 이내에 활동 중인 태풍은 없냥! 😸\n안전한 날씨다냥~",
+      fields:      [],
+    };
+  }
+
+  const koreaBound    = typhoons.filter((t) => t.target === "korea");
+  const nearbyOthers  = typhoons.filter((t) => t.target === "japan" || t.target === "china");
+  const fields        = [...koreaBound, ...nearbyOthers].map(typhoonField);
+
+  if (koreaBound.length) {
+    return {
+      color:       0xed4245,
+      title:       "⚠️ 서태평양 태풍 현황",
+      description: "**한국 방향으로 접근 중인 태풍이 있냥!**\n기상 예보를 계속 확인해달라냥!",
+      fields,
+    };
+  }
+
+  return {
+    color:       nearbyOthers.length ? 0xfee75c : 0x57f287,
+    title:       "🌐 서태평양 태풍 현황",
+    description: "현재 한국 방향으로 오는 태풍은 없냥~ ✅" +
+                 (nearbyOthers.length ? "\n아래는 주변 태풍 현황이냥 (참고)" : ""),
+    fields,
+  };
+}
+
+module.exports = { getActiveTyphoons, buildTyphoonEmbedOptions };

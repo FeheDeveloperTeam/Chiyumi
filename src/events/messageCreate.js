@@ -12,7 +12,7 @@ const { askGroq } = require("../utils/groqChat");
 const { getWeather, getWeatherComment } = require("../utils/weatherApi");
 const { buildWeatherCardImage } = require("../utils/weatherCard");
 const { getRecentEarthquakes, formatEarthquakeResponse } = require("../utils/earthquakeApi");
-const { getActiveTyphoons, formatTyphoonResponse } = require("../utils/typhoonApi");
+const { getActiveTyphoons, buildTyphoonEmbedOptions } = require("../utils/typhoonApi");
 const { buildRadarImage } = require("../utils/radarApi");
 
 const CALL_NAME_PATTERN = /^유미야[,!~]?\s*(.*)$/s;
@@ -165,7 +165,15 @@ module.exports = {
       await message.channel.sendTyping().catch(() => {});
       try {
         const typhoons = await getActiveTyphoons();
-        await message.reply(formatTyphoonResponse(typhoons));
+        const opts     = buildTyphoonEmbedOptions(typhoons);
+        const embed    = new EmbedBuilder()
+          .setColor(opts.color)
+          .setTitle(opts.title)
+          .setDescription(opts.description)
+          .setFooter({ text: "출처: IBTrACS (NOAA) · 6시간 단위 갱신" })
+          .setTimestamp();
+        if (opts.fields.length) embed.addFields(opts.fields);
+        await message.reply({ embeds: [embed] });
       } catch (err) {
         console.log("[태풍] 에러:", err?.message);
         await message.reply("태풍 정보를 가져오지 못했냥... 잠깐 후에 다시 물어봐달라냥ㅠ");
