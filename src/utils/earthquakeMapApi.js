@@ -44,46 +44,64 @@ function fmtDate(d) {
 }
 
 async function fetchKmaEarthquakes() {
-  const key     = process.env.KMA_API_KEY ?? "";
-  const today   = new Date();
-  const past30  = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  // serviceKey는 포털에서 받은 값 그대로 사용 (이미 URL 인코딩됨 — encodeURIComponent 금지)
+  const key    = process.env.KMA_API_KEY ?? "";
+  const today  = new Date();
+  const past30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const params = `pageNo=1&numOfRows=100&dataType=JSON&startDt=${fmtDate(past30)}&endDt=${fmtDate(today)}`;
 
-  const url = `https://apis.data.go.kr/1360000/EqkInfoService/getEqkInfoList` +
-              `?serviceKey=${encodeURIComponent(key)}` +
-              `&pageNo=1&numOfRows=100&dataType=JSON` +
-              `&startDt=${fmtDate(past30)}&endDt=${fmtDate(today)}`;
+  // https → http 순서로 시도 (일부 data.go.kr 서비스는 http만 허용)
+  const BASE_URLS = [
+    `https://apis.data.go.kr/1360000/EqkInfoService/getEqkMsg`,
+    `http://apis.data.go.kr/1360000/EqkInfoService/getEqkMsg`,
+  ];
 
-  console.log("[지진지도] KMA API 호출");
-  const ctrl = new AbortController();
-  const t    = setTimeout(() => ctrl.abort(), 10000);
-  const res  = await fetch(url, { signal: ctrl.signal, headers: { "User-Agent": "ChiyumiBot/1.0" } });
-  clearTimeout(t);
+  let lastErr;
+  for (const base of BASE_URLS) {
+    const url = `${base}?serviceKey=${key}&${params}`;
+    console.log("[지진지도] KMA API 호출:", base.replace(/https?:\/\//, ""));
+    try {
+      const ctrl = new AbortController();
+      const t    = setTimeout(() => ctrl.abort(), 10000);
+      const res  = await fetch(url, { signal: ctrl.signal, headers: { "User-Agent": "ChiyumiBot/1.0" } });
+      clearTimeout(t);
 
-  const text = await res.text();
-  let json;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    console.log("[지진지도] KMA 비JSON 응답 (HTTP", res.status, "):", text.slice(0, 120));
-    throw new Error(`KMA 비JSON 응답: ${text.slice(0, 80)}`);
+      const text = await res.text();
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        console.log("[지진지도] KMA 비JSON 응답 (HTTP", res.status, "):", text.slice(0, 120));
+        lastErr = new Error(`KMA 비JSON 응답: ${text.slice(0, 80)}`);
+        continue;
+      }
+
+      const code = json?.response?.header?.resultCode;
+      console.log("[지진지도] KMA 응답 코드:", code, "HTTP:", res.status);
+
+      if (!res.ok || (code && code !== "00")) {
+        lastErr = new Error(`KMA 오류 resultCode=${code} HTTP=${res.status}`);
+        continue;
+      }
+
+      const items = json?.response?.body?.items?.item ?? [];
+      const list  = Array.isArray(items) ? items : [items];
+
+      // getEqkMsg 필드명 (eqLat/eqLon/...) 과 구형 필드명 (lat/lon/...) 모두 처리
+      return list.map((item) => ({
+        lat:  parseFloat(item.eqLat  ?? item.lat),
+        lon:  parseFloat(item.eqLon  ?? item.lon),
+        mag:  parseFloat(item.eqMag  ?? item.mag),
+        dep:  parseFloat(item.eqDep  ?? item.dep ?? 0),
+        loc:  item.eqArea ?? item.loc ?? "",
+        time: item.eqKiDate ?? item.tmEqk ?? "",
+      })).filter((e) => !isNaN(e.lat) && !isNaN(e.lon) && e.mag >= 1.0);
+    } catch (e) {
+      console.log("[지진지도] KMA 요청 실패:", e?.message);
+      lastErr = e;
+    }
   }
-  if (!res.ok) {
-    console.log("[지진지도] KMA HTTP 오류:", res.status, JSON.stringify(json).slice(0, 120));
-    throw new Error(`KMA HTTP ${res.status}`);
-  }
-  console.log("[지진지도] KMA 응답 코드:", json?.response?.header?.resultCode);
-
-  const items = json?.response?.body?.items?.item ?? [];
-  const list  = Array.isArray(items) ? items : [items]; // 1건이면 객체로 오는 경우 대비
-
-  return list.map((item) => ({
-    lat:  parseFloat(item.lat),
-    lon:  parseFloat(item.lon),
-    mag:  parseFloat(item.mag),
-    dep:  parseFloat(item.dep ?? 0),
-    loc:  item.loc ?? "",
-    time: item.tmEqk ?? "", // YYYYMMDDHHMMSS
-  })).filter((e) => !isNaN(e.lat) && !isNaN(e.lon) && e.mag >= 1.0);
+  throw lastErr ?? new Error("KMA 모든 엔드포인트 실패");
 }
 
 async function safeTile(url) {
