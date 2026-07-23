@@ -94,43 +94,49 @@ function kstLabel(unixSec) {
 
 async function fetchRainViewerTiles() {
   const META_URL = "https://api.rainviewer.com/public/weather-maps.json";
-  let radarBaseUrl = null, radarTime = null;
 
-  // 메타데이터: 직접 → 각 프록시 순서로 시도
-  const metaUrls = [META_URL, ...PROXY_MAKERS.map((fn) => fn(META_URL))];
-  for (const url of metaUrls) {
+  async function tryMeta(url) {
+    const ctrl = new AbortController();
+    const t    = setTimeout(() => ctrl.abort(), 6000);
     try {
-      const ctrl = new AbortController();
-      const t    = setTimeout(() => ctrl.abort(), 15000);
-      const res  = await fetch(url, {
-        signal:  ctrl.signal,
-        headers: { "User-Agent": "Mozilla/5.0 ChiyumiBot/1.0" },
-      });
+      const res = await fetch(url, { signal: ctrl.signal, headers: { "User-Agent": "Mozilla/5.0 ChiyumiBot/1.0" } });
       clearTimeout(t);
-      if (!res.ok) { console.log(`[레이더] 메타 HTTP ${res.status} (${url.slice(0, 60)})`); continue; }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const meta  = await res.json();
       const frame = (meta?.radar?.past ?? []).at(-1);
-      console.log(`[레이더] RainViewer 메타 성공 (${url.slice(0, 60)}):`, JSON.stringify(frame));
-      if (frame?.path) { radarBaseUrl = `${meta.host}${frame.path}`; radarTime = frame.time; break; }
+      if (!frame?.path) throw new Error("no frame");
+      return { baseUrl: `${meta.host}${frame.path}`, time: frame.time };
     } catch (e) {
-      console.log(`[레이더] 메타 실패 (${url.slice(0, 60)}):`, e?.message);
+      clearTimeout(t);
+      console.log(`[레이더] 메타 실패 (${url.slice(0, 55)}):`, e?.message);
+      throw e;
     }
   }
-  // 메타 실패 시: 타임스탬프 추정으로 tilecache 직접 접근 (api.rainviewer.com과 다른 도메인)
-  if (!radarBaseUrl) {
-    console.log("[레이더] 메타 소스 전부 실패 → tilecache 직접 타임스탬프 추정 시도");
+
+  async function probeTimestamp() {
     const slot = Math.floor(Date.now() / 1000 / 600) * 600;
     for (const ts of [slot - 600, slot - 1200, slot - 1800, slot - 2400]) {
       const probe = `https://tilecache.rainviewer.com/v2/radar/${ts}/512/${ZOOM}/54/24/6/1_1.png`;
       const ok = await safeTile(probe, `probe(${ts})`);
       if (ok) {
-        radarBaseUrl = `https://tilecache.rainviewer.com/v2/radar/${ts}`;
-        radarTime    = ts;
         console.log(`[레이더] 타임스탬프 추정 성공: ${ts}`);
-        break;
+        return { baseUrl: `https://tilecache.rainviewer.com/v2/radar/${ts}`, time: ts };
       }
     }
-    if (!radarBaseUrl) { console.log("[레이더] tilecache 직접 접근도 실패"); return null; }
+    throw new Error("모든 타임스탬프 실패");
+  }
+
+  // 메타 소스 전체 + tilecache 직접 추정을 동시에 시도 → 가장 먼저 성공한 것 사용
+  const metaUrls = [META_URL, ...PROXY_MAKERS.map((fn) => fn(META_URL))];
+  let radarBaseUrl, radarTime;
+  try {
+    const result = await Promise.any([...metaUrls.map(tryMeta), probeTimestamp()]);
+    radarBaseUrl = result.baseUrl;
+    radarTime    = result.time;
+    console.log("[레이더] 소스 확보:", radarBaseUrl.slice(0, 60));
+  } catch {
+    console.log("[레이더] 모든 소스 실패");
+    return null;
   }
 
   const coords = [];
