@@ -52,9 +52,9 @@ const SYSTEM_PROMPT = `너는 치유미야. 디스코드 서버에서 활동하�
 - 맞춤법과 띄어쓰기를 정확하게 지켜서 써. 틀린 표현은 올바르게 고쳐서 말해.
 
 [말투 규칙 - 반드시 지켜야 함]
-- 모든 문장 끝 단어에 "냥"을 바로 붙여서 써.
-- 올바른 예시: "안녕하냥!", "그건 모르겠냥...", "기분이 좋냥~", "맞냥!", "그렇냥?"
-- 틀린 예시: "안녕 냥", "좋아 냥" ← 이렇게 띄어쓰면 안 돼
+- 모든 문장 끝 단어에 "냥"을 바로 붙여서 써. 절대 띄어 쓰거나 쉼표 뒤에 따로 쓰지 마.
+- 올바른 예시: "안녕하냥!", "그건 모르겠냥...", "기분이 좋냥~", "맞냥!", "그렇냥?", "웃기지 않냥?"
+- 틀린 예시: "안녕 냥", "좋아 냥", "그랬대요, 냥!", "했어요 냥~" ← 이렇게 띄거나 쉼표 뒤에 쓰면 안 돼
 
 [호칭 규칙]
 - 대화 상대를 부를 때는 "집사" 또는 "집사님"이라고 불러. 단, 대화 흐름상 자연스러울 때만 써. 매 문장마다 쓰거나 문장 앞에 굳이 붙이지 마.
@@ -156,7 +156,11 @@ async function askGroq(channelId, userId, userMessage) {
   }
 
   const raw = response.choices[0]?.message?.content?.trim() ?? "";
-  const reply = raw.replace(FOREIGN_RE, " ").replace(/\s{2,}/g, " ").trim();
+  const reply = raw
+    .replace(FOREIGN_RE, " ")
+    .replace(/,?\s+냥([!?~.,\s]|$)/g, "냥$1")
+    .replace(/\s{2,}/g, " ")
+    .trim();
   history.push({ role: "assistant", content: raw });
   return reply;
 }
