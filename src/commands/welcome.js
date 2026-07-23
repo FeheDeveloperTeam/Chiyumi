@@ -86,7 +86,18 @@ function buildWelcomeRows(guildId) {
     ),
   );
 
-  return [row1, row2, row3];
+  const row4 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("welcome-action:test-join")
+      .setLabel("입장 테스트")
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId("welcome-action:test-leave")
+      .setLabel("퇴장 테스트")
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  return [row1, row2, row3, row4];
 }
 
 module.exports = {

@@ -24,6 +24,7 @@ const {
   getLogOptions,
   setLogOption,
   setWelcomeChannel,
+  getWelcomeChannelId,
   getWelcomeOptions,
   setWelcomeOption,
   setWelcomeMessage,
@@ -52,6 +53,7 @@ const {
   buildFilterRow: buildCensorFilterRow,
 } = require("../commands/censor");
 const { buildWelcomeEmbed, buildWelcomeRows } = require("../commands/welcome");
+const { formatWelcomeMessage } = require("../utils/welcomeFormat");
 const { getCommandsByCategory, buildCategoryEmbed } = require("../commands/help");
 const { buildLevelUpEmbed, buildLevelUpRow } = require("../commands/rank");
 const { buildTicketEmbed, buildTicketRow } = require("../commands/ticket");
@@ -2492,6 +2494,78 @@ async function handleButton(interaction) {
     if (action === "join-message" || action === "leave-message") {
       const type = action === "join-message" ? "join" : "leave";
       await showWelcomeMessageModal(interaction, type);
+      return;
+    }
+
+    if (action === "test-join" || action === "test-leave") {
+      const channelId = getWelcomeChannelId(interaction.guild.id);
+      if (!channelId) {
+        await interaction.reply({
+          content: nya("채널이 설정되어 있지 않습니다. 먼저 채널을 설정해주세요."),
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const channel = interaction.guild.channels.cache.get(channelId);
+      if (!channel) {
+        await interaction.reply({
+          content: nya("설정된 채널을 찾을 수 없습니다."),
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const isJoin = action === "test-join";
+      const options = getWelcomeOptions(interaction.guild.id);
+      const template = getWelcomeMessage(interaction.guild.id, isJoin ? "join" : "leave");
+      const description = formatWelcomeMessage(template, {
+        user: interaction.user,
+        guild: interaction.guild,
+      }) + " *(🧪 테스트)*";
+
+      const embed = new EmbedBuilder()
+        .setDescription(description)
+        .setThumbnail(interaction.user.displayAvatarURL())
+        .setColor(isJoin ? 0xe1aa74 : 0xed4245)
+        .setTimestamp();
+
+      const now = Math.floor(Date.now() / 1000);
+      const fields = [];
+      if (options.showCreatedAt) {
+        fields.push({
+          name: "📅 계정 생성일",
+          value: `<t:${Math.floor(interaction.user.createdTimestamp / 1000)}:F>`,
+          inline: true,
+        });
+      }
+      if (options.showJoinedAt) {
+        fields.push({
+          name: "🚪 서버 입장일",
+          value: `<t:${now}:F>`,
+          inline: true,
+        });
+      }
+      if (isJoin && options.showInviter) {
+        fields.push({ name: "📨 초대자", value: "(테스트)", inline: true });
+      }
+      if (!isJoin && options.showLeftAt) {
+        fields.push({ name: "👋 퇴장 일시", value: `<t:${now}:F>`, inline: true });
+      }
+      if (options.showMemberCount) {
+        fields.push({
+          name: "👥 현재 인원",
+          value: `${interaction.guild.memberCount}명`,
+          inline: true,
+        });
+      }
+      if (fields.length) embed.addFields(fields);
+
+      await channel.send({ embeds: [embed] }).catch(() => {});
+      await interaction.reply({
+        content: nya(`${channel} 채널에 테스트 메시지를 보냈습니다`),
+        ephemeral: true,
+      });
       return;
     }
 
