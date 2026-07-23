@@ -121,21 +121,31 @@ async function getWeather(cityQuery) {
   const { base_date, base_time } = getBaseDateTime();
   const key = process.env.KMA_API_KEY;
 
-  const params = new URLSearchParams({
-    serviceKey: key,
-    pageNo: "1",
-    numOfRows: "100",
-    dataType: "JSON",
-    base_date,
-    base_time,
-    nx: String(city.nx),
-    ny: String(city.ny),
-  });
+  // serviceKey는 URLSearchParams 없이 직접 삽입 (이중 인코딩 방지)
+  const url =
+    `https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst` +
+    `?serviceKey=${encodeURIComponent(key)}` +
+    `&pageNo=1&numOfRows=100&dataType=JSON` +
+    `&base_date=${base_date}&base_time=${base_time}` +
+    `&nx=${city.nx}&ny=${city.ny}`;
 
-  const res = await fetch(
-    `https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst?${params}`,
-  );
-  const json = await res.json();
+  const res  = await fetch(url);
+  const text = await res.text();
+
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    // XML 오류 응답인 경우 — 로그로 내용 확인
+    console.error("[날씨 API] JSON 파싱 실패, 응답 내용:", text.slice(0, 500));
+    throw new Error("KMA API가 JSON이 아닌 응답을 반환했습니다");
+  }
+
+  const resultCode = json?.response?.header?.resultCode;
+  if (resultCode && resultCode !== "00") {
+    console.error("[날씨 API] 오류 코드:", resultCode, json?.response?.header?.resultMsg);
+    throw new Error(`KMA API 오류: ${resultCode}`);
+  }
 
   const items = json?.response?.body?.items?.item;
   if (!Array.isArray(items)) return null;
