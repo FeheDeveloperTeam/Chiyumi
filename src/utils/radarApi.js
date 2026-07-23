@@ -16,7 +16,10 @@ const IMG_H  = TS * TILE_H.length;
 const OUT_W  = 900;
 const OUT_H  = 900;
 
-const PROXY = "https://cors.eu.org/";
+const PROXIES = [
+  "https://cors.eu.org/",
+  "https://corsproxy.io/?",
+];
 
 function kstStr(offsetMin = 0) {
   const d   = new Date(Date.now() - offsetMin * 60 * 1000 + 9 * 60 * 60 * 1000);
@@ -89,7 +92,9 @@ async function fetchRainViewerTiles() {
   const META_URL = "https://api.rainviewer.com/public/weather-maps.json";
   let radarBaseUrl = null, radarTime = null;
 
-  for (const url of [META_URL, PROXY + META_URL]) {
+  // 메타데이터: 직접 → 각 프록시 순서로 시도
+  for (const prefix of ["", ...PROXIES]) {
+    const url = prefix + META_URL;
     try {
       const ctrl = new AbortController();
       const t    = setTimeout(() => ctrl.abort(), 8000);
@@ -100,10 +105,10 @@ async function fetchRainViewerTiles() {
       clearTimeout(t);
 
       const frame = (meta?.radar?.past ?? []).at(-1);
-      console.log(`[레이더] RainViewer 메타 (${url.includes("cors") ? "프록시" : "직접"}):`, JSON.stringify(frame));
+      console.log(`[레이더] RainViewer 메타 (${prefix || "직접"}):`, JSON.stringify(frame));
       if (frame?.path) { radarBaseUrl = `${meta.host}${frame.path}`; radarTime = frame.time; break; }
     } catch (e) {
-      console.log(`[레이더] RainViewer 메타 실패:`, e?.message);
+      console.log(`[레이더] RainViewer 메타 실패 (${prefix || "직접"}):`, e?.message);
     }
   }
   if (!radarBaseUrl) return null;
@@ -111,18 +116,28 @@ async function fetchRainViewerTiles() {
   const coords = [];
   for (const y of TILE_H) for (const x of TILE_W) coords.push([x, y]);
 
-  const [baseTiles, radarTiles] = await Promise.all([
-    Promise.all(coords.map(([x, y]) =>
+  const baseTiles = await Promise.all(
+    coords.map(([x, y]) =>
       safeTile(`https://basemaps.cartocdn.com/dark_all/${ZOOM}/${x}/${y}.png`, `base(${x},${y})`)
-    )),
-    Promise.all(coords.map(([x, y]) =>
-      safeTile(`${PROXY}${radarBaseUrl}/512/${ZOOM}/${x}/${y}/6/1_1.png`, `radar(${x},${y})`)
-    )),
-  ]);
+    )
+  );
 
-  const radarLoaded = radarTiles.filter(Boolean).length;
-  console.log(`[레이더] base=${baseTiles.filter(Boolean).length}/9, radar=${radarLoaded}/9`);
+  // 타일: 프록시 순서대로 시도, 하나라도 성공하면 그걸 사용
+  let radarTiles = [];
+  let radarLoaded = 0;
+  for (const proxy of PROXIES) {
+    const tiles = await Promise.all(
+      coords.map(([x, y]) =>
+        safeTile(`${proxy}${radarBaseUrl}/512/${ZOOM}/${x}/${y}/6/1_1.png`, `radar(${x},${y})`)
+      )
+    );
+    const loaded = tiles.filter(Boolean).length;
+    console.log(`[레이더] 타일 시도 (${proxy}): ${loaded}/9`);
+    if (loaded > radarLoaded) { radarTiles = tiles; radarLoaded = loaded; }
+    if (loaded >= 5) break; // 절반 이상 성공이면 충분
+  }
 
+  console.log(`[레이더] 최종 base=${baseTiles.filter(Boolean).length}/9, radar=${radarLoaded}/9`);
   return { type: "rainviewer", baseTiles, radarTiles, coords, radarTime, radarLoaded };
 }
 
