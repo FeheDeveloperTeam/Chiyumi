@@ -11,6 +11,7 @@ const { handleMessage: handleWordChainMessage } = require("../utils/wordchainGam
 const { askGroq } = require("../utils/groqChat");
 const { getWeather, getWeatherComment } = require("../utils/weatherApi");
 const { buildWeatherCardImage } = require("../utils/weatherCard");
+const { getRecentEarthquakes, formatEarthquakeResponse } = require("../utils/earthquakeApi");
 
 const CALL_NAME_PATTERN = /^유미야[,!~]?\s*(.*)$/s;
 
@@ -126,6 +127,19 @@ module.exports = {
 
     const rest = match[1].trim();
     const input = rest || "불렀어?";
+
+    // --- 지진 처리 ---
+    if (input.includes("지진")) {
+      await message.channel.sendTyping().catch(() => {});
+      try {
+        const quakes = await getRecentEarthquakes();
+        await message.reply(formatEarthquakeResponse(quakes));
+      } catch (err) {
+        console.log("[지진] 에러:", err?.message);
+        await message.reply("지진 정보를 가져오지 못했냥... 잠깐 후에 다시 물어봐달라냥ㅠ");
+      }
+      return;
+    }
 
     // --- 날씨 처리 ---
     if (input.includes("날씨")) {

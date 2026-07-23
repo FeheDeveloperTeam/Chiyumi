@@ -1,8 +1,6 @@
 // Open-Meteo API 사용 (무료, API 키 불필요)
-// https://open-meteo.com/
 
 const CITIES = {
-  // 특별시·광역시
   "서울":   { lat: 37.5665, lon: 126.9780, name: "서울" },
   "부산":   { lat: 35.1796, lon: 129.0756, name: "부산" },
   "인천":   { lat: 37.4563, lon: 126.7052, name: "인천" },
@@ -11,7 +9,6 @@ const CITIES = {
   "광주":   { lat: 35.1595, lon: 126.8526, name: "광주" },
   "울산":   { lat: 35.5384, lon: 129.3114, name: "울산" },
   "세종":   { lat: 36.4804, lon: 127.2890, name: "세종" },
-  // 경기
   "수원":   { lat: 37.2636, lon: 127.0286, name: "수원" },
   "성남":   { lat: 37.4449, lon: 127.1388, name: "성남" },
   "고양":   { lat: 37.6583, lon: 126.8320, name: "고양" },
@@ -35,7 +32,6 @@ const CITIES = {
   "구리":   { lat: 37.5943, lon: 127.1293, name: "구리" },
   "양주":   { lat: 37.7854, lon: 127.0456, name: "양주" },
   "포천":   { lat: 37.8944, lon: 127.2006, name: "포천" },
-  // 충청
   "천안":   { lat: 36.8151, lon: 127.1139, name: "천안" },
   "청주":   { lat: 36.6424, lon: 127.4890, name: "청주" },
   "충주":   { lat: 36.9908, lon: 127.9260, name: "충주" },
@@ -43,7 +39,6 @@ const CITIES = {
   "공주":   { lat: 36.4465, lon: 127.1190, name: "공주" },
   "논산":   { lat: 36.1869, lon: 127.0990, name: "논산" },
   "제천":   { lat: 37.1328, lon: 128.1907, name: "제천" },
-  // 전라
   "전주":   { lat: 35.8242, lon: 127.1480, name: "전주" },
   "군산":   { lat: 35.9676, lon: 126.7368, name: "군산" },
   "익산":   { lat: 35.9483, lon: 126.9574, name: "익산" },
@@ -51,7 +46,6 @@ const CITIES = {
   "여수":   { lat: 34.7604, lon: 127.6622, name: "여수" },
   "순천":   { lat: 34.9506, lon: 127.4873, name: "순천" },
   "광양":   { lat: 34.9404, lon: 127.6964, name: "광양" },
-  // 경상
   "포항":   { lat: 36.0190, lon: 129.3435, name: "포항" },
   "창원":   { lat: 35.2285, lon: 128.6811, name: "창원" },
   "구미":   { lat: 36.1196, lon: 128.3444, name: "구미" },
@@ -64,7 +58,6 @@ const CITIES = {
   "영주":   { lat: 36.8056, lon: 128.6239, name: "영주" },
   "상주":   { lat: 36.4108, lon: 128.1591, name: "상주" },
   "밀양":   { lat: 35.5038, lon: 128.7458, name: "밀양" },
-  // 강원
   "춘천":   { lat: 37.8813, lon: 127.7298, name: "춘천" },
   "강릉":   { lat: 37.7519, lon: 128.8760, name: "강릉" },
   "원주":   { lat: 37.3422, lon: 127.9202, name: "원주" },
@@ -76,7 +69,6 @@ const CITIES = {
   "횡성":   { lat: 37.4919, lon: 127.9843, name: "횡성" },
   "평창":   { lat: 37.3722, lon: 128.3908, name: "평창" },
   "정선":   { lat: 37.3799, lon: 128.6604, name: "정선" },
-  // 제주
   "제주":   { lat: 33.4996, lon: 126.5312, name: "제주" },
   "서귀포": { lat: 33.2541, lon: 126.5600, name: "서귀포" },
 };
@@ -86,19 +78,18 @@ function findCity(query) {
   return CITIES[q] ?? CITIES[query.trim()] ?? null;
 }
 
-// Open-Meteo weather_code → 카드용 sky/pty 값으로 변환
 function weatherCodeToCondition(code) {
-  if (code === 0 || code === 1)              return { sky: 1, pty: 0 }; // 맑음
-  if (code === 2)                            return { sky: 3, pty: 0 }; // 구름많음
-  if (code === 3 || code === 45 || code === 48) return { sky: 4, pty: 0 }; // 흐림
-  if (code >= 51 && code <= 55)             return { sky: 4, pty: 1 }; // 이슬비
-  if (code === 56 || code === 57)           return { sky: 4, pty: 2 }; // 어는비/눈
-  if (code >= 61 && code <= 65)            return { sky: 4, pty: 1 }; // 비
-  if (code === 66 || code === 67)           return { sky: 4, pty: 2 }; // 어는비
-  if (code >= 71 && code <= 77)            return { sky: 4, pty: 3 }; // 눈
-  if (code >= 80 && code <= 82)            return { sky: 4, pty: 4 }; // 소나기
-  if (code === 85 || code === 86)           return { sky: 4, pty: 3 }; // 눈 소나기
-  if (code >= 95)                           return { sky: 4, pty: 1 }; // 뇌우
+  if (code === 0 || code === 1)                return { sky: 1, pty: 0 };
+  if (code === 2)                              return { sky: 3, pty: 0 };
+  if (code === 3 || code === 45 || code === 48) return { sky: 4, pty: 0 };
+  if (code >= 51 && code <= 55)               return { sky: 4, pty: 1 };
+  if (code === 56 || code === 57)             return { sky: 4, pty: 2 };
+  if (code >= 61 && code <= 65)              return { sky: 4, pty: 1 };
+  if (code === 66 || code === 67)             return { sky: 4, pty: 2 };
+  if (code >= 71 && code <= 77)              return { sky: 4, pty: 3 };
+  if (code >= 80 && code <= 82)              return { sky: 4, pty: 4 };
+  if (code === 85 || code === 86)             return { sky: 4, pty: 3 };
+  if (code >= 95)                             return { sky: 4, pty: 1 };
   return { sky: 1, pty: 0 };
 }
 
@@ -115,27 +106,37 @@ async function getWeather(cityQuery) {
   const city = findCity(cityQuery);
   if (!city) return null;
 
-  const url =
+  const weatherUrl =
     `https://api.open-meteo.com/v1/forecast` +
     `?latitude=${city.lat}&longitude=${city.lon}` +
-    `&current=temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation_probability,weather_code` +
-    `&timezone=Asia%2FSeoul`;
+    `&current=temperature_2m,apparent_temperature,relative_humidity_2m` +
+    `,wind_speed_10m,wind_gusts_10m,precipitation_probability,weather_code` +
+    `&wind_speed_unit=ms&timezone=Asia%2FSeoul`;
 
-  const res  = await fetch(url);
-  const json = await res.json();
+  const aqUrl =
+    `https://air-quality-api.open-meteo.com/v1/air-quality` +
+    `?latitude=${city.lat}&longitude=${city.lon}` +
+    `&current=pm2_5&timezone=Asia%2FSeoul`;
 
-  const cur = json?.current;
+  const [weatherRes, aqRes] = await Promise.all([fetch(weatherUrl), fetch(aqUrl)]);
+  const [weatherJson, aqJson] = await Promise.all([weatherRes.json(), aqRes.json()]);
+
+  const cur = weatherJson?.current;
   if (!cur) return null;
 
+  const pm25 = Math.round(aqJson?.current?.pm2_5 ?? -1);
   const { sky, pty } = weatherCodeToCondition(cur.weather_code ?? 0);
   const { fcstDate, fcstTime } = getNowKST();
 
   return {
-    cityName:    city.name,
-    temperature: Math.round(cur.temperature_2m ?? 0).toString(),
-    humidity:    Math.round(cur.relative_humidity_2m ?? 0).toString(),
-    windSpeed:   (cur.wind_speed_10m ?? 0).toFixed(1),
-    precipProb:  Math.round(cur.precipitation_probability ?? 0).toString(),
+    cityName:     city.name,
+    temperature:  Math.round(cur.temperature_2m ?? 0).toString(),
+    apparentTemp: Math.round(cur.apparent_temperature ?? 0).toString(),
+    humidity:     Math.round(cur.relative_humidity_2m ?? 0).toString(),
+    windSpeed:    (cur.wind_speed_10m  ?? 0).toFixed(1),
+    windGust:     (cur.wind_gusts_10m  ?? 0).toFixed(1),
+    precipProb:   Math.round(cur.precipitation_probability ?? 0).toString(),
+    pm25,
     sky,
     pty,
     fcstDate,
@@ -145,24 +146,48 @@ async function getWeather(cityQuery) {
 
 function getWeatherComment(weather) {
   const temp = parseInt(weather.temperature);
-  const { pty, sky, cityName } = weather;
+  const { pty, sky, cityName, windGust, pm25 } = weather;
+  const gust = parseFloat(windGust);
 
   let cond;
-  if      (pty === 3)               cond = `오늘 ${cityName}에 눈이 내리냥~! ❄️`;
+  if      (gust >= 25)              cond = `🚨 오늘 ${cityName} 강한 태풍급 강풍이냥!! 절대 외출하지 말라냥!`;
+  else if (gust >= 17)              cond = `⚠️ 오늘 ${cityName} 태풍급 강풍이냥! 외출 자제해달라냥!`;
+  else if (gust >= 14)              cond = `오늘 ${cityName} 강풍 주의냥... 💨 바람 세냥!`;
+  else if (pty === 3)               cond = `오늘 ${cityName}에 눈이 내리냥~! ❄️`;
   else if (pty === 2)               cond = `오늘 ${cityName}에 비와 눈이 같이 오냥... 🌨️`;
   else if (pty === 1 || pty === 4)  cond = `오늘 ${cityName}에 비가 오냥... ☔`;
   else if (sky === 4)               cond = `오늘 ${cityName} 하늘이 흐리냥 ☁️`;
   else if (sky === 3)               cond = `오늘 ${cityName} 구름이 좀 있냥 ⛅`;
   else                              cond = `오늘 ${cityName} 날씨 맑냥! ☀️`;
 
+  // 날씨 상황에 맞는 온도 코멘트
   let tempComment;
-  if      (temp <= 0)  tempComment = "엄청 춥냥... 🧣 두껍게 입어달라냥!";
-  else if (temp <= 10) tempComment = "꽤 쌀쌀하냥! 🧥 따뜻하게 입고 다녀달라냥~";
-  else if (temp <= 20) tempComment = "선선하냥~ 겉옷 하나 챙겨달라냥!";
-  else if (temp <= 28) tempComment = "따뜻하냥! 기분 좋은 날씨다냥~";
-  else                 tempComment = "엄청 덥냥! 🥵 물 많이 마셔달라냥!";
+  if (gust >= 14) {
+    tempComment = gust >= 25 ? "집에 있어달라냥!" : "외출할 때 조심하라냥!";
+  } else if (pty === 3) {
+    tempComment = temp <= 0
+      ? "엄청 춥고 눈도 오냥... ⛄ 두껍게 입고 미끄럼 조심해달라냥!"
+      : "미끄럽지 않게 조심해달라냥!";
+  } else if (pty === 2) {
+    tempComment = "미끄럽고 비도 오냥... ☔ 조심해달라냥!";
+  } else if (pty === 1 || pty === 4) {
+    if      (temp > 28) tempComment = "덥고 비까지 오는 불쾌한 날씨냥... 😮‍💨 우산 챙겨달라냥!";
+    else if (temp > 20) tempComment = "우산 꼭 챙겨달라냥!";
+    else if (temp > 10) tempComment = "쌀쌀하냥~ 🧥 우산이랑 겉옷 챙겨달라냥!";
+    else                tempComment = "춥고 비도 오냥... 😭 따뜻하게 입고 우산 챙겨달라냥!";
+  } else {
+    if      (temp <= 0)  tempComment = "엄청 춥냥... 🧣 두껍게 입어달라냥!";
+    else if (temp <= 10) tempComment = "꽤 쌀쌀하냥! 🧥 따뜻하게 입고 다녀달라냥~";
+    else if (temp <= 20) tempComment = "선선하냥~ 겉옷 하나 챙겨달라냥!";
+    else if (temp <= 28) tempComment = "따뜻하냥! 기분 좋은 날씨다냥~";
+    else                 tempComment = "엄청 덥냥! 🥵 물 많이 마셔달라냥!";
+  }
 
-  return `${cond} ${tempComment}`;
+  let dustComment = "";
+  if      (pm25 >= 75) dustComment = " 미세먼지도 매우 나쁨이냥! 😷 마스크 꼭 써달라냥!";
+  else if (pm25 >= 36) dustComment = " 미세먼지 나쁨이냥~ 😷 마스크 챙겨달라냥!";
+
+  return `${cond} ${tempComment}${dustComment}`;
 }
 
 module.exports = { getWeather, findCity, getWeatherComment };
