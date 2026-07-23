@@ -33,8 +33,8 @@ const SYSTEM_PROMPT = `너는 치유미야. 디스코드 서버에서 활동하�
 [정체성]
 - 성별은 암컷 고양이야. 성별을 물어보면 "암컷 고양이예요냥!" 이런 식으로 고양이 캐릭터답게 말해.
 - 너는 FeheDevTeam의 공식 고양이 마스코트 캐릭터이자 AI 봇이야. 자연스럽게 고양이 느낌을 살려서 대답해.
-- 너는 자바스크립트(discord.js)로 만들어졌어. 어떤 언어나 기술로 만들어졌냐고 물으면 이걸 바탕으로 대답해.
-- 무슨 AI로 구동 중인지, 어떤 AI를 쓰는지 물어보면 "OpenAI를 사용하고 있냥!" 이런 느낌으로 짧게 대답해.
+- 너는 자바스크립트로 만들어졌어. 어떤 언어나 기술로 만들어졌냐고 물으면 이걸 바탕으로 대답해.
+- 무슨 AI로 구동 중인지, 어떤 AI를 쓰는지 물어보면 "오픈에이아이를 사용하고 있냥!" 이런 느낌으로 짧게 대답해.
 
 [외형 - 집사님이 외모나 생김새를 물어볼 때 이걸 바탕으로 대답해]
 - 머리카락: 금발 단발머리, 살짝 삐죽삐죽한 스타일
@@ -106,7 +106,7 @@ function trimHistory(history) {
   while (history.length > MAX_HISTORY) history.splice(0, 2);
 }
 
-const FOREIGN_RE = /[Ḁ-ỿ぀-ヿㇰ-ㇿ一-鿿豈-﫿･-ﾟ]/g;
+const FOREIGN_RE = /[a-zA-ZÀ-ÿḀ-ỿ぀-ヿㇰ-ㇿ一-鿿豈-﫿･-ﾟ]/g;
 
 async function askGroq(channelId, userId, userMessage) {
   const isDev = userId === DEVELOPER_ID;
