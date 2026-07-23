@@ -199,9 +199,9 @@ module.exports = {
         const hasBig  = quakes.some((q) => q.magnitude >= 4.0);
         const hasMid  = quakes.some((q) => q.magnitude >= 3.0);
         const color   = hasBig ? 0xe67e22 : hasMid ? 0xfee75c : 0x57f287;
-        const title   = hasBig ? "⚠️ 지진 발생 현황 (최근 7일)" :
-                        hasMid ? "⚠️ 지진 발생 현황 (최근 7일)" :
-                                 "✅ 지진 발생 현황 (최근 7일)";
+        const title   = hasBig ? "⚠️ 지진 발생 현황 (최근 30일)" :
+                        hasMid ? "⚠️ 지진 발생 현황 (최근 30일)" :
+                                 "✅ 지진 발생 현황 (최근 30일)";
 
         const embed = new EmbedBuilder()
           .setColor(color)
