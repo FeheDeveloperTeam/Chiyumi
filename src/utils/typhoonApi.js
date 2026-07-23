@@ -200,19 +200,33 @@ const TARGET_LABEL = {
   china: "🇨🇳 중국 방향",
 };
 
-function typhoonField(t) {
+// 태풍 1개당 필드 4개: 헤더(전폭) + 위치·풍속·거리(3컬럼 inline)
+function typhoonFields(t) {
   const name  = t.name ? `태풍 ${t.name}` : "무명 태풍";
   const dir   = TARGET_LABEL[t.target] ?? "기타 방향";
   const arrow = t.movingNorth ? "↑ 북상 중" : "→ 진행 중";
-  return {
-    name:  `🌀 ${name} (${t.intensity}) — ${dir}`,
-    value: [
-      `📍 위치: 북위 ${t.lat.toFixed(1)}° / 동경 ${t.lon.toFixed(1)}°`,
-      `💨 최대풍속: ${t.windMs} m/s (${t.windKt}kt) · ${arrow}`,
-      `📏 서울까지: 약 ${t.distFromSeoul.toLocaleString()}km`,
-    ].join("\n"),
-    inline: false,
-  };
+  return [
+    {
+      name:   `🌀 ${name} — ${dir}`,
+      value:  `${t.intensity}`,
+      inline: false,
+    },
+    {
+      name:   "📍 현재 위치",
+      value:  `북위 ${t.lat.toFixed(1)}°\n동경 ${t.lon.toFixed(1)}°`,
+      inline: true,
+    },
+    {
+      name:   "💨 최대풍속",
+      value:  `${t.windMs} m/s (${t.windKt}kt)\n${arrow}`,
+      inline: true,
+    },
+    {
+      name:   "📏 서울까지",
+      value:  `약 ${t.distFromSeoul.toLocaleString()}km`,
+      inline: true,
+    },
+  ];
 }
 
 function buildTyphoonEmbedOptions(typhoons) {
@@ -225,9 +239,9 @@ function buildTyphoonEmbedOptions(typhoons) {
     };
   }
 
-  const koreaBound    = typhoons.filter((t) => t.target === "korea");
-  const nearbyOthers  = typhoons.filter((t) => t.target === "japan" || t.target === "china");
-  const fields        = [...koreaBound, ...nearbyOthers].map(typhoonField);
+  const koreaBound   = typhoons.filter((t) => t.target === "korea");
+  const nearbyOthers = typhoons.filter((t) => t.target === "japan" || t.target === "china");
+  const fields       = [...koreaBound, ...nearbyOthers].flatMap(typhoonFields);
 
   if (koreaBound.length) {
     return {
