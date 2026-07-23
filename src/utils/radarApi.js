@@ -185,6 +185,37 @@ async function buildRadarImage() {
     ctx.textAlign = "left";
   }
 
+  // 강수량 범례
+  if (hasData) {
+    const LEGEND = [
+      { color: "#64c8ff", label: "매우 약한 비  ~1mm/h" },
+      { color: "#00c800", label: "약한 비  ~5mm/h" },
+      { color: "#f0f000", label: "보통 비  ~10mm/h" },
+      { color: "#ff9600", label: "강한 비  ~30mm/h" },
+      { color: "#ff0000", label: "매우 강한 비  ~50mm/h" },
+      { color: "#c800c8", label: "폭우  80mm/h+" },
+    ];
+    const LX = 20;
+    const LY = IMG_H - 46 - LEGEND.length * 38 - 44;
+
+    ctx.fillStyle = "rgba(0,0,0,0.72)";
+    ctx.fillRect(LX - 10, LY - 36, 270, LEGEND.length * 38 + 48);
+
+    ctx.fillStyle = "#aaaaaa";
+    ctx.font      = "bold 22px 'Plex Bold'";
+    ctx.textAlign = "left";
+    ctx.fillText("강수 강도", LX, LY - 10);
+
+    LEGEND.forEach(({ color, label }, i) => {
+      const y = LY + i * 38 + 26;
+      ctx.fillStyle = color;
+      ctx.fillRect(LX, y - 16, 20, 20);
+      ctx.fillStyle = "#dddddd";
+      ctx.font      = "19px 'Plex Regular'";
+      ctx.fillText(label, LX + 28, y);
+    });
+  }
+
   // 하단 정보 바
   ctx.fillStyle = "rgba(0,0,0,0.75)";
   ctx.fillRect(0, IMG_H - 46, IMG_W, 46);
