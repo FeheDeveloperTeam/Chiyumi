@@ -164,16 +164,23 @@ module.exports = {
     if (input.includes("태풍") && !input.includes("날씨")) {
       await message.channel.sendTyping().catch(() => {});
       try {
-        const typhoons = await getActiveTyphoons();
-        const opts     = buildTyphoonEmbedOptions(typhoons);
-        const embed    = new EmbedBuilder()
+        const [typhoons, radarBuf] = await Promise.all([
+          getActiveTyphoons(),
+          buildRadarImage().catch((e) => { console.log("[태풍/레이더] 실패:", e?.message); return null; }),
+        ]);
+
+        const opts  = buildTyphoonEmbedOptions(typhoons);
+        const embed = new EmbedBuilder()
           .setColor(opts.color)
           .setTitle(opts.title)
           .setDescription(opts.description)
-          .setFooter({ text: "출처: IBTrACS (NOAA) · 6시간 단위 갱신" })
+          .setFooter({ text: "출처: IBTrACS (NOAA) · RainViewer · 6시간 단위 갱신" })
           .setTimestamp();
         if (opts.fields.length) embed.addFields(opts.fields);
-        await message.reply({ embeds: [embed] });
+        if (radarBuf) embed.setImage("attachment://radar.png");
+
+        const files = radarBuf ? [new AttachmentBuilder(radarBuf, { name: "radar.png" })] : [];
+        await message.reply({ embeds: [embed], files });
       } catch (err) {
         console.log("[태풍] 에러:", err?.message);
         await message.reply("태풍 정보를 가져오지 못했냥... 잠깐 후에 다시 물어봐달라냥ㅠ");
