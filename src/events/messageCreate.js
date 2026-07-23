@@ -12,6 +12,7 @@ const { askGroq } = require("../utils/groqChat");
 const { getWeather, getWeatherComment } = require("../utils/weatherApi");
 const { buildWeatherCardImage } = require("../utils/weatherCard");
 const { getRecentEarthquakes, formatEarthquakeResponse } = require("../utils/earthquakeApi");
+const { getActiveTyphoons, formatTyphoonResponse } = require("../utils/typhoonApi");
 
 const CALL_NAME_PATTERN = /^유미야[,!~]?\s*(.*)$/s;
 
@@ -137,6 +138,19 @@ module.exports = {
       } catch (err) {
         console.log("[지진] 에러:", err?.message);
         await message.reply("지진 정보를 가져오지 못했냥... 잠깐 후에 다시 물어봐달라냥ㅠ");
+      }
+      return;
+    }
+
+    // --- 태풍 북상 확인 ---
+    if (input.includes("태풍") && !input.includes("날씨")) {
+      await message.channel.sendTyping().catch(() => {});
+      try {
+        const typhoons = await getActiveTyphoons();
+        await message.reply(formatTyphoonResponse(typhoons));
+      } catch (err) {
+        console.log("[태풍] 에러:", err?.message);
+        await message.reply("태풍 정보를 가져오지 못했냥... 잠깐 후에 다시 물어봐달라냥ㅠ");
       }
       return;
     }
