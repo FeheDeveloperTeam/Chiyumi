@@ -156,7 +156,7 @@ async function askGroq(channelId, userId, userMessage) {
   }
 
   const raw = response.choices[0]?.message?.content?.trim() ?? "";
-  const reply = raw.replace(FOREIGN_RE, "").trim();
+  const reply = raw.replace(FOREIGN_RE, " ").replace(/\s{2,}/g, " ").trim();
   history.push({ role: "assistant", content: raw });
   return reply;
 }
