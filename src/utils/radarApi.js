@@ -125,14 +125,19 @@ async function fetchRainViewerTiles() {
     )
   );
 
-  // 타일: 각 프록시 순서대로 시도, 5개 이상 성공하면 사용
+  // 타일: 직접 요청 먼저 (Node.js는 CORS 없음), 실패 시 프록시 순서대로
+  const TILE_MAKERS = [
+    (u) => u,  // 직접
+    ...PROXY_MAKERS,
+  ];
   let radarTiles = [];
   let radarLoaded = 0;
-  for (const makeUrl of PROXY_MAKERS) {
+  for (const makeUrl of TILE_MAKERS) {
     const tileUrl = (x, y) => makeUrl(`${radarBaseUrl}/512/${ZOOM}/${x}/${y}/6/1_1.png`);
+    const label   = makeUrl === TILE_MAKERS[0] ? "직접" : makeUrl("").slice(0, 40);
     const tiles   = await Promise.all(coords.map(([x, y]) => safeTile(tileUrl(x, y), `radar(${x},${y})`)));
     const loaded  = tiles.filter(Boolean).length;
-    console.log(`[레이더] 타일 (${makeUrl("").slice(0, 40)}): ${loaded}/9`);
+    console.log(`[레이더] 타일 (${label}): ${loaded}/9`);
     if (loaded > radarLoaded) { radarTiles = tiles; radarLoaded = loaded; }
     if (loaded >= 5) break;
   }
