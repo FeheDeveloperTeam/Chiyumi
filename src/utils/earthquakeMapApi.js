@@ -3,6 +3,7 @@
 
 const { createCanvas, loadImage, GlobalFonts } = require("@napi-rs/canvas");
 const { boldBase64, regularBase64 } = require("../assets/fontData");
+const { getRecentEarthquakes } = require("./earthquakeApi");
 
 GlobalFonts.register(Buffer.from(boldBase64,    "base64"), "Plex Bold");
 GlobalFonts.register(Buffer.from(regularBase64, "base64"), "Plex Regular");
@@ -58,6 +59,12 @@ async function fetchKmaEarthquakes() {
   const res  = await fetch(url, { signal: ctrl.signal, headers: { "User-Agent": "ChiyumiBot/1.0" } });
   clearTimeout(t);
 
+  const ct   = res.headers.get("content-type") ?? "";
+  if (!res.ok || !ct.includes("json")) {
+    const text = await res.text();
+    console.log("[지진지도] KMA 비정상 응답:", res.status, text.slice(0, 120));
+    throw new Error(`KMA 응답 오류: ${text.slice(0, 80)}`);
+  }
   const json = await res.json();
   console.log("[지진지도] KMA 응답 코드:", json?.response?.header?.resultCode);
 
@@ -86,13 +93,35 @@ async function safeTile(url) {
 }
 
 async function buildEarthquakeMapImage() {
-  // 1. 지진 데이터
+  // 1. 지진 데이터: KMA 우선, 실패 시 USGS fallback
   let quakes = [];
+  let dataSource = "기상청";
+
   try {
     quakes = await fetchKmaEarthquakes();
-    console.log(`[지진지도] 지진 ${quakes.length}건 로드`);
+    console.log(`[지진지도] KMA ${quakes.length}건 로드`);
   } catch (e) {
-    console.log("[지진지도] KMA 조회 실패:", e?.message);
+    console.log("[지진지도] KMA 실패:", e?.message);
+  }
+
+  if (!quakes.length) {
+    try {
+      const usgs = await getRecentEarthquakes();
+      quakes = usgs
+        .filter((q) => q.lat != null && q.lon != null)
+        .map((q) => ({
+          lat:  q.lat,
+          lon:  q.lon,
+          mag:  q.magnitude,
+          dep:  q.depth,
+          loc:  q.place,
+          time: String(q.time),
+        }));
+      if (quakes.length) dataSource = "USGS";
+      console.log(`[지진지도] USGS fallback ${quakes.length}건`);
+    } catch (e) {
+      console.log("[지진지도] USGS fallback 실패:", e?.message);
+    }
   }
 
   // 2. 지도 타일
@@ -196,7 +225,7 @@ async function buildEarthquakeMapImage() {
   ctx.fillStyle = "#cccccc";
   ctx.font      = "20px 'Plex Regular'";
   ctx.textAlign = "right";
-  ctx.fillText(`기준: ${nowStr} · 출처: 기상청`, IMG_W - 20, IMG_H - 12);
+  ctx.fillText(`기준: ${nowStr} · 출처: ${dataSource} · CARTO`, IMG_W - 20, IMG_H - 12);
 
   // 8. 리사이즈
   const out  = createCanvas(OUT_W, OUT_H);

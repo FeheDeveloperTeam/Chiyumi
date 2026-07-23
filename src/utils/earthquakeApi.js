@@ -20,6 +20,8 @@ async function getRecentEarthquakes() {
     place:     f.properties.place,
     time:      f.properties.time,
     depth:     Math.round(f.geometry.coordinates[2]),
+    lat:       f.geometry.coordinates[1],
+    lon:       f.geometry.coordinates[0],
   }));
 }
 
