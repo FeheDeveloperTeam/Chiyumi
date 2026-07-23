@@ -130,6 +130,7 @@ module.exports = {
     // --- 날씨 처리 ---
     if (input.includes("날씨")) {
       const cityQuery = extractCityFromWeatherQuery(input);
+      console.log("[날씨] 도시 쿼리:", cityQuery, "| 원본:", input);
       if (!cityQuery) {
         await message.reply("어느 지역 날씨가 궁금하냥? 도시 이름을 같이 말해달라냥~");
         return;
@@ -138,17 +139,22 @@ module.exports = {
       await message.channel.sendTyping().catch(() => {});
 
       try {
+        console.log("[날씨] API 호출 시작");
         const weather = await getWeather(cityQuery);
+        console.log("[날씨] API 결과:", JSON.stringify(weather));
         if (!weather) {
           await message.reply(`**${cityQuery}**은(는) 아직 지원하지 않는 지역이냥... 😿 다른 도시 이름으로 물어봐달라냥~`);
           return;
         }
 
+        console.log("[날씨] 카드 생성 시작");
         const cardBuffer = await buildWeatherCardImage(weather);
+        console.log("[날씨] 카드 생성 완료, 크기:", cardBuffer?.length);
         const attachment = new AttachmentBuilder(cardBuffer, { name: "weather.png" });
         await message.reply({ content: getWeatherComment(weather), files: [attachment] });
+        console.log("[날씨] 응답 완료");
       } catch (err) {
-        console.error("[날씨]", err);
+        console.log("[날씨] 에러:", err?.message, err?.stack);
         await message.reply("날씨 정보를 가져오지 못했냥... 잠깐 후에 다시 물어봐달라냥ㅠ");
       }
       return;

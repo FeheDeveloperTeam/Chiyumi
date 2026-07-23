@@ -1,169 +1,145 @@
-const CITY_GRID = {
+// Open-Meteo API 사용 (무료, API 키 불필요)
+// https://open-meteo.com/
+
+const CITIES = {
   // 특별시·광역시
-  "서울":   { nx: 60,  ny: 127, name: "서울" },
-  "부산":   { nx: 98,  ny: 76,  name: "부산" },
-  "인천":   { nx: 55,  ny: 124, name: "인천" },
-  "대구":   { nx: 89,  ny: 90,  name: "대구" },
-  "대전":   { nx: 67,  ny: 100, name: "대전" },
-  "광주":   { nx: 58,  ny: 74,  name: "광주" },
-  "울산":   { nx: 102, ny: 84,  name: "울산" },
-  "세종":   { nx: 66,  ny: 103, name: "세종" },
+  "서울":   { lat: 37.5665, lon: 126.9780, name: "서울" },
+  "부산":   { lat: 35.1796, lon: 129.0756, name: "부산" },
+  "인천":   { lat: 37.4563, lon: 126.7052, name: "인천" },
+  "대구":   { lat: 35.8714, lon: 128.6014, name: "대구" },
+  "대전":   { lat: 36.3504, lon: 127.3845, name: "대전" },
+  "광주":   { lat: 35.1595, lon: 126.8526, name: "광주" },
+  "울산":   { lat: 35.5384, lon: 129.3114, name: "울산" },
+  "세종":   { lat: 36.4804, lon: 127.2890, name: "세종" },
   // 경기
-  "수원":   { nx: 60,  ny: 121, name: "수원" },
-  "성남":   { nx: 62,  ny: 123, name: "성남" },
-  "고양":   { nx: 57,  ny: 128, name: "고양" },
-  "부천":   { nx: 56,  ny: 125, name: "부천" },
-  "용인":   { nx: 62,  ny: 120, name: "용인" },
-  "안산":   { nx: 57,  ny: 121, name: "안산" },
-  "안양":   { nx: 59,  ny: 123, name: "안양" },
-  "남양주": { nx: 64,  ny: 128, name: "남양주" },
-  "화성":   { nx: 57,  ny: 119, name: "화성" },
-  "의정부": { nx: 61,  ny: 130, name: "의정부" },
-  "평택":   { nx: 62,  ny: 114, name: "평택" },
-  "파주":   { nx: 56,  ny: 131, name: "파주" },
-  "시흥":   { nx: 57,  ny: 122, name: "시흥" },
-  "김포":   { nx: 55,  ny: 128, name: "김포" },
-  "광명":   { nx: 58,  ny: 123, name: "광명" },
-  "군포":   { nx: 59,  ny: 120, name: "군포" },
-  "하남":   { nx: 64,  ny: 126, name: "하남" },
-  "오산":   { nx: 62,  ny: 117, name: "오산" },
-  "이천":   { nx: 68,  ny: 121, name: "이천" },
-  "안성":   { nx: 65,  ny: 115, name: "안성" },
-  "구리":   { nx: 63,  ny: 127, name: "구리" },
-  "의왕":   { nx: 60,  ny: 121, name: "의왕" },
-  "양주":   { nx: 61,  ny: 131, name: "양주" },
-  "포천":   { nx: 64,  ny: 134, name: "포천" },
+  "수원":   { lat: 37.2636, lon: 127.0286, name: "수원" },
+  "성남":   { lat: 37.4449, lon: 127.1388, name: "성남" },
+  "고양":   { lat: 37.6583, lon: 126.8320, name: "고양" },
+  "부천":   { lat: 37.5034, lon: 126.7660, name: "부천" },
+  "용인":   { lat: 37.2342, lon: 127.2010, name: "용인" },
+  "안산":   { lat: 37.3219, lon: 126.8309, name: "안산" },
+  "안양":   { lat: 37.3943, lon: 126.9568, name: "안양" },
+  "남양주": { lat: 37.6360, lon: 127.2165, name: "남양주" },
+  "화성":   { lat: 37.1998, lon: 126.8314, name: "화성" },
+  "의정부": { lat: 37.7382, lon: 127.0337, name: "의정부" },
+  "평택":   { lat: 36.9921, lon: 127.1127, name: "평택" },
+  "파주":   { lat: 37.7600, lon: 126.7798, name: "파주" },
+  "시흥":   { lat: 37.3800, lon: 126.8027, name: "시흥" },
+  "김포":   { lat: 37.6151, lon: 126.7157, name: "김포" },
+  "광명":   { lat: 37.4784, lon: 126.8647, name: "광명" },
+  "군포":   { lat: 37.3614, lon: 126.9352, name: "군포" },
+  "하남":   { lat: 37.5395, lon: 127.2149, name: "하남" },
+  "오산":   { lat: 37.1499, lon: 127.0776, name: "오산" },
+  "이천":   { lat: 37.2723, lon: 127.4350, name: "이천" },
+  "안성":   { lat: 37.0078, lon: 127.2799, name: "안성" },
+  "구리":   { lat: 37.5943, lon: 127.1293, name: "구리" },
+  "양주":   { lat: 37.7854, lon: 127.0456, name: "양주" },
+  "포천":   { lat: 37.8944, lon: 127.2006, name: "포천" },
   // 충청
-  "천안":   { nx: 63,  ny: 110, name: "천안" },
-  "청주":   { nx: 69,  ny: 107, name: "청주" },
-  "충주":   { nx: 76,  ny: 114, name: "충주" },
-  "아산":   { nx: 58,  ny: 111, name: "아산" },
-  "공주":   { nx: 63,  ny: 102, name: "공주" },
-  "논산":   { nx: 62,  ny: 97,  name: "논산" },
-  "제천":   { nx: 81,  ny: 118, name: "제천" },
+  "천안":   { lat: 36.8151, lon: 127.1139, name: "천안" },
+  "청주":   { lat: 36.6424, lon: 127.4890, name: "청주" },
+  "충주":   { lat: 36.9908, lon: 127.9260, name: "충주" },
+  "아산":   { lat: 36.7897, lon: 127.0020, name: "아산" },
+  "공주":   { lat: 36.4465, lon: 127.1190, name: "공주" },
+  "논산":   { lat: 36.1869, lon: 127.0990, name: "논산" },
+  "제천":   { lat: 37.1328, lon: 128.1907, name: "제천" },
   // 전라
-  "전주":   { nx: 63,  ny: 89,  name: "전주" },
-  "군산":   { nx: 56,  ny: 92,  name: "군산" },
-  "익산":   { nx: 60,  ny: 91,  name: "익산" },
-  "목포":   { nx: 50,  ny: 67,  name: "목포" },
-  "여수":   { nx: 73,  ny: 66,  name: "여수" },
-  "순천":   { nx: 70,  ny: 70,  name: "순천" },
-  "광양":   { nx: 74,  ny: 72,  name: "광양" },
+  "전주":   { lat: 35.8242, lon: 127.1480, name: "전주" },
+  "군산":   { lat: 35.9676, lon: 126.7368, name: "군산" },
+  "익산":   { lat: 35.9483, lon: 126.9574, name: "익산" },
+  "목포":   { lat: 34.8118, lon: 126.3922, name: "목포" },
+  "여수":   { lat: 34.7604, lon: 127.6622, name: "여수" },
+  "순천":   { lat: 34.9506, lon: 127.4873, name: "순천" },
+  "광양":   { lat: 34.9404, lon: 127.6964, name: "광양" },
   // 경상
-  "포항":   { nx: 102, ny: 94,  name: "포항" },
-  "창원":   { nx: 91,  ny: 77,  name: "창원" },
-  "구미":   { nx: 84,  ny: 96,  name: "구미" },
-  "경주":   { nx: 100, ny: 91,  name: "경주" },
-  "김해":   { nx: 95,  ny: 77,  name: "김해" },
-  "진주":   { nx: 81,  ny: 75,  name: "진주" },
-  "통영":   { nx: 87,  ny: 68,  name: "통영" },
-  "안동":   { nx: 91,  ny: 106, name: "안동" },
-  "거제":   { nx: 98,  ny: 68,  name: "거제" },
-  "영주":   { nx: 88,  ny: 111, name: "영주" },
-  "상주":   { nx: 81,  ny: 103, name: "상주" },
-  "밀양":   { nx: 96,  ny: 83,  name: "밀양" },
+  "포항":   { lat: 36.0190, lon: 129.3435, name: "포항" },
+  "창원":   { lat: 35.2285, lon: 128.6811, name: "창원" },
+  "구미":   { lat: 36.1196, lon: 128.3444, name: "구미" },
+  "경주":   { lat: 35.8562, lon: 129.2246, name: "경주" },
+  "김해":   { lat: 35.2285, lon: 128.8892, name: "김해" },
+  "진주":   { lat: 35.1798, lon: 128.1076, name: "진주" },
+  "통영":   { lat: 34.8544, lon: 128.4330, name: "통영" },
+  "안동":   { lat: 36.5684, lon: 128.7294, name: "안동" },
+  "거제":   { lat: 34.8800, lon: 128.6210, name: "거제" },
+  "영주":   { lat: 36.8056, lon: 128.6239, name: "영주" },
+  "상주":   { lat: 36.4108, lon: 128.1591, name: "상주" },
+  "밀양":   { lat: 35.5038, lon: 128.7458, name: "밀양" },
   // 강원
-  "춘천":   { nx: 73,  ny: 134, name: "춘천" },
-  "강릉":   { nx: 92,  ny: 131, name: "강릉" },
-  "원주":   { nx: 76,  ny: 122, name: "원주" },
-  "속초":   { nx: 87,  ny: 141, name: "속초" },
-  "동해":   { nx: 97,  ny: 127, name: "동해" },
-  "삼척":   { nx: 99,  ny: 124, name: "삼척" },
-  "태백":   { nx: 95,  ny: 119, name: "태백" },
-  "홍천":   { nx: 75,  ny: 130, name: "홍천" },
-  "횡성":   { nx: 77,  ny: 125, name: "횡성" },
-  "평창":   { nx: 84,  ny: 123, name: "평창" },
-  "정선":   { nx: 89,  ny: 123, name: "정선" },
+  "춘천":   { lat: 37.8813, lon: 127.7298, name: "춘천" },
+  "강릉":   { lat: 37.7519, lon: 128.8760, name: "강릉" },
+  "원주":   { lat: 37.3422, lon: 127.9202, name: "원주" },
+  "속초":   { lat: 38.2048, lon: 128.5912, name: "속초" },
+  "동해":   { lat: 37.5244, lon: 129.1140, name: "동해" },
+  "삼척":   { lat: 37.4499, lon: 129.1657, name: "삼척" },
+  "태백":   { lat: 37.1637, lon: 128.9852, name: "태백" },
+  "홍천":   { lat: 37.6973, lon: 127.8878, name: "홍천" },
+  "횡성":   { lat: 37.4919, lon: 127.9843, name: "횡성" },
+  "평창":   { lat: 37.3722, lon: 128.3908, name: "평창" },
+  "정선":   { lat: 37.3799, lon: 128.6604, name: "정선" },
   // 제주
-  "제주":   { nx: 52,  ny: 38,  name: "제주" },
-  "서귀포": { nx: 52,  ny: 33,  name: "서귀포" },
+  "제주":   { lat: 33.4996, lon: 126.5312, name: "제주" },
+  "서귀포": { lat: 33.2541, lon: 126.5600, name: "서귀포" },
 };
 
 function findCity(query) {
   const q = query.trim().replace(/특별시$|광역시$|특별자치시$|특별자치도$|시$|군$|구$/, "").trim();
-  return CITY_GRID[q] ?? CITY_GRID[query.trim()] ?? null;
+  return CITIES[q] ?? CITIES[query.trim()] ?? null;
 }
 
-function getBaseDateTime() {
-  const now = new Date();
-  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+// Open-Meteo weather_code → 카드용 sky/pty 값으로 변환
+function weatherCodeToCondition(code) {
+  if (code === 0 || code === 1)              return { sky: 1, pty: 0 }; // 맑음
+  if (code === 2)                            return { sky: 3, pty: 0 }; // 구름많음
+  if (code === 3 || code === 45 || code === 48) return { sky: 4, pty: 0 }; // 흐림
+  if (code >= 51 && code <= 55)             return { sky: 4, pty: 1 }; // 이슬비
+  if (code === 56 || code === 57)           return { sky: 4, pty: 2 }; // 어는비/눈
+  if (code >= 61 && code <= 65)            return { sky: 4, pty: 1 }; // 비
+  if (code === 66 || code === 67)           return { sky: 4, pty: 2 }; // 어는비
+  if (code >= 71 && code <= 77)            return { sky: 4, pty: 3 }; // 눈
+  if (code >= 80 && code <= 82)            return { sky: 4, pty: 4 }; // 소나기
+  if (code === 85 || code === 86)           return { sky: 4, pty: 3 }; // 눈 소나기
+  if (code >= 95)                           return { sky: 4, pty: 1 }; // 뇌우
+  return { sky: 1, pty: 0 };
+}
 
+function getNowKST() {
+  const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
   const pad = (n) => String(n).padStart(2, "0");
-  const year  = kst.getUTCFullYear();
-  const month = pad(kst.getUTCMonth() + 1);
-  const day   = pad(kst.getUTCDate());
-  const hour  = kst.getUTCHours();
-  const min   = kst.getUTCMinutes();
-
-  const BASE_HOURS = [2, 5, 8, 11, 14, 17, 20, 23];
-  const curMinutes = hour * 60 + min - 10; // 10분 여유
-
-  if (curMinutes < 2 * 60) {
-    const prev = new Date(kst.getTime() - 24 * 60 * 60 * 1000);
-    return {
-      base_date: `${prev.getUTCFullYear()}${pad(prev.getUTCMonth() + 1)}${pad(prev.getUTCDate())}`,
-      base_time: "2300",
-    };
-  }
-
-  let baseHour = BASE_HOURS[0];
-  for (const h of BASE_HOURS) {
-    if (h * 60 <= curMinutes) baseHour = h;
-  }
-
-  return { base_date: `${year}${month}${day}`, base_time: pad(baseHour) + "00" };
+  return {
+    fcstDate: `${kst.getUTCFullYear()}${pad(kst.getUTCMonth() + 1)}${pad(kst.getUTCDate())}`,
+    fcstTime: `${pad(kst.getUTCHours())}00`,
+  };
 }
 
 async function getWeather(cityQuery) {
   const city = findCity(cityQuery);
   if (!city) return null;
 
-  const { base_date, base_time } = getBaseDateTime();
-  const key = process.env.KMA_API_KEY;
-
-  // serviceKey는 URLSearchParams 없이 직접 삽입 (이중 인코딩 방지)
   const url =
-    `https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst` +
-    `?serviceKey=${encodeURIComponent(key)}` +
-    `&pageNo=1&numOfRows=100&dataType=JSON` +
-    `&base_date=${base_date}&base_time=${base_time}` +
-    `&nx=${city.nx}&ny=${city.ny}`;
+    `https://api.open-meteo.com/v1/forecast` +
+    `?latitude=${city.lat}&longitude=${city.lon}` +
+    `&current=temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation_probability,weather_code` +
+    `&timezone=Asia%2FSeoul`;
 
   const res  = await fetch(url);
-  const text = await res.text();
+  const json = await res.json();
 
-  let json;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    // XML 오류 응답인 경우 — 로그로 내용 확인
-    console.error("[날씨 API] JSON 파싱 실패, 응답 내용:", text.slice(0, 500));
-    throw new Error("KMA API가 JSON이 아닌 응답을 반환했습니다");
-  }
+  const cur = json?.current;
+  if (!cur) return null;
 
-  const resultCode = json?.response?.header?.resultCode;
-  if (resultCode && resultCode !== "00") {
-    console.error("[날씨 API] 오류 코드:", resultCode, json?.response?.header?.resultMsg);
-    throw new Error(`KMA API 오류: ${resultCode}`);
-  }
-
-  const items = json?.response?.body?.items?.item;
-  if (!Array.isArray(items)) return null;
-
-  const times = [...new Set(items.map((i) => i.fcstTime))].sort();
-  const t = times[0];
-  const get = (cat) => items.find((i) => i.category === cat && i.fcstTime === t)?.fcstValue;
+  const { sky, pty } = weatherCodeToCondition(cur.weather_code ?? 0);
+  const { fcstDate, fcstTime } = getNowKST();
 
   return {
-    cityName:   city.name,
-    temperature: get("TMP") ?? "?",
-    humidity:    get("REH") ?? "?",
-    windSpeed:   get("WSD") ?? "?",
-    precipProb:  get("POP") ?? "?",
-    sky: parseInt(get("SKY") ?? "1"),
-    pty: parseInt(get("PTY") ?? "0"),
-    fcstDate: base_date,
-    fcstTime: t,
+    cityName:    city.name,
+    temperature: Math.round(cur.temperature_2m ?? 0).toString(),
+    humidity:    Math.round(cur.relative_humidity_2m ?? 0).toString(),
+    windSpeed:   (cur.wind_speed_10m ?? 0).toFixed(1),
+    precipProb:  Math.round(cur.precipitation_probability ?? 0).toString(),
+    sky,
+    pty,
+    fcstDate,
+    fcstTime,
   };
 }
 
@@ -172,12 +148,12 @@ function getWeatherComment(weather) {
   const { pty, sky, cityName } = weather;
 
   let cond;
-  if      (pty === 3)          cond = `오늘 ${cityName}에 눈이 내리냥~! ❄️`;
-  else if (pty === 2)          cond = `오늘 ${cityName}에 비와 눈이 같이 오냥... 🌨️`;
-  else if (pty === 1 || pty === 4) cond = `오늘 ${cityName}에 비가 오냥... ☔`;
-  else if (sky === 4)          cond = `오늘 ${cityName} 하늘이 흐리냥 ☁️`;
-  else if (sky === 3)          cond = `오늘 ${cityName} 구름이 좀 있냥 ⛅`;
-  else                         cond = `오늘 ${cityName} 날씨 맑냥! ☀️`;
+  if      (pty === 3)               cond = `오늘 ${cityName}에 눈이 내리냥~! ❄️`;
+  else if (pty === 2)               cond = `오늘 ${cityName}에 비와 눈이 같이 오냥... 🌨️`;
+  else if (pty === 1 || pty === 4)  cond = `오늘 ${cityName}에 비가 오냥... ☔`;
+  else if (sky === 4)               cond = `오늘 ${cityName} 하늘이 흐리냥 ☁️`;
+  else if (sky === 3)               cond = `오늘 ${cityName} 구름이 좀 있냥 ⛅`;
+  else                              cond = `오늘 ${cityName} 날씨 맑냥! ☀️`;
 
   let tempComment;
   if      (temp <= 0)  tempComment = "엄청 춥냥... 🧣 두껍게 입어달라냥!";
