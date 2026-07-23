@@ -152,7 +152,7 @@ const DEALER_STANDS_AT     = { 1: 15, 2: 16, 3: 17, 5: 18 };
 const INQUIRY_ACTION_PREFIX = "inquiry-action:";
 const INQUIRY_MODAL_PREFIX = "inquiry-modal:";
 const INQUIRY_CHANNEL_ID = "1518461357735936000";
-const INQUIRY_TITLES = { report: "신고", feedback: "피드백", bug: "버그 신고" };
+const INQUIRY_TITLES = { report: "유저 신고", feedback: "피드백", bug: "버그 신고" };
 const VERIFY_BUTTON_PREFIX = "verify:";
 const VERIFY_ACTION_PREFIX = "verify-action:";
 const VERIFY_ACTION_MODAL_PREFIX = "verify-action-modal:";
@@ -3410,11 +3410,23 @@ async function showInquiryModal(interaction, type) {
     .setRequired(true)
     .setMaxLength(1800);
 
-  modal.addComponents(
+  const rows = [
     new ActionRowBuilder().addComponents(serverNameInput),
     new ActionRowBuilder().addComponents(serverInviteInput),
-    new ActionRowBuilder().addComponents(contentInput),
-  );
+  ];
+
+  if (type === "bug") {
+    const errorCodeInput = new TextInputBuilder()
+      .setCustomId("error_code")
+      .setLabel("오류 코드 (있는 경우에만 입력)")
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder("예: INQUIRY-001")
+      .setRequired(false);
+    rows.push(new ActionRowBuilder().addComponents(errorCodeInput));
+  }
+
+  rows.push(new ActionRowBuilder().addComponents(contentInput));
+  modal.addComponents(...rows);
 
   await interaction.showModal(modal);
 }
@@ -3423,18 +3435,24 @@ async function handleInquiryModal(interaction, type) {
   const serverName = interaction.fields.getTextInputValue("server_name").trim();
   const serverInvite = interaction.fields.getTextInputValue("server_invite").trim();
   const content = interaction.fields.getTextInputValue("content").trim();
+  const errorCode = type === "bug"
+    ? interaction.fields.getTextInputValue("error_code").trim()
+    : null;
 
   try {
     const channel = await interaction.client.channels.fetch(INQUIRY_CHANNEL_ID);
 
+    const fields = [
+      { name: "작성자", value: `${interaction.user} (${interaction.user.id})` },
+      { name: "서버 이름", value: serverName },
+      { name: "서버 주소", value: serverInvite },
+    ];
+    if (errorCode) fields.push({ name: "오류 코드", value: errorCode });
+    fields.push({ name: "내용", value: content });
+
     const embed = new EmbedBuilder()
       .setTitle(INQUIRY_TITLES[type] ?? "문의")
-      .addFields(
-        { name: "작성자", value: `${interaction.user} (${interaction.user.id})` },
-        { name: "서버 이름", value: serverName },
-        { name: "서버 주소", value: serverInvite },
-        { name: "내용", value: content },
-      )
+      .addFields(...fields)
       .setColor(type === "report" ? 0xed4245 : 0xe1aa74)
       .setTimestamp();
 
@@ -4048,8 +4066,8 @@ async function handleAnnounceModal(interaction) {
   const logEmbed = new EmbedBuilder()
     .setTitle("공지 전송")
     .addFields(
-      { name: "채널", value: `${channel}` },
-      { name: "작성자", value: `${interaction.user}` },
+      { name: "채널", value: `${channel}`, inline: true },
+      { name: "작성자", value: `${interaction.user}`, inline: true },
       { name: "제목", value: title || "(없음)" },
     )
     .setColor(0xe1aa74)

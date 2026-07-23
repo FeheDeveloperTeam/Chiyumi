@@ -23,8 +23,9 @@ module.exports = {
         {
           name: "작성자",
           value: message.author ? `${message.author}` : "알 수 없음",
+          inline: true,
         },
-        { name: "채널", value: `${message.channel}` },
+        { name: "채널", value: `${message.channel}`, inline: true },
         {
           name: "내용",
           value: message.content?.slice(0, 1000) || "(내용을 알 수 없음)",

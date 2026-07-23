@@ -23,8 +23,8 @@ module.exports = {
       const embed = new EmbedBuilder()
         .setTitle("음성 채널 입장")
         .addFields(
-          { name: "사용자", value: `${member}` },
-          { name: "채널", value: `${newState.channel}` },
+          { name: "사용자", value: `${member}`, inline: true },
+          { name: "채널", value: `${newState.channel}`, inline: true },
         )
         .setColor(0xe1aa74)
         .setTimestamp();
@@ -39,8 +39,8 @@ module.exports = {
       const embed = new EmbedBuilder()
         .setTitle("음성 채널 퇴장")
         .addFields(
-          { name: "사용자", value: `${member}` },
-          { name: "채널", value: `${oldState.channel}` },
+          { name: "사용자", value: `${member}`, inline: true },
+          { name: "채널", value: `${oldState.channel}`, inline: true },
         )
         .setColor(0xed4245)
         .setTimestamp();
@@ -59,9 +59,9 @@ module.exports = {
       const embed = new EmbedBuilder()
         .setTitle("음성 채널 이동")
         .addFields(
-          { name: "사용자", value: `${member}` },
-          { name: "이전 채널", value: `${oldState.channel}` },
-          { name: "이동한 채널", value: `${newState.channel}` },
+          { name: "사용자", value: `${member}`, inline: true },
+          { name: "이전 채널", value: `${oldState.channel}`, inline: true },
+          { name: "이동한 채널", value: `${newState.channel}`, inline: true },
         )
         .setColor(0xe1aa74)
         .setTimestamp();

@@ -26,8 +26,8 @@ async function handleProfanity(message) {
   const embed = new EmbedBuilder()
     .setTitle("욕설 검열")
     .addFields(
-      { name: "작성자", value: `${message.author}` },
-      { name: "채널", value: `${message.channel}` },
+      { name: "작성자", value: `${message.author}`, inline: true },
+      { name: "채널", value: `${message.channel}`, inline: true },
       {
         name: "내용",
         value: message.content?.slice(0, 1000) || "(내용을 알 수 없음)",
@@ -53,8 +53,8 @@ async function handleSpam(message) {
   const embed = new EmbedBuilder()
     .setTitle("도배 검열")
     .addFields(
-      { name: "작성자", value: `${message.author}` },
-      { name: "채널", value: `${message.channel}` },
+      { name: "작성자", value: `${message.author}`, inline: true },
+      { name: "채널", value: `${message.channel}`, inline: true },
       {
         name: "내용",
         value: message.content?.slice(0, 1000) || "(내용을 알 수 없음)",

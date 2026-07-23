@@ -29,7 +29,7 @@ module.exports = {
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId("inquiry-action:report")
-        .setLabel("신고")
+        .setLabel("유저 신고")
         .setStyle(ButtonStyle.Primary),
       new ButtonBuilder()
         .setCustomId("inquiry-action:feedback")
@@ -54,6 +54,10 @@ module.exports = {
         .setLabel("개인정보처리방침")
         .setStyle(ButtonStyle.Link)
         .setURL("https://fehedeveloperteam.github.io/Chiyumi/privacy.html"),
+      new ButtonBuilder()
+        .setLabel("FeheDevTeam")
+        .setStyle(ButtonStyle.Link)
+        .setURL("https://discord.gg/fKR7RbfdmF"),
     );
 
     await interaction.reply({ embeds: [embed], components: [row, linkRow], ephemeral: true });
