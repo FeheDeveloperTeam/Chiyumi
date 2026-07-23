@@ -116,7 +116,22 @@ async function fetchRainViewerTiles() {
       console.log(`[레이더] 메타 실패 (${url.slice(0, 60)}):`, e?.message);
     }
   }
-  if (!radarBaseUrl) { console.log("[레이더] 모든 메타 소스 실패"); return null; }
+  // 메타 실패 시: 타임스탬프 추정으로 tilecache 직접 접근 (api.rainviewer.com과 다른 도메인)
+  if (!radarBaseUrl) {
+    console.log("[레이더] 메타 소스 전부 실패 → tilecache 직접 타임스탬프 추정 시도");
+    const slot = Math.floor(Date.now() / 1000 / 600) * 600;
+    for (const ts of [slot - 600, slot - 1200, slot - 1800, slot - 2400]) {
+      const probe = `https://tilecache.rainviewer.com/v2/radar/${ts}/512/${ZOOM}/54/24/6/1_1.png`;
+      const ok = await safeTile(probe, `probe(${ts})`);
+      if (ok) {
+        radarBaseUrl = `https://tilecache.rainviewer.com/v2/radar/${ts}`;
+        radarTime    = ts;
+        console.log(`[레이더] 타임스탬프 추정 성공: ${ts}`);
+        break;
+      }
+    }
+    if (!radarBaseUrl) { console.log("[레이더] tilecache 직접 접근도 실패"); return null; }
+  }
 
   const coords = [];
   for (const y of TILE_H) for (const x of TILE_W) coords.push([x, y]);
