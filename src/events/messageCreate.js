@@ -204,31 +204,29 @@ module.exports = {
                                  "✅ 지진 발생 현황 (최근 30일)";
 
         // 인라인 통계 필드
-        const eqkFields = quakes.length === 0 ? [] : (() => {
-          const maxQ   = quakes.reduce((a, b) => a.magnitude >= b.magnitude ? a : b);
-          const avgDep = Math.round(quakes.reduce((s, q) => s + q.depth, 0) / quakes.length);
-          const big3   = quakes.filter((q) => q.magnitude >= 3.0).length;
-          const pad    = (n) => String(n).padStart(2, "0");
-          const latest = new Date(quakes[0].time + 9 * 60 * 60 * 1000);
-          const latestStr = `${latest.getUTCMonth() + 1}/${latest.getUTCDate()} ${pad(latest.getUTCHours())}:${pad(latest.getUTCMinutes())} KST`;
-          return [
-            { name: "📊 발생 횟수",  value: `${quakes.length}건`,              inline: true },
-            { name: "📈 최대 규모",  value: `M${maxQ.magnitude.toFixed(1)}`,   inline: true },
-            { name: "📏 평균 깊이",  value: `${avgDep}km`,                     inline: true },
-            { name: "⚠️ M3.0 이상", value: `${big3}건`,                        inline: true },
-            { name: "🕐 최근 발생",  value: latestStr,                          inline: true },
-            { name: "📍 최대 진원",  value: maxQ.place.slice(0, 40),           inline: true },
-          ];
-        })();
+        const pad    = (n) => String(n).padStart(2, "0");
+        const maxQ   = quakes.length ? quakes.reduce((a, b) => a.magnitude >= b.magnitude ? a : b) : null;
+        const avgDep = quakes.length ? Math.round(quakes.reduce((s, q) => s + q.depth, 0) / quakes.length) : 0;
+        const big3   = quakes.filter((q) => q.magnitude >= 3.0).length;
+        const latestStr = quakes.length
+          ? (() => { const d = new Date(quakes[0].time + 9 * 60 * 60 * 1000); return `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} KST`; })()
+          : "없음";
+        const eqkFields = [
+          { name: "📊 발생 횟수",  value: `${quakes.length}건`,                             inline: true },
+          { name: "📈 최대 규모",  value: maxQ ? `M${maxQ.magnitude.toFixed(1)}` : "없음",  inline: true },
+          { name: "📏 평균 깊이",  value: quakes.length ? `${avgDep}km` : "없음",           inline: true },
+          { name: "⚠️ M3.0 이상", value: `${big3}건`,                                       inline: true },
+          { name: "🕐 최근 발생",  value: latestStr,                                         inline: true },
+          { name: "📍 최대 진원",  value: maxQ ? maxQ.place.slice(0, 40) : "없음",          inline: true },
+        ];
 
         const embed = new EmbedBuilder()
           .setColor(color)
           .setTitle(title)
           .setDescription(formatEarthquakeResponse(quakes))
+          .addFields(eqkFields)
           .setFooter({ text: "출처: USGS · 기상청 지진정보 조회서비스 · CARTO" })
           .setTimestamp();
-
-        if (eqkFields.length) embed.addFields(eqkFields);
 
         if (mapBuf) embed.setImage("attachment://earthquake_map.png");
 
