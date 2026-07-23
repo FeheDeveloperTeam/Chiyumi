@@ -13,6 +13,7 @@ const { getWeather, getWeatherComment } = require("../utils/weatherApi");
 const { buildWeatherCardImage } = require("../utils/weatherCard");
 const { getRecentEarthquakes, formatEarthquakeResponse } = require("../utils/earthquakeApi");
 const { getActiveTyphoons, formatTyphoonResponse } = require("../utils/typhoonApi");
+const { buildRadarImage } = require("../utils/radarApi");
 
 const CALL_NAME_PATTERN = /^유미야[,!~]?\s*(.*)$/s;
 
@@ -138,6 +139,23 @@ module.exports = {
       } catch (err) {
         console.log("[지진] 에러:", err?.message);
         await message.reply("지진 정보를 가져오지 못했냥... 잠깐 후에 다시 물어봐달라냥ㅠ");
+      }
+      return;
+    }
+
+    // --- 레이더 이미지 ---
+    if (input.includes("레이더")) {
+      await message.channel.sendTyping().catch(() => {});
+      try {
+        const buf        = await buildRadarImage();
+        const attachment = new AttachmentBuilder(buf, { name: "radar.png" });
+        await message.reply({
+          content: "현재 한반도 주변 강수 레이더냥! 🌧 (RainViewer · CartoDB)",
+          files:   [attachment],
+        });
+      } catch (err) {
+        console.log("[레이더] 에러:", err?.message);
+        await message.reply("레이더 이미지를 불러오지 못했냥... 잠깐 후에 다시 물어봐달라냥ㅠ");
       }
       return;
     }

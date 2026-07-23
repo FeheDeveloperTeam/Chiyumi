@@ -1,21 +1,112 @@
 // IBTrACS ACTIVE — NOAA (무료, API 키 불필요)
-// 서태평양(WP) 활동 태풍만 필터링
+// 서태평양(WP) 활동 태풍 중 한반도 주변 3500km 이내만 필터링
 
 const IBTRACS_URL =
   "https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs" +
   "/v04r00/access/csv/ibtracs.ACTIVE.list.v04r00.csv";
 
-// 서울 위치
-const SEOUL = { lat: 37.5, lon: 126.9 };
+// 주요 지점
+const SEOUL   = { lat: 37.5,  lon: 126.9 };
+const JAPAN   = { lat: 34.5,  lon: 137.5 }; // 혼슈 중심
+const CHINA   = { lat: 31.0,  lon: 121.5 }; // 상하이 인근
 
+const MAX_DIST_KM = 3500;
+
+// ── 이름 한국어 사전 ───────────────────────────────────────────
+const NAMES_KO = {
+  // 대한민국 기여
+  "GAEMI":     "개미",   "NARI":      "나리",   "JANGMI":    "장미",
+  "MIRINAE":   "미리내", "NORU":      "노루",   "GEURUM":    "구름",
+  "KONI":      "고니",   "DOKSURI":   "독수리", "GIREOGI":   "기러기",
+  "JEBI":      "제비",   "NEOGURI":   "너구리",
+  // 북한 기여
+  "TORAJI":    "도라지", "PODUL":     "버들",   "KHANUN":    "칸눈",
+  "BOLAVEN":   "볼라벤", "SANBA":     "산바",
+  // 일본 기여
+  "SHANSHAN":  "산산",   "YAGI":      "야기",   "AMPIL":     "암필",
+  "WUKONG":    "우쿵",   "USAGI":     "우사기", "FAXAI":     "파사이",
+  "HAGIBIS":   "하기비스","MITAG":    "미탁",   "TAPAH":     "타파",
+  "KRATHON":   "크라톤", "HAGUPIT":  "하구핏", "SINLAKU":   "신라쿠",
+  "ETAU":      "에타우",
+  // 캄보디아 기여
+  "DAMREY":    "담레이", "NAKRI":     "나크리", "KETSANA":   "켓사나",
+  // 중국 기여
+  "HAIKUI":    "하이쿠이","YUTU":     "위투",   "HAISHEN":   "하이선",
+  "MUYIFA":    "무이파", "MERBOK":    "머복",   "DUJUAN":    "두쥐엔",
+  "MUJIGAE":   "무지개", "CHAN-HOM":  "찬홈",   "LINFA":     "린파",
+  "NANGKA":    "낭카",   "IN-FA":     "인파",
+  // 베트남 기여
+  "TRAMI":     "트라미", "KONG-REY":  "콩레이", "MANGKHUT":  "망쿳",
+  "KAMMURI":   "캄무리", "MAWAR":     "마와르", "VAMCO":     "밤코",
+  "KROVANH":   "크로바나",
+  // 태국 기여
+  "PRAPIROON": "쁘라삐룬","WIPHA":    "위파",   "MEKKHALA":  "멕칼라",
+  "NOUL":      "노울",   "MATMO":     "마트모",
+  // 마카오 기여
+  "HATO":      "하토",   "BEBINCA":   "버빈카",
+  // 홍콩 기여
+  "SARIKA":    "사리카", "HAIMA":     "하이마", "PAKHAR":    "팍하",
+  // 말레이시아 기여
+  "RUMBIA":    "룸비아", "SOULIK":    "솔릭",   "CIMARON":   "시마론",
+  // 미국/미크로네시아 기여
+  "WUTIP":     "우팁",   "BUALOI":    "부알로이","PHANFONE":  "판폰",
+  // 최근 주요 태풍
+  "HINNAMNOR": "힌남노", "MAYSAK":    "마이삭", "BAVI":      "바비",
+  "LINGLING":  "링링",   "KROSA":     "크로사", "LEKIMA":    "레키마",
+  "FRANCISCO": "프란시스코","BAILU":  "바이루", "VONGFONG":  "봉퐁",
+  "MAN-YI":    "만이",   "FUNG-WONG": "풍웡",  "NIDA":      "나이다",
+  "HALONG":    "할롱",   "KALMAEGI":  "칼마에기","SOUDELOR":  "소우델로르",
+  "MOLAVE":    "몰라베", "CHOI-WAN":  "차이완", "KOPPU":     "코푸",
+  "CHAMPI":    "참피",   "RAI":       "라이",   "MELOR":     "멜로르",
+  "ATSANI":    "아싸니", "CEMPAKA":   "첨파카",
+};
+
+function localName(raw) {
+  const upper = raw.toUpperCase().trim();
+  if (!upper || upper === "NOT_NAMED" || upper === "NO-NAME") return null;
+  return NAMES_KO[upper] ?? null;
+}
+
+// ── Haversine 거리 ────────────────────────────────────────────
 function distKm(lat1, lon1, lat2, lon2) {
   const R  = 6371;
-  const dL = ((lat2 - lat1) * Math.PI) / 180;
-  const dO = ((lon2 - lon1) * Math.PI) / 180;
-  const a  =
-    Math.sin(dL / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dO / 2) ** 2;
+  const dL = (lat2 - lat1) * Math.PI / 180;
+  const dO = (lon2 - lon1) * Math.PI / 180;
+  const a  = Math.sin(dL / 2) ** 2 +
+             Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dO / 2) ** 2;
   return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+// ── 진행 방향 베어링 ──────────────────────────────────────────
+function bearing(lat1, lon1, lat2, lon2) {
+  const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+  const y  = Math.sin(Δλ) * Math.cos(φ2);
+  const x  = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+function angDiff(a, b) { return Math.min(Math.abs(a - b), 360 - Math.abs(a - b)); }
+
+// korea | japan | china | other
+function classifyTarget(lat, lon, pts) {
+  if (pts.length < 2) return "other";
+  const prev = pts[pts.length - 2];
+  const mb   = bearing(prev.lat, prev.lon, lat, lon);
+
+  const bK = bearing(lat, lon, SEOUL.lat,  SEOUL.lon);
+  const bJ = bearing(lat, lon, JAPAN.lat,  JAPAN.lon);
+  const bC = bearing(lat, lon, CHINA.lat,  CHINA.lon);
+
+  const dK = angDiff(mb, bK);
+  const dJ = angDiff(mb, bJ);
+  const dC = angDiff(mb, bC);
+
+  const best = Math.min(dK, dJ, dC);
+  if (best > 75) return "other"; // 어느 방향도 아님
+  if (best === dK) return "korea";
+  if (best === dJ) return "japan";
+  return "china";
 }
 
 function classifyIntensity(windKt) {
@@ -27,6 +118,7 @@ function classifyIntensity(windKt) {
   return "열대저압부";
 }
 
+// ── 데이터 로드 ───────────────────────────────────────────────
 async function getActiveTyphoons() {
   const controller = new AbortController();
   const timer      = setTimeout(() => controller.abort(), 12000);
@@ -42,18 +134,11 @@ async function getActiveTyphoons() {
   const lines = text.trim().split("\n");
   if (lines.length < 3) return [];
 
-  // 첫 번째 줄: 헤더, 두 번째 줄: 단위 → 데이터는 세 번째 줄부터
   const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, "").toUpperCase());
-
-  const col = (name) => headers.indexOf(name);
+  const col = (n) => headers.indexOf(n);
   const I = {
-    sid:   col("SID"),
-    name:  col("NAME"),
-    basin: col("BASIN"),
-    lat:   col("LAT"),
-    lon:   col("LON"),
-    wind:  col("WMO_WIND"),
-    time:  col("ISO_TIME"),
+    sid: col("SID"), name: col("NAME"), basin: col("BASIN"),
+    lat: col("LAT"), lon: col("LON"), wind: col("WMO_WIND"),
   };
 
   const storms = new Map();
@@ -61,7 +146,6 @@ async function getActiveTyphoons() {
   for (const line of lines.slice(2)) {
     if (!line.trim()) continue;
     const c = line.split(",").map((v) => v.trim().replace(/^"|"$/g, ""));
-
     if (c[I.basin] !== "WP") continue;
 
     const lat  = parseFloat(c[I.lat]);
@@ -70,10 +154,8 @@ async function getActiveTyphoons() {
     if (isNaN(lat) || isNaN(lon)) continue;
 
     const sid = c[I.sid];
-    if (!storms.has(sid)) {
-      storms.set(sid, { name: c[I.name] || "NO-NAME", points: [] });
-    }
-    storms.get(sid).points.push({ lat, lon, wind, time: c[I.time] });
+    if (!storms.has(sid)) storms.set(sid, { name: c[I.name] || "", points: [] });
+    storms.get(sid).points.push({ lat, lon, wind });
   }
 
   const result = [];
@@ -83,68 +165,80 @@ async function getActiveTyphoons() {
 
     const pts    = storm.points;
     const latest = pts[pts.length - 1];
+    const dist   = distKm(latest.lat, latest.lon, SEOUL.lat, SEOUL.lon);
 
-    // 이동 방향: 마지막 두 관측점 위도 차이
+    if (dist > MAX_DIST_KM) continue; // 너무 먼 태풍 제외
+
     const latTrend = pts.length >= 2 ? latest.lat - pts[pts.length - 2].lat : 0;
+    const target   = classifyTarget(latest.lat, latest.lon, pts);
 
-    const dist = distKm(latest.lat, latest.lon, SEOUL.lat, SEOUL.lon);
-
-    // 한국 영향권 판단: 서태평양 북상 중 + 적절한 경도대
-    const approaching =
-      latTrend > 0 &&
-      latest.lat > 10 && latest.lat < 40 &&
-      latest.lon > 115 && latest.lon < 145;
-
-    let displayName = storm.name.replace(/^NOT[-_]?NAMED$/i, "무명");
-    displayName = displayName.charAt(0) + displayName.slice(1).toLowerCase();
+    const rawName = storm.name;
+    const koName  = localName(rawName);
+    const displayName = koName ?? (rawName && rawName !== "NOT_NAMED" ? rawName : null);
 
     result.push({
-      name:       displayName,
-      lat:        latest.lat,
-      lon:        latest.lon,
-      windKt:     latest.wind,
-      windMs:     Math.round(latest.wind * 0.514),
-      latTrend,
+      name:        displayName,
+      lat:         latest.lat,
+      lon:         latest.lon,
+      windKt:      latest.wind,
+      windMs:      Math.round(latest.wind * 0.514),
       movingNorth: latTrend > 0,
       distFromSeoul: dist,
-      intensity:  classifyIntensity(latest.wind),
-      approaching,
+      intensity:   classifyIntensity(latest.wind),
+      target,       // "korea" | "japan" | "china" | "other"
     });
   }
 
-  // 서울에서 가까운 순 정렬
   result.sort((a, b) => a.distFromSeoul - b.distFromSeoul);
   return result;
 }
 
+// ── 응답 포맷 ─────────────────────────────────────────────────
+const TARGET_LABEL = {
+  korea: "🇰🇷 한국 방향 ⚠️",
+  japan: "🇯🇵 일본 방향",
+  china: "🇨🇳 중국 방향",
+  other: "기타 방향",
+};
+
 function formatTyphoonResponse(typhoons) {
-  if (typhoons.length === 0) {
-    return "현재 서태평양에 활동 중인 태풍은 없냥! 😸 안전한 날씨다냥~";
+  if (!typhoons.length) {
+    return "현재 한반도 주변 3,500km 이내에 활동 중인 태풍은 없냥! 😸 안전한 날씨다냥~";
   }
 
-  const blocks = typhoons.map((t) => {
-    const dir    = t.movingNorth ? "북상 중 ↑" : t.latTrend < 0 ? "남하 중 ↓" : "정체";
-    const danger = t.approaching ? "\n│  ⚠️ **한국 접근 가능성 주의!**" : "";
+  const koreaBound = typhoons.filter((t) => t.target === "korea");
+  const others     = typhoons.filter((t) => t.target !== "korea");
 
-    return (
-      `**🌀 태풍 ${t.name}** (${t.intensity})\n` +
-      `├ 위치: 북위 ${t.lat.toFixed(1)}° / 동경 ${t.lon.toFixed(1)}°\n` +
-      `├ 최대풍속: ${t.windMs} m/s (${t.windKt}kt)\n` +
-      `├ 이동: ${dir}${danger}\n` +
-      `└ 서울까지: 약 ${t.distFromSeoul.toLocaleString()}km`
-    );
-  });
+  const lines = [];
 
-  const anyApproaching = typhoons.some((t) => t.approaching);
-  const footer = anyApproaching
-    ? "\n\n⚠️ 북상 중인 태풍이 있냥! 기상 예보 계속 확인해달라냥!"
-    : "\n\n현재 한국에 직접 영향을 줄 태풍은 없는 것 같냥~";
+  // 한국 방향 태풍 우선 강조
+  if (koreaBound.length) {
+    lines.push("⚠️ **한국 방향으로 접근 중인 태풍이 있냥!**\n");
+    for (const t of koreaBound) lines.push(typhoonBlock(t));
+  } else {
+    lines.push("✅ **현재 한국 방향으로 오는 태풍은 없냥~**");
+  }
 
+  // 중국·일본 방향 태풍
+  const nearbyOthers = others.filter((t) => t.target === "japan" || t.target === "china");
+  if (nearbyOthers.length) {
+    lines.push(koreaBound.length ? "\n**주변 태풍 현황:**" : "\n**주변 태풍 현황 (참고):**");
+    for (const t of nearbyOthers) lines.push(typhoonBlock(t));
+  }
+
+  lines.push("\n출처: IBTrACS (NOAA) · 6시간 단위 갱신");
+  return lines.join("\n");
+}
+
+function typhoonBlock(t) {
+  const name  = t.name ? `태풍 ${t.name}` : "무명 태풍";
+  const dir   = TARGET_LABEL[t.target] ?? "기타";
+  const arrow = t.movingNorth ? "↑ 북상 중" : "→ 진행 중";
   return (
-    `**현재 서태평양 활동 태풍 현황**\n\n` +
-    blocks.join("\n\n") +
-    footer +
-    "\n\n출처: IBTrACS (NOAA)"
+    `\n**🌀 ${name}** (${t.intensity}) — ${dir}\n` +
+    `├ 위치: 북위 ${t.lat.toFixed(1)}° / 동경 ${t.lon.toFixed(1)}°\n` +
+    `├ 최대풍속: ${t.windMs} m/s (${t.windKt}kt) · ${arrow}\n` +
+    `└ 서울까지: 약 ${t.distFromSeoul.toLocaleString()}km`
   );
 }
 
