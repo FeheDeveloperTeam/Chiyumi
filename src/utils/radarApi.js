@@ -1,53 +1,70 @@
 // RainViewer(레이더) + CartoDB(지도) 타일 합성
 // 한반도 + 주변 해역 (zoom 6, 3×3 타일)
 
-const { createCanvas, loadImage } = require("@napi-rs/canvas");
+const { createCanvas, loadImage, GlobalFonts } = require("@napi-rs/canvas");
+const { boldBase64, regularBase64 } = require("../assets/fontData");
 
-// zoom 6에서 한반도·일본·중국 동부를 포함하는 타일 범위
-// lon 118°E~135°E / lat 40°N~28°N 커버
-const ZOOM    = 6;
-const TILE_W  = [53, 54, 55]; // 서→동
-const TILE_H  = [23, 24, 25]; // 북→남
-const TS      = 512;           // 타일 픽셀 사이즈
+GlobalFonts.register(Buffer.from(boldBase64,    "base64"), "Plex Bold");
+GlobalFonts.register(Buffer.from(regularBase64, "base64"), "Plex Regular");
 
-const COLS = TILE_W.length;
-const ROWS = TILE_H.length;
-const IMG_W = TS * COLS; // 1536
-const IMG_H = TS * ROWS; // 1536
-const OUT_W = 900;
-const OUT_H = 900;
+const ZOOM  = 6;
+const TILE_W = [53, 54, 55]; // 서→동 (lon ~118°E~135°E)
+const TILE_H = [23, 24, 25]; // 북→남 (lat ~40°N~28°N)
+const TS     = 512;
+const IMG_W  = TS * TILE_W.length; // 1536
+const IMG_H  = TS * TILE_H.length; // 1536
+const OUT_W  = 900;
+const OUT_H  = 900;
 
-async function safeTile(url) {
+async function safeTile(url, label) {
   try {
-    const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(url, {
-      signal:  controller.signal,
-      headers: { "User-Agent": "ChiyumiBot/1.0 (Discord weather bot)" },
+    const ctrl = new AbortController();
+    const t    = setTimeout(() => ctrl.abort(), 10000);
+    const res  = await fetch(url, {
+      signal:  ctrl.signal,
+      headers: { "User-Agent": "ChiyumiBot/1.0" },
     });
     clearTimeout(t);
-    if (!res.ok) return null;
-    return loadImage(Buffer.from(await res.arrayBuffer()));
-  } catch {
+    if (!res.ok) {
+      console.log(`[레이더] 타일 ${label} HTTP ${res.status}: ${url}`);
+      return null;
+    }
+    const buf = Buffer.from(await res.arrayBuffer());
+    return loadImage(buf);
+  } catch (e) {
+    console.log(`[레이더] 타일 ${label} 실패: ${e?.message} | ${url}`);
     return null;
   }
 }
 
-function getNowKST() {
-  const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+function kstLabel(unixSec) {
+  const d   = new Date(unixSec * 1000 + 9 * 60 * 60 * 1000);
   const pad = (n) => String(n).padStart(2, "0");
-  return `${kst.getUTCMonth() + 1}/${kst.getUTCDate()} ${pad(kst.getUTCHours())}:${pad(kst.getUTCMinutes())} KST`;
+  return `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} KST`;
 }
 
 async function buildRadarImage() {
-  // 1. RainViewer 최신 레이더 타임스탬프 조회
-  let radarTime;
+  // 1. RainViewer API에서 최신 레이더 경로 조회
+  let radarBaseUrl = null;
+  let radarTime    = null;
+
   try {
-    const meta  = await fetch("https://api.rainviewer.com/public/weather-maps.json").then((r) => r.json());
+    const ctrl  = new AbortController();
+    const t     = setTimeout(() => ctrl.abort(), 8000);
+    const meta  = await fetch("https://api.rainviewer.com/public/weather-maps.json", { signal: ctrl.signal }).then((r) => r.json());
+    clearTimeout(t);
+
+    const host  = meta?.host ?? "https://tilecache.rainviewer.com";
     const past  = meta?.radar?.past ?? [];
-    radarTime   = past[past.length - 1]?.time ?? null;
-  } catch {
-    radarTime = null;
+    const frame = past[past.length - 1];
+    console.log("[레이더] API 응답 host:", host, "| 최신 frame:", JSON.stringify(frame));
+
+    if (frame?.path) {
+      radarBaseUrl = `${host}${frame.path}`;
+      radarTime    = frame.time;
+    }
+  } catch (e) {
+    console.log("[레이더] API 메타 조회 실패:", e?.message);
   }
 
   // 2. 타일 좌표 목록
@@ -55,77 +72,82 @@ async function buildRadarImage() {
   for (const y of TILE_H) for (const x of TILE_W) coords.push([x, y]);
 
   // 3. CartoDB 기본지도 + RainViewer 레이더 병렬 다운로드
+  // color scheme 6 (Meteored — 선명한 색상), options 1_1 (smooth + snow)
   const [baseTiles, radarTiles] = await Promise.all([
     Promise.all(
       coords.map(([x, y]) =>
-        safeTile(`https://basemaps.cartocdn.com/dark_all/${ZOOM}/${x}/${y}.png`)
+        safeTile(`https://basemaps.cartocdn.com/dark_all/${ZOOM}/${x}/${y}.png`, `base(${x},${y})`)
       )
     ),
-    radarTime
+    radarBaseUrl
       ? Promise.all(
           coords.map(([x, y]) =>
-            safeTile(
-              `https://tilecache.rainviewer.com/v2/radar/${radarTime}/512/${ZOOM}/${x}/${y}/2/1_1.png`
-            )
+            safeTile(`${radarBaseUrl}/512/${ZOOM}/${x}/${y}/6/1_1.png`, `radar(${x},${y})`)
           )
         )
       : Promise.resolve(coords.map(() => null)),
   ]);
 
-  // 4. 캔버스 합성 (1536×1536)
+  const radarLoaded = radarTiles.filter(Boolean).length;
+  console.log(`[레이더] base=${baseTiles.filter(Boolean).length}/9, radar=${radarLoaded}/9`);
+
+  // 4. 캔버스 합성
   const canvas = createCanvas(IMG_W, IMG_H);
   const ctx    = canvas.getContext("2d");
 
-  // 기본 배경 (지도 타일 로드 실패 시 대비)
-  ctx.fillStyle = "#1a1e2e";
+  ctx.fillStyle = "#111827";
   ctx.fillRect(0, 0, IMG_W, IMG_H);
 
   coords.forEach(([x, y], i) => {
     const xi = TILE_W.indexOf(x);
     const yi = TILE_H.indexOf(y);
-    const dx = xi * TS;
-    const dy = yi * TS;
+    const dx = xi * TS, dy = yi * TS;
 
-    if (baseTiles[i]) ctx.drawImage(baseTiles[i], dx, dy, TS, TS);
+    if (baseTiles[i])  ctx.drawImage(baseTiles[i], dx, dy, TS, TS);
 
     if (radarTiles[i]) {
-      ctx.globalAlpha = 0.75;
+      ctx.globalAlpha = 0.85;
       ctx.drawImage(radarTiles[i], dx, dy, TS, TS);
       ctx.globalAlpha = 1.0;
     }
   });
 
-  // 5. 그리드 선 (타일 경계 확인용 — 생략 가능)
-  // ctx.strokeStyle = "rgba(255,255,255,0.05)"; ...
+  // 레이더 데이터 없을 때 안내
+  if (!radarLoaded) {
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(IMG_W / 2 - 280, IMG_H / 2 - 36, 560, 72);
+    ctx.fillStyle = "#ffdd57";
+    ctx.font      = "bold 32px 'Plex Bold'";
+    ctx.textAlign = "center";
+    ctx.fillText("레이더 데이터 없음", IMG_W / 2, IMG_H / 2 + 12);
+    ctx.textAlign = "left";
+  }
 
-  // 6. 하단 정보 바
-  const barH = 44;
-  ctx.fillStyle = "rgba(0, 0, 0, 0.72)";
-  ctx.fillRect(0, IMG_H - barH, IMG_W, barH);
+  // 5. 하단 정보 바
+  const timeStr = radarTime ? kstLabel(radarTime) : "시간 불명";
+
+  ctx.fillStyle = "rgba(0,0,0,0.75)";
+  ctx.fillRect(0, IMG_H - 46, IMG_W, 46);
 
   ctx.fillStyle = "#e1aa74";
-  ctx.font = "bold 28px sans-serif";
+  ctx.font      = "bold 28px 'Plex Bold'";
   ctx.textAlign = "left";
-  ctx.fillText("🌧 레이더", 24, IMG_H - 12);
+  ctx.fillText("🌧 강수 레이더", 20, IMG_H - 12);
 
   ctx.fillStyle = "#cccccc";
-  ctx.font = "22px sans-serif";
+  ctx.font      = "22px 'Plex Regular'";
   ctx.textAlign = "center";
-  const label = radarTime
-    ? `${new Date(radarTime * 1000).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} KST`
-    : getNowKST() + " (기준시 불명)";
-  ctx.fillText(label, IMG_W / 2, IMG_H - 12);
+  ctx.fillText(timeStr, IMG_W / 2, IMG_H - 12);
 
-  ctx.fillStyle = "#888888";
-  ctx.font = "18px sans-serif";
+  ctx.fillStyle = "#666666";
+  ctx.font      = "18px 'Plex Regular'";
   ctx.textAlign = "right";
   ctx.fillText("© CARTO · RainViewer", IMG_W - 20, IMG_H - 12);
 
-  // 7. OUT_W × OUT_H 로 리사이즈
-  const out    = createCanvas(OUT_W, OUT_H);
-  const octx   = out.getContext("2d");
+  // 6. 900×900 리사이즈
+  const out  = createCanvas(OUT_W, OUT_H);
+  const octx = out.getContext("2d");
   octx.drawImage(canvas, 0, 0, IMG_W, IMG_H, 0, 0, OUT_W, OUT_H);
-
   return out.encode("png");
 }
 
