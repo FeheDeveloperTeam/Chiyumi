@@ -23,6 +23,22 @@ const WEATHER_STOP_WORDS = new Set([
   "어때요", "알려주세요", "어떤지", "궁금해", "좀", "한번", "요즘",
 ]);
 
+// 날씨 임베드 제목 이모지 + 도시명
+function weatherEmbedTitle(w) {
+  const g = parseFloat(w.windGust ?? "0");
+  let emoji;
+  if      (g >= 17)               emoji = "🌀";
+  else if (g >= 14)               emoji = "🌬️";
+  else if (w.pty === 3)           emoji = "❄️";
+  else if (w.pty === 2)           emoji = "🌨️";
+  else if (w.pty === 4)           emoji = "🌦️";
+  else if (w.pty === 1)           emoji = "🌧️";
+  else if (w.sky === 4)           emoji = "☁️";
+  else if (w.sky === 3)           emoji = "⛅";
+  else                            emoji = "☀️";
+  return `${emoji} ${w.cityName} 날씨`;
+}
+
 // 날씨 임베드 사이드바 색상 (날씨 카드 테마와 동일 기준)
 function weatherEmbedColor(w) {
   const g = parseFloat(w.windGust ?? "0");
@@ -163,9 +179,15 @@ module.exports = {
       try {
         const buf        = await buildRadarImage();
         const attachment = new AttachmentBuilder(buf, { name: "radar.png" });
+        const radarEmbed = new EmbedBuilder()
+          .setColor(0x2c5aa0)
+          .setTitle("📡 강수 레이더 (한반도 주변)")
+          .setImage("attachment://radar.png")
+          .setFooter({ text: "RainViewer · CARTO" })
+          .setTimestamp();
         await message.reply({
-          content: "현재 한반도 주변 강수 레이더냥! 🌧 (RainViewer · CartoDB)",
-          files:   [attachment],
+          embeds: [radarEmbed],
+          files:  [attachment],
         });
       } catch (err) {
         console.log("[레이더] 에러:", err?.message);
@@ -235,20 +257,28 @@ module.exports = {
         const dateLabel  = `${weather.fcstDate.slice(4,6)}/${weather.fcstDate.slice(6,8)} ${weather.fcstTime.slice(0,2)}시 기준`;
         const embed = new EmbedBuilder()
           .setColor(embedColor)
+          .setTitle(weatherEmbedTitle(weather))
           .setDescription(getWeatherComment(weather))
           .setImage("attachment://weather.png")
-          .setFooter({ text: `Open-Meteo · ${dateLabel}` });
+          .setFooter({ text: `Open-Meteo · ${dateLabel}` })
+          .setTimestamp();
 
         await message.reply({
           embeds: [embed],
           files:  [new AttachmentBuilder(cardBuffer, { name: "weather.png" })],
         });
 
-        // 레이더 → 별도 메시지 (갤러리 방지)
+        // 레이더 → 별도 임베드 (갤러리 방지)
         if (radarBuf) {
+          const radarEmbed = new EmbedBuilder()
+            .setColor(0x2c5aa0)
+            .setTitle("📡 강수 레이더 (한반도 주변)")
+            .setImage("attachment://radar.png")
+            .setFooter({ text: "RainViewer · CARTO" })
+            .setTimestamp();
           await message.channel.send({
-            content: "📡 현재 강수 레이더 (한반도 주변)",
-            files:   [new AttachmentBuilder(radarBuf, { name: "radar.png" })],
+            embeds: [radarEmbed],
+            files:  [new AttachmentBuilder(radarBuf, { name: "radar.png" })],
           });
         }
         console.log("[날씨] 응답 완료");
