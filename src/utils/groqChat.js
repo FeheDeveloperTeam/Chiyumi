@@ -111,8 +111,8 @@ const FOREIGN_RE = /[a-zA-ZÀ-ÿḀ-ỿ぀-ヿㇰ-ㇿ一-鿿豈-﫿･-ﾟ]/g;
 async function askGroq(channelId, userId, userMessage) {
   const isDev = userId === DEVELOPER_ID;
 
-  if (!checkRateLimit(userId)) return "1분에 5번만 말 걸 수 있냥! 잠깐 기다려달라냥~";
-  if (!isDev && isHarmfulInput(userMessage)) return "그런 말은 나한테 하면 안 됩니다냥! 착하게 대화해줘야 한다냥 😾";
+  if (!checkRateLimit(userId)) return "1분에 5번만 말 걸 수 있냥! 잠깐 기다려달라냥~ (오류 코드: AI-001)";
+  if (!isDev && isHarmfulInput(userMessage)) return "그런 말은 나한테 하면 안 됩니다냥! 착하게 대화해줘야 한다냥 😾 (오류 코드: AI-002)";
 
   const history = getHistory(channelId);
   const userLabel = isDev ? "페헤님" : "집사";
@@ -147,13 +147,12 @@ async function askGroq(channelId, userId, userMessage) {
           });
         } catch {
           history.pop();
-          return "지금 채팅 한도가 꽉 찼냥... 잠깐 후에 다시 말 걸어줘냥!";
+          return "지금 채팅 한도가 꽉 찼냥... 잠깐 후에 다시 말 걸어줘냥! (오류 코드: AI-003)";
         }
       }
     } else {
       history.pop();
-      if (groqErr?.status === 429) return "지금 채팅 한도가 꽉 찼냥... 무료 버전이라 어쩔 수 없냥ㅠ 관리자한테 문의해달라냥!";
-      return "지금 말하기가 어렵냥... 잠깐 후에 다시 말 걸어줘냥!";
+      return "지금 말하기가 어렵냥... 잠깐 후에 다시 말 걸어줘냥! (오류 코드: AI-004)";
     }
   }
 
