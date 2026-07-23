@@ -23,6 +23,19 @@ const WEATHER_STOP_WORDS = new Set([
   "어때요", "알려주세요", "어떤지", "궁금해", "좀", "한번", "요즘",
 ]);
 
+// 날씨 임베드 사이드바 색상 (날씨 카드 테마와 동일 기준)
+function weatherEmbedColor(w) {
+  const g = parseFloat(w.windGust ?? "0");
+  if (g >= 17)                        return 0x9b59b6; // 태풍급
+  if (g >= 14)                        return 0xe67e22; // 강풍
+  if (w.pty === 3)                    return 0xaec6e8; // 눈
+  if (w.pty === 2)                    return 0x6699bb; // 비눈
+  if (w.pty === 1 || w.pty === 4)     return 0x3a7fe8; // 비/소나기
+  if (w.sky === 4)                    return 0x7f8c8d; // 흐림
+  if (w.sky === 3)                    return 0xd4a843; // 구름많음
+  return 0xe1aa74;                                     // 맑음
+}
+
 function extractCityFromWeatherQuery(input) {
   const beforeWeather = input.split(/날씨/)[0].trim();
   const words = beforeWeather.split(/\s+/).filter((w) => w && !WEATHER_STOP_WORDS.has(w));
@@ -203,7 +216,6 @@ module.exports = {
 
       try {
         console.log("[날씨] API 호출 시작");
-        // 날씨 데이터와 레이더 병렬 요청
         const [weather, radarBuf] = await Promise.all([
           getWeather(cityQuery),
           buildRadarImage().catch((e) => { console.log("[날씨/레이더] 실패:", e?.message); return null; }),
@@ -216,12 +228,29 @@ module.exports = {
 
         console.log("[날씨] 카드 생성 시작");
         const cardBuffer = await buildWeatherCardImage(weather);
-        console.log("[날씨] 카드 생성 완료, 크기:", cardBuffer?.length);
+        console.log("[날씨] 카드 생성 완료");
 
-        const files = [new AttachmentBuilder(cardBuffer, { name: "weather.png" })];
-        if (radarBuf) files.push(new AttachmentBuilder(radarBuf, { name: "radar.png" }));
+        // 날씨 카드 → 임베드
+        const embedColor = weatherEmbedColor(weather);
+        const dateLabel  = `${weather.fcstDate.slice(4,6)}/${weather.fcstDate.slice(6,8)} ${weather.fcstTime.slice(0,2)}시 기준`;
+        const embed = new EmbedBuilder()
+          .setColor(embedColor)
+          .setDescription(getWeatherComment(weather))
+          .setImage("attachment://weather.png")
+          .setFooter({ text: `Open-Meteo · ${dateLabel}` });
 
-        await message.reply({ content: getWeatherComment(weather), files });
+        await message.reply({
+          embeds: [embed],
+          files:  [new AttachmentBuilder(cardBuffer, { name: "weather.png" })],
+        });
+
+        // 레이더 → 별도 메시지 (갤러리 방지)
+        if (radarBuf) {
+          await message.channel.send({
+            content: "📡 현재 강수 레이더 (한반도 주변)",
+            files:   [new AttachmentBuilder(radarBuf, { name: "radar.png" })],
+          });
+        }
         console.log("[날씨] 응답 완료");
       } catch (err) {
         console.log("[날씨] 에러:", err?.message, err?.stack);
