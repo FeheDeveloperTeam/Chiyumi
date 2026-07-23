@@ -19,6 +19,8 @@ const OUT_H  = 900;
 // 프록시별 URL 생성 함수 (인코딩 방식이 각자 다름)
 const PROXY_MAKERS = [
   (u) => `https://cors.eu.org/${u}`,
+  (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  (u) => `https://proxy.cors.sh/${u}`,
   (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
   (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
 ];
@@ -99,7 +101,7 @@ async function fetchRainViewerTiles() {
   for (const url of metaUrls) {
     try {
       const ctrl = new AbortController();
-      const t    = setTimeout(() => ctrl.abort(), 8000);
+      const t    = setTimeout(() => ctrl.abort(), 15000);
       const res  = await fetch(url, {
         signal:  ctrl.signal,
         headers: { "User-Agent": "Mozilla/5.0 ChiyumiBot/1.0" },
