@@ -39,6 +39,31 @@ function weatherEmbedTitle(w) {
   return `${emoji} ${w.cityName} 날씨`;
 }
 
+// 날씨 임베드 인라인 필드 (2행 × 3열)
+function weatherEmbedFields(w) {
+  const g       = parseFloat(w.windGust ?? "0");
+  const windVal = g >= 1
+    ? `${w.windSpeed} m/s\n(돌풍 ${w.windGust} m/s)`
+    : `${w.windSpeed} m/s`;
+
+  let pm25Text;
+  const pm = parseInt(w.pm25 ?? "-1");
+  if (pm < 0)    pm25Text = "정보없음";
+  else if (pm <= 15) pm25Text = `좋음 (${pm}㎍)`;
+  else if (pm <= 35) pm25Text = `보통 (${pm}㎍)`;
+  else if (pm <= 75) pm25Text = `나쁨 (${pm}㎍)`;
+  else               pm25Text = `매우나쁨 (${pm}㎍)`;
+
+  return [
+    { name: "🌡️ 기온",     value: `${w.temperature}°C`,   inline: true },
+    { name: "🌡️ 체감온도", value: `${w.apparentTemp}°C`,  inline: true },
+    { name: "💧 습도",      value: `${w.humidity}%`,       inline: true },
+    { name: "🌧️ 강수확률", value: `${w.precipProb}%`,     inline: true },
+    { name: "💨 풍속",      value: windVal,                 inline: true },
+    { name: "🏭 미세먼지",  value: pm25Text,               inline: true },
+  ];
+}
+
 // 날씨 임베드 사이드바 색상 (날씨 카드 테마와 동일 기준)
 function weatherEmbedColor(w) {
   const g = parseFloat(w.windGust ?? "0");
@@ -259,6 +284,7 @@ module.exports = {
           .setColor(embedColor)
           .setTitle(weatherEmbedTitle(weather))
           .setDescription(getWeatherComment(weather))
+          .addFields(weatherEmbedFields(weather))
           .setImage("attachment://weather.png")
           .setFooter({ text: `Open-Meteo · ${dateLabel}` })
           .setTimestamp();
