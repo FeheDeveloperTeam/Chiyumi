@@ -59,13 +59,18 @@ async function fetchKmaEarthquakes() {
   const res  = await fetch(url, { signal: ctrl.signal, headers: { "User-Agent": "ChiyumiBot/1.0" } });
   clearTimeout(t);
 
-  const ct   = res.headers.get("content-type") ?? "";
-  if (!res.ok || !ct.includes("json")) {
-    const text = await res.text();
-    console.log("[지진지도] KMA 비정상 응답:", res.status, text.slice(0, 120));
-    throw new Error(`KMA 응답 오류: ${text.slice(0, 80)}`);
+  const text = await res.text();
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    console.log("[지진지도] KMA 비JSON 응답 (HTTP", res.status, "):", text.slice(0, 120));
+    throw new Error(`KMA 비JSON 응답: ${text.slice(0, 80)}`);
   }
-  const json = await res.json();
+  if (!res.ok) {
+    console.log("[지진지도] KMA HTTP 오류:", res.status, JSON.stringify(json).slice(0, 120));
+    throw new Error(`KMA HTTP ${res.status}`);
+  }
   console.log("[지진지도] KMA 응답 코드:", json?.response?.header?.resultCode);
 
   const items = json?.response?.body?.items?.item ?? [];
