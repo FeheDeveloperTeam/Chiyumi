@@ -1,4 +1,4 @@
-const { Events, EmbedBuilder } = require("discord.js");
+const { Events, EmbedBuilder, AttachmentBuilder } = require("discord.js");
 const { nya } = require("../utils/nya");
 const { containsProfanity } = require("../utils/profanityFilter");
 const { isSpam } = require("../utils/spamFilter");
@@ -9,8 +9,21 @@ const { announceLevelUp } = require("../utils/levelUpAnnounce");
 const { hasAgreed } = require("../utils/consent");
 const { handleMessage: handleWordChainMessage } = require("../utils/wordchainGame");
 const { askGroq } = require("../utils/groqChat");
+const { getWeather, getWeatherComment } = require("../utils/weatherApi");
+const { buildWeatherCardImage } = require("../utils/weatherCard");
 
 const CALL_NAME_PATTERN = /^유미야[,!~]?\s*(.*)$/s;
+
+const WEATHER_STOP_WORDS = new Set([
+  "오늘", "내일", "지금", "현재", "날씨", "어때", "알려줘",
+  "어때요", "알려주세요", "어떤지", "궁금해", "좀", "한번", "요즘",
+]);
+
+function extractCityFromWeatherQuery(input) {
+  const beforeWeather = input.split(/날씨/)[0].trim();
+  const words = beforeWeather.split(/\s+/).filter((w) => w && !WEATHER_STOP_WORDS.has(w));
+  return words[words.length - 1] ?? null;
+}
 
 async function handleProfanity(message) {
   await message.delete().catch(() => {});
@@ -113,6 +126,33 @@ module.exports = {
 
     const rest = match[1].trim();
     const input = rest || "불렀어?";
+
+    // --- 날씨 처리 ---
+    if (input.includes("날씨")) {
+      const cityQuery = extractCityFromWeatherQuery(input);
+      if (!cityQuery) {
+        await message.reply("어느 지역 날씨가 궁금하냥? 도시 이름을 같이 말해달라냥~");
+        return;
+      }
+
+      await message.channel.sendTyping().catch(() => {});
+
+      try {
+        const weather = await getWeather(cityQuery);
+        if (!weather) {
+          await message.reply(`**${cityQuery}**은(는) 아직 지원하지 않는 지역이냥... 😿 다른 도시 이름으로 물어봐달라냥~`);
+          return;
+        }
+
+        const cardBuffer = await buildWeatherCardImage(weather);
+        const attachment = new AttachmentBuilder(cardBuffer, { name: "weather.png" });
+        await message.reply({ content: getWeatherComment(weather), files: [attachment] });
+      } catch (err) {
+        console.error("[날씨]", err);
+        await message.reply("날씨 정보를 가져오지 못했냥... 잠깐 후에 다시 물어봐달라냥ㅠ");
+      }
+      return;
+    }
 
     await message.channel.sendTyping().catch(() => {});
 
