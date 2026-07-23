@@ -61,27 +61,36 @@ function kstLabel(unixSec) {
 }
 
 async function buildRadarImage() {
-  // 1. RainViewer 메타데이터 (직접 접근 가능)
+  // 1. RainViewer 메타데이터 — 직접 시도 후 프록시 fallback
   let radarBaseUrl = null;
   let radarTime    = null;
 
-  try {
-    const ctrl = new AbortController();
-    const t    = setTimeout(() => ctrl.abort(), 8000);
-    const meta = await fetch("https://api.rainviewer.com/public/weather-maps.json", { signal: ctrl.signal }).then((r) => r.json());
-    clearTimeout(t);
+  const META_URL = "https://api.rainviewer.com/public/weather-maps.json";
+  const metaUrls = [META_URL, proxyUrl(META_URL)];
 
-    const host  = meta?.host ?? "https://tilecache.rainviewer.com";
-    const past  = meta?.radar?.past ?? [];
-    const frame = past[past.length - 1];
-    console.log("[레이더] frame:", JSON.stringify(frame));
+  for (const url of metaUrls) {
+    try {
+      const ctrl = new AbortController();
+      const t    = setTimeout(() => ctrl.abort(), 8000);
+      const meta = await fetch(url, {
+        signal:  ctrl.signal,
+        headers: { "User-Agent": "ChiyumiBot/1.0", "x-requested-with": "ChiyumiBot" },
+      }).then((r) => r.json());
+      clearTimeout(t);
 
-    if (frame?.path) {
-      radarBaseUrl = `${host}${frame.path}`;
-      radarTime    = frame.time;
+      const host  = meta?.host ?? "https://tilecache.rainviewer.com";
+      const past  = meta?.radar?.past ?? [];
+      const frame = past[past.length - 1];
+      console.log("[레이더] 메타 소스:", url.includes("cors") ? "프록시" : "직접", "| frame:", JSON.stringify(frame));
+
+      if (frame?.path) {
+        radarBaseUrl = `${host}${frame.path}`;
+        radarTime    = frame.time;
+        break;
+      }
+    } catch (e) {
+      console.log("[레이더] 메타 조회 실패:", e?.message, "| url:", url.includes("cors") ? "프록시" : "직접");
     }
-  } catch (e) {
-    console.log("[레이더] 메타 조회 실패:", e?.message);
   }
 
   // 2. 타일 좌표 목록
