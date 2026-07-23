@@ -203,7 +203,11 @@ module.exports = {
 
       try {
         console.log("[날씨] API 호출 시작");
-        const weather = await getWeather(cityQuery);
+        // 날씨 데이터와 레이더 병렬 요청
+        const [weather, radarBuf] = await Promise.all([
+          getWeather(cityQuery),
+          buildRadarImage().catch((e) => { console.log("[날씨/레이더] 실패:", e?.message); return null; }),
+        ]);
         console.log("[날씨] API 결과:", JSON.stringify(weather));
         if (!weather) {
           await message.reply(`**${cityQuery}**은(는) 아직 지원하지 않는 지역이냥... 😿 다른 도시 이름으로 물어봐달라냥~`);
@@ -213,8 +217,11 @@ module.exports = {
         console.log("[날씨] 카드 생성 시작");
         const cardBuffer = await buildWeatherCardImage(weather);
         console.log("[날씨] 카드 생성 완료, 크기:", cardBuffer?.length);
-        const attachment = new AttachmentBuilder(cardBuffer, { name: "weather.png" });
-        await message.reply({ content: getWeatherComment(weather), files: [attachment] });
+
+        const files = [new AttachmentBuilder(cardBuffer, { name: "weather.png" })];
+        if (radarBuf) files.push(new AttachmentBuilder(radarBuf, { name: "radar.png" }));
+
+        await message.reply({ content: getWeatherComment(weather), files });
         console.log("[날씨] 응답 완료");
       } catch (err) {
         console.log("[날씨] 에러:", err?.message, err?.stack);
