@@ -18,6 +18,7 @@ const INFO_TOGGLES = [
   { key: "showJoinedAt",    label: "서버 입장일" },
   { key: "showLeftAt",      label: "퇴장 일시" },
   { key: "showMemberCount", label: "현재 인원" },
+  { key: "showInviter",     label: "초대자" },
 ];
 
 function buildWelcomeEmbed(guildId) {

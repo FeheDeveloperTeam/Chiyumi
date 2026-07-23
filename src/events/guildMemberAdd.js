@@ -1,6 +1,7 @@
 const { Events, EmbedBuilder } = require("discord.js");
 const { getWelcomeChannelId, getWelcomeOptions, getWelcomeMessage } = require("../utils/guildConfig");
 const { formatWelcomeMessage } = require("../utils/welcomeFormat");
+const { findUsedInvite } = require("../utils/inviteTracker");
 
 module.exports = {
   name: Events.GuildMemberAdd,
@@ -23,6 +24,8 @@ module.exports = {
       .setColor(0xe1aa74)
       .setTimestamp();
 
+    const inviter = options.showInviter ? await findUsedInvite(member.guild) : null;
+
     const fields = [];
     if (options.showCreatedAt) {
       fields.push({
@@ -35,6 +38,13 @@ module.exports = {
       fields.push({
         name: "🚪 서버 입장일",
         value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:F>`,
+        inline: true,
+      });
+    }
+    if (options.showInviter) {
+      fields.push({
+        name: "📨 초대자",
+        value: inviter ? `${inviter}` : "알 수 없음",
         inline: true,
       });
     }

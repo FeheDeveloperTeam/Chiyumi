@@ -71,6 +71,7 @@ const DEFAULT_WELCOME_OPTIONS = {
   showJoinedAt: false,     // 서버 입장일
   showLeftAt: false,       // 퇴장 일시 (퇴장 메시지 전용)
   showMemberCount: false,  // 현재 서버 인원수
+  showInviter: false,      // 초대자 (입장 전용)
 };
 
 const DEFAULT_JOIN_MESSAGE = "{유저}님이 {서버}에 입장했습니다";

@@ -6,6 +6,7 @@ const { applyDailyInterest } = require("../utils/bank");
 const { buildSupportEmbed } = require("../utils/supportInfo");
 const { getAllConfigs } = require("../utils/guildConfig");
 const { checkAllStreams } = require("../utils/streamAlert");
+const { cacheGuildInvites } = require("../utils/inviteTracker");
 
 const SHEETS_SYNC_INTERVAL_MS = 15 * 60 * 1000;
 const KST_TIMEZONE = "Asia/Seoul";
@@ -129,6 +130,10 @@ module.exports = {
     updatePresence(client);
     client.on(Events.GuildCreate, () => updatePresence(client));
     client.on(Events.GuildDelete, () => updatePresence(client));
+
+    for (const guild of client.guilds.cache.values()) {
+      cacheGuildInvites(guild).catch(() => {});
+    }
 
     runSheetsSync(client);
     setInterval(() => runSheetsSync(client), SHEETS_SYNC_INTERVAL_MS);
