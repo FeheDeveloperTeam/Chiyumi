@@ -1,6 +1,5 @@
-// 기상청(KMA) 한반도 합성 레이더 이미지
-// URL: https://www.weather.go.kr/cgi-bin/rdr_new/nph-rdr_cmp_img
-// API 키 불필요, 10분 단위 갱신
+// RainViewer 레이더 + CartoDB 지도 타일 합성
+// RainViewer 타일은 cors.eu.org 프록시 경유 (tilecache.rainviewer.com 서버 직접 접근 불가)
 
 const { createCanvas, loadImage, GlobalFonts } = require("@napi-rs/canvas");
 const { boldBase64, regularBase64 } = require("../assets/fontData");
@@ -8,111 +7,170 @@ const { boldBase64, regularBase64 } = require("../assets/fontData");
 GlobalFonts.register(Buffer.from(boldBase64,    "base64"), "Plex Bold");
 GlobalFonts.register(Buffer.from(regularBase64, "base64"), "Plex Regular");
 
-const OUT_W = 900;
-const OUT_H = 900;
+const ZOOM   = 6;
+const TILE_W = [53, 54, 55]; // 서→동 (~118°E~135°E)
+const TILE_H = [23, 24, 25]; // 북→남 (~40°N~28°N)
+const TS     = 512;
+const IMG_W  = TS * TILE_W.length; // 1536
+const IMG_H  = TS * TILE_H.length; // 1536
+const OUT_W  = 900;
+const OUT_H  = 900;
 
-// 현재 KST를 YYYYMMDDHHMM (10분 단위 내림) 으로 반환
-function kstStr(offsetMin = 0) {
-  const d   = new Date(Date.now() - offsetMin * 60 * 1000 + 9 * 60 * 60 * 1000);
-  const pad = (n) => String(n).padStart(2, "0");
-  const m   = Math.floor(d.getUTCMinutes() / 10) * 10;
-  return {
-    str:   `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}${pad(d.getUTCHours())}${pad(m)}`,
-    label: `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${pad(d.getUTCHours())}:${pad(m)} KST`,
-  };
+// RainViewer 타일은 프록시 경유 (직접 접근 차단됨)
+const PROXIES = [
+  "https://cors.eu.org/",
+  "https://proxy.cors.sh/",
+];
+
+function proxyUrl(directUrl) {
+  return PROXIES[0] + directUrl;
 }
 
-async function fetchKmaRadar() {
-  // 최신부터 30분 전까지 최대 4번 시도 (서버 업로드 지연 대비)
-  for (const offsetMin of [0, 10, 20, 30]) {
-    const { str, label } = kstStr(offsetMin);
-    const url = `https://www.weather.go.kr/cgi-bin/rdr_new/nph-rdr_cmp_img` +
-                `?tm=${str}&cmp=WRC&obs=ECHO&color=C4&ef=Y&qpf=N`;
-
-    console.log(`[레이더] KMA 시도 (offset ${offsetMin}min): tm=${str}`);
-    try {
-      const ctrl = new AbortController();
-      const t    = setTimeout(() => ctrl.abort(), 10000);
-      const res  = await fetch(url, {
-        signal:  ctrl.signal,
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          "Referer":    "https://www.weather.go.kr/w/weather/radar/single.do",
-        },
-      });
-      clearTimeout(t);
-
-      const ct   = res.headers.get("content-type") ?? "";
-      const size = parseInt(res.headers.get("content-length") ?? "0");
-      console.log(`[레이더] KMA 응답 ${res.status} | ct=${ct} | size=${size}`);
-
-      if (res.ok && (ct.includes("image") || ct.includes("octet-stream"))) {
-        const buf = Buffer.from(await res.arrayBuffer());
-        if (buf.length > 1000) { // 빈 응답 방지
-          return { buf, label };
-        }
-        console.log(`[레이더] KMA 이미지 너무 작음 (${buf.length}bytes), 다음 시도`);
-      }
-    } catch (e) {
-      console.log(`[레이더] KMA 실패 (offset ${offsetMin}min):`, e?.message);
+async function safeTile(url, label) {
+  try {
+    const ctrl = new AbortController();
+    const t    = setTimeout(() => ctrl.abort(), 12000);
+    const res  = await fetch(url, {
+      signal:  ctrl.signal,
+      headers: {
+        "User-Agent": "ChiyumiBot/1.0",
+        "x-requested-with": "ChiyumiBot",
+      },
+    });
+    clearTimeout(t);
+    if (!res.ok) {
+      console.log(`[레이더] 타일 ${label} HTTP ${res.status}`);
+      return null;
     }
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length < 200) {
+      console.log(`[레이더] 타일 ${label} 너무 작음 (${buf.length}bytes)`);
+      return null;
+    }
+    return loadImage(buf);
+  } catch (e) {
+    console.log(`[레이더] 타일 ${label} 실패: ${e?.message}`);
+    return null;
   }
-  return null;
+}
+
+function kstLabel(unixSec) {
+  const d   = new Date(unixSec * 1000 + 9 * 60 * 60 * 1000);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} KST`;
 }
 
 async function buildRadarImage() {
-  const result = await fetchKmaRadar();
+  // 1. RainViewer 메타데이터 (직접 접근 가능)
+  let radarBaseUrl = null;
+  let radarTime    = null;
 
-  const canvas = createCanvas(OUT_W, OUT_H);
+  try {
+    const ctrl = new AbortController();
+    const t    = setTimeout(() => ctrl.abort(), 8000);
+    const meta = await fetch("https://api.rainviewer.com/public/weather-maps.json", { signal: ctrl.signal }).then((r) => r.json());
+    clearTimeout(t);
+
+    const host  = meta?.host ?? "https://tilecache.rainviewer.com";
+    const past  = meta?.radar?.past ?? [];
+    const frame = past[past.length - 1];
+    console.log("[레이더] frame:", JSON.stringify(frame));
+
+    if (frame?.path) {
+      radarBaseUrl = `${host}${frame.path}`;
+      radarTime    = frame.time;
+    }
+  } catch (e) {
+    console.log("[레이더] 메타 조회 실패:", e?.message);
+  }
+
+  // 2. 타일 좌표 목록
+  const coords = [];
+  for (const y of TILE_H) for (const x of TILE_W) coords.push([x, y]);
+
+  // 3. CartoDB 베이스맵 (직접) + RainViewer 레이더 (프록시) 병렬 다운로드
+  const [baseTiles, radarTiles] = await Promise.all([
+    Promise.all(
+      coords.map(([x, y]) =>
+        safeTile(
+          `https://basemaps.cartocdn.com/dark_all/${ZOOM}/${x}/${y}.png`,
+          `base(${x},${y})`
+        )
+      )
+    ),
+    radarBaseUrl
+      ? Promise.all(
+          coords.map(([x, y]) =>
+            safeTile(
+              proxyUrl(`${radarBaseUrl}/512/${ZOOM}/${x}/${y}/6/1_1.png`),
+              `radar(${x},${y})`
+            )
+          )
+        )
+      : Promise.resolve(coords.map(() => null)),
+  ]);
+
+  const radarLoaded = radarTiles.filter(Boolean).length;
+  console.log(`[레이더] base=${baseTiles.filter(Boolean).length}/9, radar=${radarLoaded}/9`);
+
+  // 4. 캔버스 합성
+  const canvas = createCanvas(IMG_W, IMG_H);
   const ctx    = canvas.getContext("2d");
 
   ctx.fillStyle = "#111827";
-  ctx.fillRect(0, 0, OUT_W, OUT_H);
+  ctx.fillRect(0, 0, IMG_W, IMG_H);
 
-  let hasData   = false;
-  let timeLabel = "시간 불명";
+  coords.forEach(([x, y], i) => {
+    const xi = TILE_W.indexOf(x);
+    const yi = TILE_H.indexOf(y);
+    const dx = xi * TS, dy = yi * TS;
 
-  if (result) {
-    try {
-      const img = await loadImage(result.buf);
-      ctx.drawImage(img, 0, 0, OUT_W, OUT_H);
-      timeLabel = result.label;
-      hasData   = true;
-    } catch (e) {
-      console.log("[레이더] 이미지 로드 실패:", e?.message);
+    if (baseTiles[i])  ctx.drawImage(baseTiles[i], dx, dy, TS, TS);
+
+    if (radarTiles[i]) {
+      ctx.globalAlpha = 0.85;
+      ctx.drawImage(radarTiles[i], dx, dy, TS, TS);
+      ctx.globalAlpha = 1.0;
     }
-  }
+  });
 
-  if (!hasData) {
+  // 레이더 데이터 없을 때
+  if (!radarLoaded) {
     ctx.fillStyle = "rgba(0,0,0,0.6)";
-    ctx.fillRect(OUT_W / 2 - 280, OUT_H / 2 - 36, 560, 72);
+    ctx.fillRect(IMG_W / 2 - 280, IMG_H / 2 - 36, 560, 72);
     ctx.fillStyle = "#ffdd57";
     ctx.font      = "bold 32px 'Plex Bold'";
     ctx.textAlign = "center";
-    ctx.fillText("레이더 데이터 없음", OUT_W / 2, OUT_H / 2 + 12);
+    ctx.fillText("레이더 데이터 없음", IMG_W / 2, IMG_H / 2 + 12);
     ctx.textAlign = "left";
   }
 
-  // 하단 정보 바
+  // 5. 하단 정보 바
+  const timeStr = radarTime ? kstLabel(radarTime) : "시간 불명";
+
   ctx.fillStyle = "rgba(0,0,0,0.75)";
-  ctx.fillRect(0, OUT_H - 46, OUT_W, 46);
+  ctx.fillRect(0, IMG_H - 46, IMG_W, 46);
 
   ctx.fillStyle = "#e1aa74";
   ctx.font      = "bold 28px 'Plex Bold'";
   ctx.textAlign = "left";
-  ctx.fillText("🌧 강수 레이더", 20, OUT_H - 12);
+  ctx.fillText("🌧 강수 레이더", 20, IMG_H - 12);
 
   ctx.fillStyle = "#cccccc";
   ctx.font      = "22px 'Plex Regular'";
   ctx.textAlign = "center";
-  ctx.fillText(timeLabel, OUT_W / 2, OUT_H - 12);
+  ctx.fillText(timeStr, IMG_W / 2, IMG_H - 12);
 
   ctx.fillStyle = "#666666";
   ctx.font      = "18px 'Plex Regular'";
   ctx.textAlign = "right";
-  ctx.fillText("© 기상청 (KMA)", OUT_W - 20, OUT_H - 12);
+  ctx.fillText("© CARTO · RainViewer", IMG_W - 20, IMG_H - 12);
 
-  return canvas.encode("png");
+  // 6. 900×900 리사이즈
+  const out  = createCanvas(OUT_W, OUT_H);
+  const octx = out.getContext("2d");
+  octx.drawImage(canvas, 0, 0, IMG_W, IMG_H, 0, 0, OUT_W, OUT_H);
+  return out.encode("png");
 }
 
 module.exports = { buildRadarImage };
