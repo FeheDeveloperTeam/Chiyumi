@@ -13,7 +13,8 @@ const { getWeather, getWeatherComment } = require("../utils/weatherApi");
 const { buildWeatherCardImage } = require("../utils/weatherCard");
 const { getRecentEarthquakes, formatEarthquakeResponse } = require("../utils/earthquakeApi");
 const { getActiveTyphoons, buildTyphoonEmbedOptions } = require("../utils/typhoonApi");
-const { buildRadarImage } = require("../utils/radarApi");
+const { buildRadarImage }    = require("../utils/radarApi");
+const { buildTyphoonMapImage } = require("../utils/typhoonMapApi");
 
 const CALL_NAME_PATTERN = /^유미야[,!~]?\s*(.*)$/s;
 
@@ -164,10 +165,11 @@ module.exports = {
     if (input.includes("태풍") && !input.includes("날씨")) {
       await message.channel.sendTyping().catch(() => {});
       try {
-        const [typhoons, radarBuf] = await Promise.all([
-          getActiveTyphoons(),
-          buildRadarImage().catch((e) => { console.log("[태풍/레이더] 실패:", e?.message); return null; }),
-        ]);
+        const typhoons = await getActiveTyphoons();
+        const mapBuf   = await buildTyphoonMapImage(typhoons).catch((e) => {
+          console.log("[태풍/지도] 실패:", e?.message);
+          return null;
+        });
 
         const opts  = buildTyphoonEmbedOptions(typhoons);
         const embed = new EmbedBuilder()
@@ -177,9 +179,9 @@ module.exports = {
           .setFooter({ text: "출처: IBTrACS (NOAA) · RainViewer · 6시간 단위 갱신" })
           .setTimestamp();
         if (opts.fields.length) embed.addFields(opts.fields);
-        if (radarBuf) embed.setImage("attachment://radar.png");
+        if (mapBuf) embed.setImage("attachment://typhoon_map.png");
 
-        const files = radarBuf ? [new AttachmentBuilder(radarBuf, { name: "radar.png" })] : [];
+        const files = mapBuf ? [new AttachmentBuilder(mapBuf, { name: "typhoon_map.png" })] : [];
         await message.reply({ embeds: [embed], files });
       } catch (err) {
         console.log("[태풍] 에러:", err?.message);

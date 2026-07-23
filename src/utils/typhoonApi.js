@@ -170,6 +170,7 @@ async function getActiveTyphoons() {
     if (dist > MAX_DIST_KM) continue; // 너무 먼 태풍 제외
 
     const latTrend = pts.length >= 2 ? latest.lat - pts[pts.length - 2].lat : 0;
+    const lonTrend = pts.length >= 2 ? latest.lon - pts[pts.length - 2].lon : 0;
     const target   = classifyTarget(latest.lat, latest.lon, pts);
 
     const rawName = storm.name;
@@ -182,6 +183,8 @@ async function getActiveTyphoons() {
       lon:         latest.lon,
       windKt:      latest.wind,
       windMs:      Math.round(latest.wind * 0.514),
+      latTrend,
+      lonTrend,
       movingNorth: latTrend > 0,
       distFromSeoul: dist,
       intensity:   classifyIntensity(latest.wind),
