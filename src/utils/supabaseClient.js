@@ -11,9 +11,7 @@ const memoriesCache = new Map();
 const MEMORY_LIMIT = 10;
 
 function clearChannelCache(channelId) {
-  for (const key of memoriesCache.keys()) {
-    if (key.startsWith(`${channelId}_`)) memoriesCache.delete(key);
-  }
+  memoriesCache.delete(channelId);
 }
 
 async function saveMemory(channelId, userId, content) {
@@ -34,20 +32,17 @@ async function countUserMemories(userId) {
   return count ?? 0;
 }
 
-async function getMemories(channelId, userId) {
-  const key = `${channelId}_${userId ?? ""}`;
-  if (!memoriesCache.has(key)) {
-    let query = supabase
+async function getMemories(channelId) {
+  if (!memoriesCache.has(channelId)) {
+    const { data, error } = await supabase
       .from("memories")
       .select("content")
       .eq("channel_id", channelId)
       .order("created_at", { ascending: true });
-    if (userId) query = query.or(`user_id.eq.${userId},user_id.is.null`);
-    const { data, error } = await query;
     if (error) { console.log("[Supabase] 기억 로드 실패:", error.message); }
-    memoriesCache.set(key, error ? [] : (data ?? []).map((r) => r.content));
+    memoriesCache.set(channelId, error ? [] : (data ?? []).map((r) => r.content));
   }
-  return memoriesCache.get(key);
+  return memoriesCache.get(channelId);
 }
 
 async function getMemoriesWithIds(channelId, userId) {
