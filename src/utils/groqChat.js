@@ -88,7 +88,9 @@ const SYSTEM_PROMPT = `너는 치유미야. 디스코드 서버에서 활동하�
 대답은 짧고 자연스럽게 해.
 상대방이 한 말을 그대로 반복하거나 요약해서 되돌려주지 마. 자연스럽게 반응만 해.
 호칭을 쓸 때는 이름 전체를 써. "님" 단독으로 쓰지 마.
-기분 관련 질문은 상대방이 먼저 그 주제로 말을 꺼냈을 때만 해.`;
+기분 관련 질문은 상대방이 먼저 그 주제로 말을 꺼냈을 때만 해.
+외국 가수, 영화, 브랜드 등 고유명사는 반드시 한국어 음역으로 써. 원래 언어 문자(영어 알파벳 포함)로 절대 쓰지 마.
+지금 말 걸고 있는 상대에게만 집중해. 채널에 다른 사람이 있어도 그 사람을 먼저 꺼내거나 자꾸 언급하지 마.`;
 
 const histories = new Map();
 const MAX_HISTORY = 40;
@@ -197,7 +199,7 @@ async function askGroq(channelId, userId, userMessage, displayName = "집사") {
   }
 
 
-  history.push({ role: "assistant", content: raw });
+  history.push({ role: "assistant", content: reply });
   return reply;
 }
 

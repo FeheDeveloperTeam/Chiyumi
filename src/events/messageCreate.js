@@ -235,7 +235,7 @@ module.exports = {
       const alphaChars = input.replace(/[\s\d!?.,~…🐾😊]/g, "");
       const koreanChars = (alphaChars.match(/[가-힣ᄀ-ᇿ㄰-㆏]/g) || []).length;
       if (alphaChars.length > 3 && koreanChars / alphaChars.length < 0.3) {
-        const r = "한국어로만 말해줘야 이해할 수 있다냥! 🐾";
+        const r = "한국어로만 말해줘야 이해할 수 있다냥! 🐾 (오류 코드: AI-005)";
         await message.reply(r);
         addToHistory(message.channel.id, userLabel, input, r);
         return;
