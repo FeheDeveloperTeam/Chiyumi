@@ -1,6 +1,7 @@
 const Groq = require("groq-sdk");
 const OpenAI = require("openai");
 const { containsProfanity } = require("./profanityFilter");
+const { loadHistory, saveMessages, pruneHistory } = require("./supabaseClient");
 
 const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const openrouterClient = new OpenAI({
@@ -82,7 +83,6 @@ const SYSTEM_PROMPT = `너는 치유미야. 디스코드 서버에서 활동하�
 기분 관련 질문은 상대방이 먼저 그 주제로 말을 꺼냈을 때만 해.`;
 
 const histories = new Map();
-const MAX_HISTORY = 20;
 const RATE_LIMIT_PER_MIN = 5;
 const userCallCount = new Map();
 
@@ -97,13 +97,12 @@ function checkRateLimit(userId) {
   return true;
 }
 
-function getHistory(channelId) {
-  if (!histories.has(channelId)) histories.set(channelId, []);
+async function getHistory(channelId) {
+  if (!histories.has(channelId)) {
+    const saved = await loadHistory(channelId);
+    histories.set(channelId, saved);
+  }
   return histories.get(channelId);
-}
-
-function trimHistory(history) {
-  while (history.length > MAX_HISTORY) history.splice(0, 2);
 }
 
 const FOREIGN_RE = /[a-zA-ZÀ-ÿḀ-ỿ぀-ヿㇰ-ㇿ一-鿿豈-﫿･-ﾟ]/g;
@@ -114,10 +113,10 @@ async function askGroq(channelId, userId, userMessage) {
   if (!checkRateLimit(userId)) return "1분에 5번만 말 걸 수 있냥! 잠깐 기다려달라냥~ (오류 코드: AI-001)";
   if (!isDev && isHarmfulInput(userMessage)) return "그런 말은 나한테 하면 안 됩니다냥! 착하게 대화해줘야 한다냥 😾 (오류 코드: AI-002)";
 
-  const history = getHistory(channelId);
+  const history = await getHistory(channelId);
   const userLabel = isDev ? "페헤님" : "집사";
-  history.push({ role: "user", content: `${userLabel}: ${userMessage}` });
-  trimHistory(history);
+  const userEntry = { role: "user", content: `${userLabel}: ${userMessage}` };
+  history.push(userEntry);
 
   const messages = [{ role: "system", content: SYSTEM_PROMPT }, ...history];
   let response;
@@ -167,7 +166,12 @@ async function askGroq(channelId, userId, userMessage) {
     .replace(/,?\s+냥([!?~.,\s]|$)/g, "냥$1")
     .replace(/\s{2,}/g, " ")
     .trim();
-  history.push({ role: "assistant", content: raw });
+  const assistantEntry = { role: "assistant", content: raw };
+  history.push(assistantEntry);
+
+  // Supabase에 비동기 저장 (응답 속도에 영향 없음)
+  saveMessages(channelId, [userEntry, assistantEntry]).then(() => pruneHistory(channelId)).catch(() => {});
+
   return reply;
 }
 
