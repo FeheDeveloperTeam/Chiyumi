@@ -423,7 +423,8 @@ module.exports = {
 
     await message.channel.sendTyping().catch(() => {});
 
-    const reply = await askGroq(message.channel.id, message.author.id, input).catch(() => "지금 말하기가 어렵냥... (오류 코드: AI-004)");
+    const displayName = message.member?.displayName ?? message.author.globalName ?? message.author.username;
+    const reply = await askGroq(message.channel.id, message.author.id, input, displayName).catch(() => "지금 말하기가 어렵냥... (오류 코드: AI-004)");
     await message.reply(reply);
   },
 };
