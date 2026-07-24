@@ -184,9 +184,10 @@ async function askGroq(channelId, userId, userMessage, displayName = "집사") {
     .replace(FOREIGN_RE, " ")
     .replace(/[（(]\s*[）)]/g, "")
     .replace(/[「]\s*[」]|[『]\s*[』]|[【]\s*[】]/g, "")
-    .replace(/[|()[\]{}<>]/g, "")
+    .replace(/[|()[\]{}<>\/]/g, "")
     .replace(/(?<!\d)\d{3,}(?!\d)/g, "")
     .replace(/(\s[,.\-!?;:]+){2,}/g, " ")
+    .replace(/(아|어|여|와|워|이)앙([!?~.…\s]|$)/g, "$1냥$2")
     .replace(/,?\s+냥([!?~.,\s]|$)/g, "냥$1")
     .replace(/\s{2,}/g, " ")
     .trim();
