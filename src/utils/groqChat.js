@@ -184,6 +184,9 @@ async function askGroq(channelId, userId, userMessage, displayName = "집사") {
     .replace(FOREIGN_RE, " ")
     .replace(/[（(]\s*[）)]/g, "")
     .replace(/[「]\s*[」]|[『]\s*[』]|[【]\s*[】]/g, "")
+    .replace(/[|()[\]{}<>]/g, "")
+    .replace(/(?<!\d)\d{3,}(?!\d)/g, "")
+    .replace(/(\s[,.\-!?;:]+){2,}/g, " ")
     .replace(/,?\s+냥([!?~.,\s]|$)/g, "냥$1")
     .replace(/\s{2,}/g, " ")
     .trim();
@@ -204,6 +207,13 @@ async function askGroq(channelId, userId, userMessage, displayName = "집사") {
   // 마지막 문장이 냥으로 안 끝나면 보정
   if (reply.length > 0 && !/냥[!?~.…)🐾😋😾]?\s*$/.test(reply)) {
     reply = reply.replace(/([요다지해줘])([!?~.…]*)(\s*)$/, "냥$2$3");
+  }
+
+  // 정제 후 한국어 비율이 너무 낮으면 (깨진 응답) 에러 반환
+  const koreanCount = (reply.match(/[가-힣]/g) || []).length;
+  if (reply.length > 10 && koreanCount / reply.replace(/\s/g, "").length < 0.4) {
+    history.pop();
+    return "뭔가 잘 이해를 못했냥... 다시 한번 말해줘냥! 😅";
   }
 
 
