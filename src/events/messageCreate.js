@@ -226,7 +226,8 @@ module.exports = {
     const rest = match[1].trim();
     const input = rest || "불렀어?";
 
-    const isDev = message.author.id === "826036359499481109";
+    const userId = message.author.id;
+    const isDev = userId === "826036359499481109";
     const displayName = message.member?.displayName ?? message.author.globalName ?? message.author.username;
     const userLabel = isDev ? "페헤님" : displayName;
 
