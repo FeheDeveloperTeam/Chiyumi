@@ -108,9 +108,10 @@ function checkRateLimit(userId) {
   return true;
 }
 
-function getHistory(channelId) {
-  if (!histories.has(channelId)) histories.set(channelId, []);
-  return histories.get(channelId);
+function getHistory(channelId, userId) {
+  const key = `${channelId}_${userId}`;
+  if (!histories.has(key)) histories.set(key, []);
+  return histories.get(key);
 }
 
 function trimHistory(history) {
@@ -125,7 +126,7 @@ async function askGroq(channelId, userId, userMessage, displayName = "집사") {
   if (!checkRateLimit(userId)) return "1분에 5번만 말 걸 수 있냥! 잠깐 기다려달라냥~ (오류 코드: AI-001)";
   if (!isDev && isHarmfulInput(userMessage)) return "그런 말은 나한테 하면 안 됩니다냥! 착하게 대화해줘야 한다냥 😾 (오류 코드: AI-002)";
 
-  const history = getHistory(channelId);
+  const history = getHistory(channelId, userId);
   const userLabel = isDev ? "페헤님" : displayName;
   const userEntry = { role: "user", content: `${userLabel}: ${userMessage}` };
   history.push(userEntry);
@@ -181,6 +182,8 @@ async function askGroq(channelId, userId, userMessage, displayName = "집사") {
   const raw = response.choices[0]?.message?.content?.trim() ?? "";
   let reply = raw
     .replace(FOREIGN_RE, " ")
+    .replace(/[（(]\s*[）)]/g, "")
+    .replace(/[「]\s*[」]|[『]\s*[』]|[【]\s*[】]/g, "")
     .replace(/,?\s+냥([!?~.,\s]|$)/g, "냥$1")
     .replace(/\s{2,}/g, " ")
     .trim();
@@ -198,13 +201,18 @@ async function askGroq(channelId, userId, userMessage, displayName = "집사") {
     if (idx > reply.length * 0.4) reply = reply.slice(0, idx + 1).trim();
   }
 
+  // 마지막 문장이 냥으로 안 끝나면 보정
+  if (reply.length > 0 && !/냥[!?~.…)🐾😋😾]?\s*$/.test(reply)) {
+    reply = reply.replace(/([요다지해줘])([!?~.…]*)(\s*)$/, "냥$2$3");
+  }
+
 
   history.push({ role: "assistant", content: reply });
   return reply;
 }
 
-function addToHistory(channelId, userLabel, userContent, assistantContent) {
-  const history = getHistory(channelId);
+function addToHistory(channelId, userId, userLabel, userContent, assistantContent) {
+  const history = getHistory(channelId, userId);
   history.push({ role: "user", content: `${userLabel}: ${userContent}` });
   history.push({ role: "assistant", content: assistantContent });
   trimHistory(history);

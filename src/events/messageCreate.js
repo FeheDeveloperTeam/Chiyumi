@@ -237,7 +237,7 @@ module.exports = {
       if (alphaChars.length > 3 && koreanChars / alphaChars.length < 0.3) {
         const r = "한국어로만 말해줘야 이해할 수 있다냥! 🐾 (오류 코드: AI-005)";
         await message.reply(r);
-        addToHistory(message.channel.id, userLabel, input, r);
+        addToHistory(message.channel.id, message.author.id, userLabel, input, r);
         return;
       }
     }
@@ -253,7 +253,7 @@ module.exports = {
         r = `유미가 기억하고 있는 것들이냥! 🐾\n${text}`;
       }
       await message.reply(r);
-      addToHistory(message.channel.id, userLabel, input, r);
+      addToHistory(message.channel.id, message.author.id, userLabel, input, r);
       return;
     }
 
@@ -262,7 +262,7 @@ module.exports = {
       const ok = await deleteAllMemories(message.channel.id);
       const r = ok ? "모든 기억을 잊었냥... 🗑️" : "삭제하기가 어렵냥... 잠깐 후에 다시 해줘냥! (오류 코드: MEM-002)";
       await message.reply(r);
-      addToHistory(message.channel.id, userLabel, input, r);
+      addToHistory(message.channel.id, message.author.id, userLabel, input, r);
       return;
     }
 
@@ -279,7 +279,7 @@ module.exports = {
       const ok = await deleteMemory(message.channel.id, list[num - 1].id);
       const r = ok ? `**${num}번** 기억을 잊었냥! 🗑️` : "삭제하기가 어렵냥... 잠깐 후에 다시 해줘냥! (오류 코드: MEM-002)";
       await message.reply(r);
-      addToHistory(message.channel.id, userLabel, input, r);
+      addToHistory(message.channel.id, message.author.id, userLabel, input, r);
       return;
     }
 
@@ -297,7 +297,7 @@ module.exports = {
       const ok = await updateMemory(message.channel.id, list[num - 1].id, newContent);
       const r = ok ? `**${num}번** 기억을 고쳤냥! 🐾` : "수정하기가 어렵냥... 잠깐 후에 다시 해줘냥! (오류 코드: MEM-003)";
       await message.reply(r);
-      addToHistory(message.channel.id, userLabel, input, r);
+      addToHistory(message.channel.id, message.author.id, userLabel, input, r);
       return;
     }
 
@@ -311,7 +311,7 @@ module.exports = {
       const ok = await saveMemory(message.channel.id, content);
       const memReply = ok ? "기억했다냥! 🐾" : "지금 기억하기가 어렵냥... 잠깐 후에 다시 해줘냥! (오류 코드: MEM-001)";
       await message.reply(memReply);
-      addToHistory(message.channel.id, userLabel, input, memReply);
+      addToHistory(message.channel.id, message.author.id, userLabel, input, memReply);
       return;
     }
 
@@ -495,7 +495,7 @@ module.exports = {
       const emoji = MEAL_EMOJI[meal];
       const mealReply = `${emoji} ${displayName}님, ${meal}은 **${pick}** 어떠냥? 🐾`;
       await message.reply(mealReply);
-      addToHistory(message.channel.id, userLabel, input, mealReply);
+      addToHistory(message.channel.id, message.author.id, userLabel, input, mealReply);
       return;
     }
 
