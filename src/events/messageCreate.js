@@ -481,7 +481,7 @@ module.exports = {
       const meal = mealTypeMatch[0];
       const pick = pickMenus(meal)[0];
       const emoji = MEAL_EMOJI[meal];
-      const mealReply = `${emoji} ${meal}은 **${pick}** 어떠냥? 🐾`;
+      const mealReply = `${emoji} ${displayName}님, ${meal}은 **${pick}** 어떠냥? 🐾`;
       await message.reply(mealReply);
       addToHistory(message.channel.id, userLabel, input, mealReply);
       return;
