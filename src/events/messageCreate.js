@@ -258,7 +258,7 @@ module.exports = {
     }
 
     // --- 기억 목록 ---
-    if (input === "기억 목록" || input === "기억목록") {
+    if (input === "기억 목록" || input === "기억목록" || /^기억(해)?\s*(목록|리스트|보여|알려|말해)/.test(input)) {
       const list = await getMemoriesWithIds(message.channel.id, userId);
       if (!list.length) {
         const r = "아직 배운 게 없냥! '유미야 기억해 [내용]'으로 가르쳐줘냥~ 🐾";
