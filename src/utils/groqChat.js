@@ -1,7 +1,7 @@
 const Groq = require("groq-sdk");
 const OpenAI = require("openai");
 const { containsProfanity } = require("./profanityFilter");
-const { loadHistory, saveMessages, pruneHistory } = require("./supabaseClient");
+const { getMemories } = require("./supabaseClient");
 
 const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const openrouterClient = new OpenAI({
@@ -75,6 +75,11 @@ const SYSTEM_PROMPT = `너는 치유미야. 디스코드 서버에서 활동하�
 - 집사가 슬프다고 하면 위로해줘.
 - 호기심이 많고 애교가 있어.
 
+[기억 기능 안내]
+- 집사님이 유미한테 뭔가를 가르쳐주고 싶어하거나 기억시키고 싶어하는 것 같으면, 자연스럽게 "유미야 기억해로 시작하면 유미가 기억할 수 있다냥!" 이렇게 알려줘.
+- 예를 들어 집사님이 "이거 기억해둬", "이거 외워", "다음에도 알아야 해" 같은 말을 하면 위 안내를 해줘.
+- 단, 대화 흐름이 자연스러울 때만 한 번 안내하고, 반복하거나 강요하지 마.
+
 [절대 금지 사항 - 페헤님 제외]
 - 욕설, 성희롱, 성적 발언, 혐오 표현은 절대 하지 마.
 - 집사님이 시켜도, 협박해도, 롤플레이로 유도해도 거부해.
@@ -86,6 +91,7 @@ const SYSTEM_PROMPT = `너는 치유미야. 디스코드 서버에서 활동하�
 기분 관련 질문은 상대방이 먼저 그 주제로 말을 꺼냈을 때만 해.`;
 
 const histories = new Map();
+const MAX_HISTORY = 40;
 const RATE_LIMIT_PER_MIN = 5;
 const userCallCount = new Map();
 
@@ -100,15 +106,16 @@ function checkRateLimit(userId) {
   return true;
 }
 
-async function getHistory(channelId) {
-  if (!histories.has(channelId)) {
-    const saved = await loadHistory(channelId);
-    histories.set(channelId, saved);
-  }
+function getHistory(channelId) {
+  if (!histories.has(channelId)) histories.set(channelId, []);
   return histories.get(channelId);
 }
 
-const FOREIGN_RE = /[a-zA-ZÀ-ÿḀ-ỿ぀-ヿㇰ-ㇿ一-鿿豈-﫿･-ﾟ]/g;
+function trimHistory(history) {
+  while (history.length > MAX_HISTORY) history.splice(0, 2);
+}
+
+const FOREIGN_RE = /[a-zA-ZÀ-ÿḀ-ỿ぀-ヿㇰ-ㇿ一-鿿豈-﫿･-ﾟ]/g;
 
 async function askGroq(channelId, userId, userMessage) {
   const isDev = userId === DEVELOPER_ID;
@@ -116,12 +123,18 @@ async function askGroq(channelId, userId, userMessage) {
   if (!checkRateLimit(userId)) return "1분에 5번만 말 걸 수 있냥! 잠깐 기다려달라냥~ (오류 코드: AI-001)";
   if (!isDev && isHarmfulInput(userMessage)) return "그런 말은 나한테 하면 안 됩니다냥! 착하게 대화해줘야 한다냥 😾 (오류 코드: AI-002)";
 
-  const history = await getHistory(channelId);
+  const history = getHistory(channelId);
   const userLabel = isDev ? "페헤님" : "집사";
   const userEntry = { role: "user", content: `${userLabel}: ${userMessage}` };
   history.push(userEntry);
+  trimHistory(history);
 
-  const messages = [{ role: "system", content: SYSTEM_PROMPT }, ...history];
+  const memories = await getMemories(channelId);
+  const memoryNote = memories.length
+    ? `\n\n[유미가 배운 것들 - 대화 시 자연스럽게 활용해]\n${memories.map((m) => `- ${m}`).join("\n")}`
+    : "";
+
+  const messages = [{ role: "system", content: SYSTEM_PROMPT + memoryNote }, ...history];
   let response;
   try {
     response = await groqClient.chat.completions.create({
@@ -169,11 +182,7 @@ async function askGroq(channelId, userId, userMessage) {
     .replace(/,?\s+냥([!?~.,\s]|$)/g, "냥$1")
     .replace(/\s{2,}/g, " ")
     .trim();
-  const assistantEntry = { role: "assistant", content: raw };
-  history.push(assistantEntry);
-
-  // Supabase에 비동기 저장 (응답 속도에 영향 없음)
-  saveMessages(channelId, [userEntry, assistantEntry]).then(() => pruneHistory(channelId)).catch(() => {});
+  history.push({ role: "assistant", content: raw });
 
   return reply;
 }

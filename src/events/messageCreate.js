@@ -9,6 +9,7 @@ const { announceLevelUp } = require("../utils/levelUpAnnounce");
 const { hasAgreed } = require("../utils/consent");
 const { handleMessage: handleWordChainMessage } = require("../utils/wordchainGame");
 const { askGroq } = require("../utils/groqChat");
+const { saveMemory } = require("../utils/supabaseClient");
 const { getWeather, getWeatherComment } = require("../utils/weatherApi");
 const { buildWeatherCardImage } = require("../utils/weatherCard");
 const { getRecentEarthquakes, formatEarthquakeResponse } = require("../utils/earthquakeApi");
@@ -185,6 +186,18 @@ module.exports = {
 
     const rest = match[1].trim();
     const input = rest || "불렀어?";
+
+    // --- 기억해 처리 ---
+    if (input.startsWith("기억해")) {
+      const content = input.slice(3).trim();
+      if (!content) {
+        await message.reply("뭘 기억하면 될까냥? '유미야 기억해 [내용]' 형식으로 알려줘냥!");
+        return;
+      }
+      const ok = await saveMemory(message.channel.id, content);
+      await message.reply(ok ? "기억했다냥! 🐾" : "지금 기억하기가 어렵냥... 잠깐 후에 다시 해줘냥!");
+      return;
+    }
 
     // --- 지진 처리 ---
     if (input.includes("지진")) {

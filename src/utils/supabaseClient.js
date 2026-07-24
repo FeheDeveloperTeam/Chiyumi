@@ -7,38 +7,28 @@ const supabase = createClient(
   { realtime: { transport: WebSocket } }
 );
 
-const MAX_HISTORY = 20;
+const memoriesCache = new Map();
 
-async function loadHistory(channelId) {
-  const { data, error } = await supabase
-    .from("chat_history")
-    .select("role, content")
-    .eq("channel_id", channelId)
-    .order("created_at", { ascending: false })
-    .limit(MAX_HISTORY);
-
-  if (error) { console.log("[Supabase] 히스토리 로드 실패:", error.message); return []; }
-  return (data ?? []).reverse();
+async function saveMemory(channelId, content) {
+  const { error } = await supabase
+    .from("memories")
+    .insert({ channel_id: channelId, content });
+  if (error) { console.log("[Supabase] 기억 저장 실패:", error.message); return false; }
+  memoriesCache.delete(channelId);
+  return true;
 }
 
-async function saveMessages(channelId, messages) {
-  const rows = messages.map((m) => ({ channel_id: channelId, role: m.role, content: m.content }));
-  const { error } = await supabase.from("chat_history").insert(rows);
-  if (error) console.log("[Supabase] 메시지 저장 실패:", error.message);
-}
-
-async function pruneHistory(channelId) {
-  const { data } = await supabase
-    .from("chat_history")
-    .select("id")
-    .eq("channel_id", channelId)
-    .order("created_at", { ascending: false })
-    .range(MAX_HISTORY, 10000);
-
-  if (data?.length) {
-    const ids = data.map((r) => r.id);
-    await supabase.from("chat_history").delete().in("id", ids);
+async function getMemories(channelId) {
+  if (!memoriesCache.has(channelId)) {
+    const { data, error } = await supabase
+      .from("memories")
+      .select("content")
+      .eq("channel_id", channelId)
+      .order("created_at", { ascending: true });
+    if (error) { console.log("[Supabase] 기억 로드 실패:", error.message); }
+    memoriesCache.set(channelId, error ? [] : (data ?? []).map((r) => r.content));
   }
+  return memoriesCache.get(channelId);
 }
 
-module.exports = { loadHistory, saveMessages, pruneHistory };
+module.exports = { saveMemory, getMemories };
