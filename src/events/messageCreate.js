@@ -20,6 +20,24 @@ const { buildTyphoonMapImage } = require("../utils/typhoonMapApi");
 
 const CALL_NAME_PATTERN = /^유미야[,!~]?\s*(.*)$/s;
 
+const MEAL_MENUS = {
+  아침: ["계란후라이 + 밥", "토스트 & 우유", "죽", "샌드위치", "오트밀", "시리얼", "스크램블에그", "과일 샐러드", "요거트 & 그래놀라", "프렌치토스트"],
+  점심: ["김치찌개", "된장찌개", "비빔밥", "볶음밥", "냉면", "짜장면", "짬뽕", "칼국수", "제육볶음", "쌀국수", "파스타", "삼겹살", "돈까스", "순대국밥"],
+  저녁: ["치킨", "삼겹살", "갈비찜", "불고기", "보쌈", "닭갈비", "해물찜", "스테이크", "피자", "족발", "소고기구이", "매운탕", "알탕"],
+  야식: ["치킨", "피자", "족발", "라면", "떡볶이", "순대", "핫도그", "감자튀김", "컵라면", "편의점 도시락", "토스트", "치즈볼"],
+};
+const MEAL_EMOJI = { 아침: "🌅", 점심: "☀️", 저녁: "🌙", 야식: "🌃" };
+const MEAL_RE = /(아침|점심|저녁|야식).{0,15}(추천|메뉴|먹|뭐)|(추천|메뉴|뭐.{0,5}먹).{0,15}(아침|점심|저녁|야식)/;
+
+function pickMenus(meal) {
+  const list = [...MEAL_MENUS[meal]];
+  for (let i = list.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  return list.slice(0, 5);
+}
+
 const WEATHER_STOP_WORDS = new Set([
   "오늘", "내일", "지금", "현재", "날씨", "어때", "알려줘",
   "어때요", "알려주세요", "어떤지", "궁금해", "좀", "한번", "요즘",
@@ -418,6 +436,17 @@ module.exports = {
         console.log("[날씨] 에러:", err?.message, err?.stack);
         await message.reply("날씨 정보를 가져오지 못했냥... 잠깐 후에 다시 물어봐달라냥ㅠ");
       }
+      return;
+    }
+
+    // --- 식사 메뉴 추천 ---
+    const mealTypeMatch = input.match(/아침|점심|저녁|야식/);
+    if (mealTypeMatch && MEAL_RE.test(input)) {
+      const meal = mealTypeMatch[0];
+      const picks = pickMenus(meal);
+      const emoji = MEAL_EMOJI[meal];
+      const list = picks.map((p, i) => `**${i + 1}.** ${p}`).join("\n");
+      await message.reply(`${emoji} **${meal} 메뉴 추천**이냥! 🐾\n${list}\n\n맛있게 먹으라냥~ 😋`);
       return;
     }
 
