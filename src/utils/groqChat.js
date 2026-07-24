@@ -2,6 +2,7 @@ const Groq = require("groq-sdk");
 const OpenAI = require("openai");
 const { containsProfanity } = require("./profanityFilter");
 const { getMemories } = require("./supabaseClient");
+const { isRestricted } = require("./restrictions");
 
 const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const openrouterClient = new OpenAI({
@@ -125,6 +126,7 @@ const FOREIGN_RE = /[a-zA-Z\u00C0-\u00FF\u0100-\u024F\u1E00-\u1EFF\u0370-\u03FF\
 async function askGroq(channelId, userId, userMessage, displayName = "집사") {
   const isDev = userId === DEVELOPER_ID;
 
+  if (!isDev && isRestricted(userId)) return "이용제한된 사용자는 AI 기능을 사용할 수 없다냥 😾 (오류 코드: AI-006)";
   if (!checkRateLimit(userId)) return "1분에 5번만 말 걸 수 있냥! 잠깐 기다려달라냥~ (오류 코드: AI-001)";
   if (!isDev && isHarmfulInput(userMessage)) return "그런 말은 나한테 하면 안 됩니다냥! 착하게 대화해줘야 한다냥 😾 (오류 코드: AI-002)";
 
