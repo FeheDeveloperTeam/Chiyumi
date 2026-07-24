@@ -230,6 +230,21 @@ module.exports = {
     const displayName = message.member?.displayName ?? message.author.globalName ?? message.author.username;
     const userLabel = isDev ? "페헤님" : displayName;
 
+    // 정치 관련 필터 (개발자 제외)
+    const POLITICS_KEYWORDS = [
+      "이재명", "윤석열", "문재인", "박근혜", "이명박", "노무현", "김대중", "김영삼",
+      "전두환", "노태우", "박정희", "한동훈", "홍준표", "안철수", "이낙연", "원희룡",
+      "오세훈", "이준석", "김기현",
+      "국민의힘", "더불어민주당", "민주당", "정의당", "개혁신당", "새누리당",
+      "대통령", "국회의원", "정치인", "선거", "대선", "총선", "탄핵", "여당", "야당", "정당",
+    ];
+    if (!isDev && POLITICS_KEYWORDS.some((k) => input.includes(k))) {
+      const r = "정치 관련 주제는 이야기하기 어렵냥! 다른 주제로 대화하자냥~ 🐾 (오류 코드: POLICY-001)";
+      await message.reply(r);
+      addToHistory(message.channel.id, message.author.id, userLabel, input, r);
+      return;
+    }
+
     // 한국어 비율 체크 (개발자 제외)
     if (!isDev) {
       const alphaChars = input.replace(/[\s\d!?.,~…🐾😊]/g, "");
