@@ -146,7 +146,7 @@ async function askGroq(channelId, userId, userMessage, displayName = "집사") {
       model: "llama-3.3-70b-versatile",
       messages,
       max_tokens: 500,
-      temperature: 0.9,
+      temperature: 0.75,
     });
   } catch (groqErr) {
     if (groqErr?.status === 429) {
@@ -155,7 +155,7 @@ async function askGroq(channelId, userId, userMessage, displayName = "집사") {
           model: "meta-llama/llama-3.3-70b-instruct",
           messages,
           max_tokens: 500,
-          temperature: 0.9,
+          temperature: 0.75,
         });
       } catch {
         try {
@@ -163,7 +163,7 @@ async function askGroq(channelId, userId, userMessage, displayName = "집사") {
             model: "mistral-small-latest",
             messages,
             max_tokens: 500,
-            temperature: 0.9,
+            temperature: 0.75,
           });
         } catch {
           history.pop();
