@@ -140,7 +140,7 @@ async function askGroq(channelId, userId, userMessage, displayName = "집사") {
     response = await groqClient.chat.completions.create({
       model: "llama-3.3-70b-versatile",
       messages,
-      max_tokens: 300,
+      max_tokens: 500,
       temperature: 0.9,
     });
   } catch (groqErr) {
@@ -149,7 +149,7 @@ async function askGroq(channelId, userId, userMessage, displayName = "집사") {
         response = await openrouterClient.chat.completions.create({
           model: "meta-llama/llama-3.3-70b-instruct",
           messages,
-          max_tokens: 300,
+          max_tokens: 500,
           temperature: 0.9,
         });
       } catch {
@@ -157,7 +157,7 @@ async function askGroq(channelId, userId, userMessage, displayName = "집사") {
           response = await mistralClient.chat.completions.create({
             model: "mistral-small-latest",
             messages,
-            max_tokens: 300,
+            max_tokens: 500,
             temperature: 0.9,
           });
         } catch {
@@ -177,11 +177,24 @@ async function askGroq(channelId, userId, userMessage, displayName = "집사") {
   }
 
   const raw = response.choices[0]?.message?.content?.trim() ?? "";
-  const reply = raw
+  let reply = raw
     .replace(FOREIGN_RE, " ")
     .replace(/,?\s+냥([!?~.,\s]|$)/g, "냥$1")
     .replace(/\s{2,}/g, " ")
     .trim();
+
+  // 문장이 중간에 잘린 경우 마지막 완성된 문장까지만 사용
+  if (reply.length > 0 && !/[.!?~…🐾😾😋]$/.test(reply)) {
+    const idx = Math.max(
+      reply.lastIndexOf("냥"),
+      reply.lastIndexOf("!"),
+      reply.lastIndexOf("?"),
+      reply.lastIndexOf("~"),
+      reply.lastIndexOf("."),
+      reply.lastIndexOf("…"),
+    );
+    if (idx > reply.length * 0.4) reply = reply.slice(0, idx + 1).trim();
+  }
 
 
   history.push({ role: "assistant", content: raw });

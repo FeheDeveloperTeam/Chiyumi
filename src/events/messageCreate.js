@@ -230,6 +230,18 @@ module.exports = {
     const displayName = message.member?.displayName ?? message.author.globalName ?? message.author.username;
     const userLabel = isDev ? "페헤님" : displayName;
 
+    // 한국어 비율 체크 (개발자 제외)
+    if (!isDev) {
+      const alphaChars = input.replace(/[\s\d!?.,~…🐾😊]/g, "");
+      const koreanChars = (alphaChars.match(/[가-힣ᄀ-ᇿ㄰-㆏]/g) || []).length;
+      if (alphaChars.length > 3 && koreanChars / alphaChars.length < 0.3) {
+        const r = "한국어로만 말해줘야 이해할 수 있다냥! 🐾";
+        await message.reply(r);
+        addToHistory(message.channel.id, userLabel, input, r);
+        return;
+      }
+    }
+
     // --- 기억 목록 ---
     if (input === "기억 목록" || input === "기억목록") {
       const list = await getMemoriesWithIds(message.channel.id);
