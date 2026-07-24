@@ -260,7 +260,7 @@ module.exports = {
     // --- 기억 모두 삭제 ---
     if (input === "기억 모두 삭제" || input === "기억 전체 삭제") {
       const ok = await deleteAllMemories(message.channel.id);
-      const r = ok ? "모든 기억을 잊었냥... 🗑️" : "삭제하기가 어렵냥... 잠깐 후에 다시 해줘냥!";
+      const r = ok ? "모든 기억을 잊었냥... 🗑️" : "삭제하기가 어렵냥... 잠깐 후에 다시 해줘냥! (오류 코드: MEM-002)";
       await message.reply(r);
       addToHistory(message.channel.id, userLabel, input, r);
       return;
@@ -277,7 +277,7 @@ module.exports = {
         return;
       }
       const ok = await deleteMemory(message.channel.id, list[num - 1].id);
-      const r = ok ? `**${num}번** 기억을 잊었냥! 🗑️` : "삭제하기가 어렵냥... 잠깐 후에 다시 해줘냥!";
+      const r = ok ? `**${num}번** 기억을 잊었냥! 🗑️` : "삭제하기가 어렵냥... 잠깐 후에 다시 해줘냥! (오류 코드: MEM-002)";
       await message.reply(r);
       addToHistory(message.channel.id, userLabel, input, r);
       return;
@@ -295,7 +295,7 @@ module.exports = {
         return;
       }
       const ok = await updateMemory(message.channel.id, list[num - 1].id, newContent);
-      const r = ok ? `**${num}번** 기억을 고쳤냥! 🐾` : "수정하기가 어렵냥... 잠깐 후에 다시 해줘냥!";
+      const r = ok ? `**${num}번** 기억을 고쳤냥! 🐾` : "수정하기가 어렵냥... 잠깐 후에 다시 해줘냥! (오류 코드: MEM-003)";
       await message.reply(r);
       addToHistory(message.channel.id, userLabel, input, r);
       return;
@@ -309,7 +309,7 @@ module.exports = {
         return;
       }
       const ok = await saveMemory(message.channel.id, content);
-      const memReply = ok ? "기억했다냥! 🐾" : "지금 기억하기가 어렵냥... 잠깐 후에 다시 해줘냥!";
+      const memReply = ok ? "기억했다냥! 🐾" : "지금 기억하기가 어렵냥... 잠깐 후에 다시 해줘냥! (오류 코드: MEM-001)";
       await message.reply(memReply);
       addToHistory(message.channel.id, userLabel, input, memReply);
       return;
@@ -365,7 +365,7 @@ module.exports = {
         });
       } catch (err) {
         console.log("[지진] 에러:", err?.message);
-        await message.reply("지진 정보를 가져오지 못했냥... 잠깐 후에 다시 물어봐달라냥ㅠ");
+        await message.reply("지진 정보를 가져오지 못했냥... 잠깐 후에 다시 물어봐달라냥ㅠ (오류 코드: EQ-001)");
       }
       return;
     }
@@ -388,7 +388,7 @@ module.exports = {
         });
       } catch (err) {
         console.log("[레이더] 에러:", err?.message);
-        await message.reply("레이더 이미지를 불러오지 못했냥... 잠깐 후에 다시 물어봐달라냥ㅠ");
+        await message.reply("레이더 이미지를 불러오지 못했냥... 잠깐 후에 다시 물어봐달라냥ㅠ (오류 코드: RADAR-001)");
       }
       return;
     }
@@ -417,7 +417,7 @@ module.exports = {
         await message.reply({ embeds: [embed], files });
       } catch (err) {
         console.log("[태풍] 에러:", err?.message);
-        await message.reply("태풍 정보를 가져오지 못했냥... 잠깐 후에 다시 물어봐달라냥ㅠ");
+        await message.reply("태풍 정보를 가져오지 못했냥... 잠깐 후에 다시 물어봐달라냥ㅠ (오류 코드: TYPHOON-001)");
       }
       return;
     }
@@ -482,7 +482,7 @@ module.exports = {
         console.log("[날씨] 응답 완료");
       } catch (err) {
         console.log("[날씨] 에러:", err?.message, err?.stack);
-        await message.reply("날씨 정보를 가져오지 못했냥... 잠깐 후에 다시 물어봐달라냥ㅠ");
+        await message.reply("날씨 정보를 가져오지 못했냥... 잠깐 후에 다시 물어봐달라냥ㅠ (오류 코드: WEATHER-001)");
       }
       return;
     }
