@@ -42,7 +42,7 @@ async function getMemories(channelId, userId) {
       .select("content")
       .eq("channel_id", channelId)
       .order("created_at", { ascending: true });
-    if (userId) query = query.eq("user_id", userId);
+    if (userId) query = query.or(`user_id.eq.${userId},user_id.is.null`);
     const { data, error } = await query;
     if (error) { console.log("[Supabase] 기억 로드 실패:", error.message); }
     memoriesCache.set(key, error ? [] : (data ?? []).map((r) => r.content));
