@@ -8,7 +8,7 @@ const { addBalance } = require("../utils/credits");
 const { announceLevelUp } = require("../utils/levelUpAnnounce");
 const { hasAgreed } = require("../utils/consent");
 const { handleMessage: handleWordChainMessage } = require("../utils/wordchainGame");
-const { askGroq } = require("../utils/groqChat");
+const { askGroq, addToHistory } = require("../utils/groqChat");
 const { saveMemory, getMemoriesWithIds, deleteMemory, updateMemory, deleteAllMemories } = require("../utils/supabaseClient");
 const { getWeather, getWeatherComment } = require("../utils/weatherApi");
 const { buildWeatherCardImage } = require("../utils/weatherCard");
@@ -226,22 +226,31 @@ module.exports = {
     const rest = match[1].trim();
     const input = rest || "불렀어?";
 
+    const isDev = message.author.id === "826036359499481109";
+    const displayName = message.member?.displayName ?? message.author.globalName ?? message.author.username;
+    const userLabel = isDev ? "페헤님" : displayName;
+
     // --- 기억 목록 ---
     if (input === "기억 목록" || input === "기억목록") {
       const list = await getMemoriesWithIds(message.channel.id);
+      let r;
       if (!list.length) {
-        await message.reply("아직 배운 게 없냥! '유미야 기억해 [내용]'으로 가르쳐줘냥~ 🐾");
-        return;
+        r = "아직 배운 게 없냥! '유미야 기억해 [내용]'으로 가르쳐줘냥~ 🐾";
+      } else {
+        const text = list.map((m, i) => `**${i + 1}.** ${m.content}`).join("\n");
+        r = `유미가 기억하고 있는 것들이냥! 🐾\n${text}`;
       }
-      const text = list.map((m, i) => `**${i + 1}.** ${m.content}`).join("\n");
-      await message.reply(`유미가 기억하고 있는 것들이냥! 🐾\n${text}`);
+      await message.reply(r);
+      addToHistory(message.channel.id, userLabel, input, r);
       return;
     }
 
     // --- 기억 모두 삭제 ---
     if (input === "기억 모두 삭제" || input === "기억 전체 삭제") {
       const ok = await deleteAllMemories(message.channel.id);
-      await message.reply(ok ? "모든 기억을 잊었냥... 🗑️" : "삭제하기가 어렵냥... 잠깐 후에 다시 해줘냥!");
+      const r = ok ? "모든 기억을 잊었냥... 🗑️" : "삭제하기가 어렵냥... 잠깐 후에 다시 해줘냥!";
+      await message.reply(r);
+      addToHistory(message.channel.id, userLabel, input, r);
       return;
     }
 
@@ -256,7 +265,9 @@ module.exports = {
         return;
       }
       const ok = await deleteMemory(message.channel.id, list[num - 1].id);
-      await message.reply(ok ? `**${num}번** 기억을 잊었냥! 🗑️` : "삭제하기가 어렵냥... 잠깐 후에 다시 해줘냥!");
+      const r = ok ? `**${num}번** 기억을 잊었냥! 🗑️` : "삭제하기가 어렵냥... 잠깐 후에 다시 해줘냥!";
+      await message.reply(r);
+      addToHistory(message.channel.id, userLabel, input, r);
       return;
     }
 
@@ -272,7 +283,9 @@ module.exports = {
         return;
       }
       const ok = await updateMemory(message.channel.id, list[num - 1].id, newContent);
-      await message.reply(ok ? `**${num}번** 기억을 고쳤냥! 🐾` : "수정하기가 어렵냥... 잠깐 후에 다시 해줘냥!");
+      const r = ok ? `**${num}번** 기억을 고쳤냥! 🐾` : "수정하기가 어렵냥... 잠깐 후에 다시 해줘냥!";
+      await message.reply(r);
+      addToHistory(message.channel.id, userLabel, input, r);
       return;
     }
 
@@ -284,7 +297,9 @@ module.exports = {
         return;
       }
       const ok = await saveMemory(message.channel.id, content);
-      await message.reply(ok ? "기억했다냥! 🐾" : "지금 기억하기가 어렵냥... 잠깐 후에 다시 해줘냥!");
+      const memReply = ok ? "기억했다냥! 🐾" : "지금 기억하기가 어렵냥... 잠깐 후에 다시 해줘냥!";
+      await message.reply(memReply);
+      addToHistory(message.channel.id, userLabel, input, memReply);
       return;
     }
 
@@ -466,13 +481,14 @@ module.exports = {
       const meal = mealTypeMatch[0];
       const pick = pickMenus(meal)[0];
       const emoji = MEAL_EMOJI[meal];
-      await message.reply(`${emoji} ${meal}은 **${pick}** 어떠냥? 🐾`);
+      const mealReply = `${emoji} ${meal}은 **${pick}** 어떠냥? 🐾`;
+      await message.reply(mealReply);
+      addToHistory(message.channel.id, userLabel, input, mealReply);
       return;
     }
 
     await message.channel.sendTyping().catch(() => {});
 
-    const displayName = message.member?.displayName ?? message.author.globalName ?? message.author.username;
     const reply = await askGroq(message.channel.id, message.author.id, input, displayName).catch(() => "지금 말하기가 어렵냥... (오류 코드: AI-004)");
     await message.reply(reply);
   },

@@ -188,4 +188,11 @@ async function askGroq(channelId, userId, userMessage, displayName = "집사") {
   return reply;
 }
 
-module.exports = { askGroq };
+function addToHistory(channelId, userLabel, userContent, assistantContent) {
+  const history = getHistory(channelId);
+  history.push({ role: "user", content: `${userLabel}: ${userContent}` });
+  history.push({ role: "assistant", content: assistantContent });
+  trimHistory(history);
+}
+
+module.exports = { askGroq, addToHistory };
