@@ -115,7 +115,7 @@ function trimHistory(history) {
   while (history.length > MAX_HISTORY) history.splice(0, 2);
 }
 
-const FOREIGN_RE = /[a-zA-Z\u00C0-\u00FF\u1E00-\u1EFF\u0E00-\u0E7F\u0600-\u06FF\u0900-\u097F\u0590-\u05FF\u3000-\u30FF\u31F0-\u31FF\u4E00-\u9FFF\uF900-\uFAFF\uFF65-\uFF9F]/g;
+const FOREIGN_RE = /[a-zA-Z\u00C0-\u00FF\u0100-\u024F\u1E00-\u1EFF\u0370-\u03FF\u0400-\u052F\u0E00-\u0E7F\u0600-\u06FF\u0900-\u097F\u0590-\u05FF\u0700-\u074F\u0750-\u077F\u0980-\u09FF\u0A00-\u0A7F\u0A80-\u0AFF\u0B00-\u0B7F\u0C00-\u0C7F\u0D00-\u0D7F\u3000-\u30FF\u31F0-\u31FF\u4E00-\u9FFF\uF900-\uFAFF\uFF65-\uFF9F]/g;
 
 async function askGroq(channelId, userId, userMessage, displayName = "집사") {
   const isDev = userId === DEVELOPER_ID;
