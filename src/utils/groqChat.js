@@ -115,7 +115,7 @@ function trimHistory(history) {
   while (history.length > MAX_HISTORY) history.splice(0, 2);
 }
 
-const FOREIGN_RE = /[a-zA-ZÀ-ÿḀ-ỿ぀-ヿㇰ-ㇿ一-鿿豈-﫿･-ﾟ]/g;
+const FOREIGN_RE = /[a-zA-Z\u00C0-\u00FF\u1E00-\u1EFF\u3000-\u30FF\u31F0-\u31FF\u4E00-\u9FFF\uF900-\uFAFF\uFF65-\uFF9F]/g;
 
 async function askGroq(channelId, userId, userMessage) {
   const isDev = userId === DEVELOPER_ID;
@@ -182,8 +182,9 @@ async function askGroq(channelId, userId, userMessage) {
     .replace(/,?\s+냥([!?~.,\s]|$)/g, "냥$1")
     .replace(/\s{2,}/g, " ")
     .trim();
-  history.push({ role: "assistant", content: raw });
 
+
+  history.push({ role: "assistant", content: raw });
   return reply;
 }
 
