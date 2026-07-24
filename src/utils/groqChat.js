@@ -156,6 +156,11 @@ async function askGroq(channelId, userId, userMessage) {
     }
   }
 
+  if (response.choices[0]?.finish_reason === "content_filter") {
+    history.pop();
+    return "그런 말은 나한테 하면 안 됩니다냥! 착하게 대화해줘야 한다냥 😾 (오류 코드: AI-002)";
+  }
+
   const raw = response.choices[0]?.message?.content?.trim() ?? "";
   const reply = raw
     .replace(FOREIGN_RE, " ")
