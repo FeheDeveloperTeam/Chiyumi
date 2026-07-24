@@ -31,4 +31,35 @@ async function getMemories(channelId) {
   return memoriesCache.get(channelId);
 }
 
-module.exports = { saveMemory, getMemories };
+async function getMemoriesWithIds(channelId) {
+  const { data, error } = await supabase
+    .from("memories")
+    .select("id, content")
+    .eq("channel_id", channelId)
+    .order("created_at", { ascending: true });
+  if (error) { console.log("[Supabase] 기억 목록 실패:", error.message); return []; }
+  return data ?? [];
+}
+
+async function deleteMemory(channelId, id) {
+  const { error } = await supabase.from("memories").delete().eq("id", id);
+  if (error) { console.log("[Supabase] 기억 삭제 실패:", error.message); return false; }
+  memoriesCache.delete(channelId);
+  return true;
+}
+
+async function updateMemory(channelId, id, content) {
+  const { error } = await supabase.from("memories").update({ content }).eq("id", id);
+  if (error) { console.log("[Supabase] 기억 수정 실패:", error.message); return false; }
+  memoriesCache.delete(channelId);
+  return true;
+}
+
+async function deleteAllMemories(channelId) {
+  const { error } = await supabase.from("memories").delete().eq("channel_id", channelId);
+  if (error) { console.log("[Supabase] 전체 기억 삭제 실패:", error.message); return false; }
+  memoriesCache.delete(channelId);
+  return true;
+}
+
+module.exports = { saveMemory, getMemories, getMemoriesWithIds, deleteMemory, updateMemory, deleteAllMemories };

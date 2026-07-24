@@ -9,7 +9,7 @@ const { announceLevelUp } = require("../utils/levelUpAnnounce");
 const { hasAgreed } = require("../utils/consent");
 const { handleMessage: handleWordChainMessage } = require("../utils/wordchainGame");
 const { askGroq } = require("../utils/groqChat");
-const { saveMemory } = require("../utils/supabaseClient");
+const { saveMemory, getMemoriesWithIds, deleteMemory, updateMemory, deleteAllMemories } = require("../utils/supabaseClient");
 const { getWeather, getWeatherComment } = require("../utils/weatherApi");
 const { buildWeatherCardImage } = require("../utils/weatherCard");
 const { getRecentEarthquakes, formatEarthquakeResponse } = require("../utils/earthquakeApi");
@@ -187,7 +187,57 @@ module.exports = {
     const rest = match[1].trim();
     const input = rest || "불렀어?";
 
-    // --- 기억해 처리 ---
+    // --- 기억 목록 ---
+    if (input === "기억 목록" || input === "기억목록") {
+      const list = await getMemoriesWithIds(message.channel.id);
+      if (!list.length) {
+        await message.reply("아직 배운 게 없냥! '유미야 기억해 [내용]'으로 가르쳐줘냥~ 🐾");
+        return;
+      }
+      const text = list.map((m, i) => `**${i + 1}.** ${m.content}`).join("\n");
+      await message.reply(`유미가 기억하고 있는 것들이냥! 🐾\n${text}`);
+      return;
+    }
+
+    // --- 기억 모두 삭제 ---
+    if (input === "기억 모두 삭제" || input === "기억 전체 삭제") {
+      const ok = await deleteAllMemories(message.channel.id);
+      await message.reply(ok ? "모든 기억을 잊었냥... 🗑️" : "삭제하기가 어렵냥... 잠깐 후에 다시 해줘냥!");
+      return;
+    }
+
+    // --- 기억 삭제 [번호] ---
+    const deleteMatch = input.match(/^기억 ?삭제 ?(\d+)$/);
+    if (deleteMatch) {
+      const num = parseInt(deleteMatch[1], 10);
+      const list = await getMemoriesWithIds(message.channel.id);
+      if (!list.length) { await message.reply("기억이 아무것도 없냥!"); return; }
+      if (num < 1 || num > list.length) {
+        await message.reply(`번호가 잘못됐냥! 1~${list.length} 사이로 입력해줘냥!`);
+        return;
+      }
+      const ok = await deleteMemory(message.channel.id, list[num - 1].id);
+      await message.reply(ok ? `**${num}번** 기억을 잊었냥! 🗑️` : "삭제하기가 어렵냥... 잠깐 후에 다시 해줘냥!");
+      return;
+    }
+
+    // --- 기억 수정 [번호] [새 내용] ---
+    const editMatch = input.match(/^기억 ?수정 ?(\d+) (.+)$/s);
+    if (editMatch) {
+      const num = parseInt(editMatch[1], 10);
+      const newContent = editMatch[2].trim();
+      const list = await getMemoriesWithIds(message.channel.id);
+      if (!list.length) { await message.reply("기억이 아무것도 없냥!"); return; }
+      if (num < 1 || num > list.length) {
+        await message.reply(`번호가 잘못됐냥! 1~${list.length} 사이로 입력해줘냥!`);
+        return;
+      }
+      const ok = await updateMemory(message.channel.id, list[num - 1].id, newContent);
+      await message.reply(ok ? `**${num}번** 기억을 고쳤냥! 🐾` : "수정하기가 어렵냥... 잠깐 후에 다시 해줘냥!");
+      return;
+    }
+
+    // --- 기억해 저장 ---
     if (input.startsWith("기억해")) {
       const content = input.slice(3).trim();
       if (!content) {
