@@ -9,7 +9,7 @@ const { announceLevelUp } = require("../utils/levelUpAnnounce");
 const { hasAgreed } = require("../utils/consent");
 const { handleMessage: handleWordChainMessage } = require("../utils/wordchainGame");
 const { askGroq, addToHistory } = require("../utils/groqChat");
-const { saveMemory, getMemoriesWithIds, deleteMemory, updateMemory, deleteAllMemories } = require("../utils/supabaseClient");
+const { saveMemory, getMemoriesWithIds, deleteMemory, updateMemory, deleteAllMemories, countUserMemories, MEMORY_LIMIT } = require("../utils/supabaseClient");
 const { getWeather, getWeatherComment } = require("../utils/weatherApi");
 const { buildWeatherCardImage } = require("../utils/weatherCard");
 const { getRecentEarthquakes, formatEarthquakeResponse } = require("../utils/earthquakeApi");
@@ -259,25 +259,29 @@ module.exports = {
 
     // --- 기억 목록 ---
     if (input === "기억 목록" || input === "기억목록") {
-      const list = await getMemoriesWithIds(message.channel.id);
-      let r;
+      const list = await getMemoriesWithIds(message.channel.id, userId);
       if (!list.length) {
-        r = "아직 배운 게 없냥! '유미야 기억해 [내용]'으로 가르쳐줘냥~ 🐾";
+        const r = "아직 배운 게 없냥! '유미야 기억해 [내용]'으로 가르쳐줘냥~ 🐾";
+        await message.reply(r);
+        addToHistory(message.channel.id, userId, userLabel, input, r);
       } else {
-        const text = list.map((m, i) => `**${i + 1}.** ${m.content}`).join("\n");
-        r = `유미가 기억하고 있는 것들이냥! 🐾\n${text}`;
+        const embed = new EmbedBuilder()
+          .setColor(0xf5c518)
+          .setTitle("📝 유미가 기억하고 있는 것들이냥! 🐾")
+          .setDescription(list.map((m, i) => `**${i + 1}.** ${m.content}`).join("\n"))
+          .setFooter({ text: `${list.length} / ${MEMORY_LIMIT}개 사용 중` });
+        await message.reply({ embeds: [embed] });
+        addToHistory(message.channel.id, userId, userLabel, input, `기억 목록 (${list.length}개)`);
       }
-      await message.reply(r);
-      addToHistory(message.channel.id, message.author.id, userLabel, input, r);
       return;
     }
 
     // --- 기억 모두 삭제 ---
     if (input === "기억 모두 삭제" || input === "기억 전체 삭제") {
-      const ok = await deleteAllMemories(message.channel.id);
+      const ok = await deleteAllMemories(message.channel.id, userId);
       const r = ok ? "모든 기억을 잊었냥... 🗑️" : "삭제하기가 어렵냥... 잠깐 후에 다시 해줘냥! (오류 코드: MEM-002)";
       await message.reply(r);
-      addToHistory(message.channel.id, message.author.id, userLabel, input, r);
+      addToHistory(message.channel.id, userId, userLabel, input, r);
       return;
     }
 
@@ -285,7 +289,7 @@ module.exports = {
     const deleteMatch = input.match(/^기억 ?삭제 ?(\d+)$/);
     if (deleteMatch) {
       const num = parseInt(deleteMatch[1], 10);
-      const list = await getMemoriesWithIds(message.channel.id);
+      const list = await getMemoriesWithIds(message.channel.id, userId);
       if (!list.length) { await message.reply("기억이 아무것도 없냥!"); return; }
       if (num < 1 || num > list.length) {
         await message.reply(`번호가 잘못됐냥! 1~${list.length} 사이로 입력해줘냥!`);
@@ -294,7 +298,7 @@ module.exports = {
       const ok = await deleteMemory(message.channel.id, list[num - 1].id);
       const r = ok ? `**${num}번** 기억을 잊었냥! 🗑️` : "삭제하기가 어렵냥... 잠깐 후에 다시 해줘냥! (오류 코드: MEM-002)";
       await message.reply(r);
-      addToHistory(message.channel.id, message.author.id, userLabel, input, r);
+      addToHistory(message.channel.id, userId, userLabel, input, r);
       return;
     }
 
@@ -303,7 +307,7 @@ module.exports = {
     if (editMatch) {
       const num = parseInt(editMatch[1], 10);
       const newContent = editMatch[2].trim();
-      const list = await getMemoriesWithIds(message.channel.id);
+      const list = await getMemoriesWithIds(message.channel.id, userId);
       if (!list.length) { await message.reply("기억이 아무것도 없냥!"); return; }
       if (num < 1 || num > list.length) {
         await message.reply(`번호가 잘못됐냥! 1~${list.length} 사이로 입력해줘냥!`);
@@ -312,7 +316,7 @@ module.exports = {
       const ok = await updateMemory(message.channel.id, list[num - 1].id, newContent);
       const r = ok ? `**${num}번** 기억을 고쳤냥! 🐾` : "수정하기가 어렵냥... 잠깐 후에 다시 해줘냥! (오류 코드: MEM-003)";
       await message.reply(r);
-      addToHistory(message.channel.id, message.author.id, userLabel, input, r);
+      addToHistory(message.channel.id, userId, userLabel, input, r);
       return;
     }
 
@@ -323,10 +327,22 @@ module.exports = {
         await message.reply("뭘 기억하면 될까냥? '유미야 기억해 [내용]' 형식으로 알려줘냥!");
         return;
       }
-      const ok = await saveMemory(message.channel.id, content);
+      const currentCount = isDev ? 0 : await countUserMemories(userId);
+      if (currentCount >= MEMORY_LIMIT) {
+        const list = await getMemoriesWithIds(message.channel.id, userId);
+        const embed = new EmbedBuilder()
+          .setColor(0xe67e22)
+          .setTitle("📝 기억 한도에 도달했다냥!")
+          .setDescription(`기억은 최대 **${MEMORY_LIMIT}개**까지만 저장할 수 있다냥!\n아래 목록에서 지울 기억을 골라줘냥!\n\`유미야 기억 삭제 [번호]\` 로 지우고 다시 시도해줘냥!`)
+          .addFields({ name: "현재 저장된 기억", value: list.map((m, i) => `**${i + 1}.** ${m.content}`).join("\n") || "없음" })
+          .setFooter({ text: `${currentCount} / ${MEMORY_LIMIT}개 사용 중` });
+        await message.reply({ embeds: [embed] });
+        return;
+      }
+      const ok = await saveMemory(message.channel.id, userId, content);
       const memReply = ok ? "기억했다냥! 🐾" : "지금 기억하기가 어렵냥... 잠깐 후에 다시 해줘냥! (오류 코드: MEM-001)";
       await message.reply(memReply);
-      addToHistory(message.channel.id, message.author.id, userLabel, input, memReply);
+      addToHistory(message.channel.id, userId, userLabel, input, memReply);
       return;
     }
 

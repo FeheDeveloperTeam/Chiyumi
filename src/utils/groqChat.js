@@ -138,7 +138,7 @@ async function askGroq(channelId, userId, userMessage, displayName = "집사") {
   history.push(userEntry);
   trimHistory(history);
 
-  const memories = await getMemories(channelId);
+  const memories = await getMemories(channelId, userId);
   const memoryNote = memories.length
     ? `\n\n[상대방이 유미한테 직접 알려준 정보]\n아래 내용의 "난" 또는 "나"는 현재 대화 상대를 가리켜. 이 정보를 유미가 이미 알고 있는 사실처럼 자연스럽게 활용해. "직접 말해달라"거나 "모르겠다"고 하지 말고 당연히 알고 있는 것처럼 대화해.\n${memories.map((m) => `- ${m}`).join("\n")}`
     : "";
@@ -195,6 +195,7 @@ async function askGroq(channelId, userId, userMessage, displayName = "집사") {
     .replace(/(\s[,.\-!?;:]+){2,}/g, " ")
     .replace(/(아|어|여|와|워|이)앙([!?~.…\s]|$)/g, "$1냥$2")
     .replace(/앙([!?~.…\s]|$)/g, "냥$1")
+    .replace(/([가-힣])([!?~])냥/g, "$1냥$2")
     .replace(/,?\s+냥([!?~.,\s]|$)/g, "냥$1")
     .replace(/\s{2,}/g, " ")
     .trim();
