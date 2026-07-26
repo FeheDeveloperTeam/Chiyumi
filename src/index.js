@@ -1,4 +1,5 @@
 require("dotenv").config();
+require("./utils/logger");
 
 const fs = require("node:fs");
 const path = require("node:path");
