@@ -1,6 +1,7 @@
+const USE_COLORS = process.stdout.isTTY === true;
 const RESET = "\x1b[0m";
 
-// prefix → ANSI color. 지진지도 must come before 지진 (longer match first)
+// prefix → ANSI color (지진지도 must come before 지진)
 const PREFIX_COLORS = [
   ["지진지도", "\x1b[95m"],  // Bright Magenta
   ["Supabase", "\x1b[34m"],  // Blue
@@ -14,6 +15,7 @@ const PREFIX_COLORS = [
 ];
 
 function colorizePrefix(str) {
+  if (!USE_COLORS) return str;
   return str.replace(/\[([^\]]+)\]/g, (match, label) => {
     for (const [key, color] of PREFIX_COLORS) {
       if (label.includes(key)) return `${color}[${label}]${RESET}`;
