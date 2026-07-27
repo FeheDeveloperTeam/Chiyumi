@@ -1,4 +1,4 @@
-const { Events, EmbedBuilder, AttachmentBuilder } = require("discord.js");
+const { Events, EmbedBuilder, AttachmentBuilder, escapeMarkdown } = require("discord.js");
 const { nya } = require("../utils/nya");
 const { containsProfanity } = require("../utils/profanityFilter");
 const { isSpam } = require("../utils/spamFilter");
@@ -246,17 +246,6 @@ module.exports = {
       return;
     }
 
-    // 한국어 비율 체크 (개발자 제외)
-    if (!isDev) {
-      const alphaChars = input.replace(/[\s\d!?.,~…🐾😊]/g, "");
-      const koreanChars = (alphaChars.match(/[가-힣ᄀ-ᇿ㄰-㆏]/g) || []).length;
-      if (alphaChars.length > 3 && koreanChars / alphaChars.length < 0.3) {
-        const r = "한국어로만 말해줘야 이해할 수 있다냥! 🐾 (오류 코드: AI-005)";
-        await message.reply(r);
-        addToHistory(message.channel.id, message.author.id, userLabel, input, r);
-        return;
-      }
-    }
 
     // --- 기억 목록 ---
     if (input === "기억 목록" || input === "기억목록" || /^기억(해)?\s*(목록|리스트|보여|알려|말해)/.test(input)) {
@@ -525,7 +514,7 @@ module.exports = {
       const meal = mealTypeMatch[0];
       const pick = pickMenus(meal)[0];
       const emoji = MEAL_EMOJI[meal];
-      const mealReply = `${emoji} ${displayName}님, ${meal}은 **${pick}** 어떠냥? 🐾`;
+      const mealReply = `${emoji} ${escapeMarkdown(displayName)}님, ${meal}은 **${pick}** 어떠냥? 🐾`;
       await message.reply(mealReply);
       addToHistory(message.channel.id, message.author.id, userLabel, input, mealReply);
       return;

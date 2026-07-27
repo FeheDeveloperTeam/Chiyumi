@@ -192,7 +192,17 @@ async function askGroq(channelId, userId, userMessage, displayName = "집사") {
   }
 
   const raw = response.choices[0]?.message?.content?.trim() ?? "";
-  let reply = raw
+
+  // 영어 알파벳이 포함된 닉네임을 FOREIGN_RE 치환에서 보호
+  const NAME_HOLDER = "■□";
+  const hasEngName = /[a-zA-Z]/.test(displayName);
+  const escapedNameRe = hasEngName
+    ? new RegExp(displayName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")
+    : null;
+  const safeMarkdownName = displayName.replace(/([_*`~|])/g, "\\$1");
+  const rawProtected = hasEngName ? raw.replace(escapedNameRe, NAME_HOLDER) : raw;
+
+  let reply = rawProtected
     .replace(FOREIGN_RE, " ")
     .replace(/[（(]\s*[）)]/g, "")
     .replace(/[「]\s*[」]|[『]\s*[』]|[【]\s*[】]/g, "")
@@ -224,13 +234,15 @@ async function askGroq(channelId, userId, userMessage, displayName = "집사") {
     reply = reply.replace(/([요다지해줘])([!?~.…]*)(\s*)$/, "냥$2$3");
   }
 
-  // 정제 후 한국어 비율이 너무 낮으면 (깨진 응답) 에러 반환
+  // 한국어 비율 체크 (닉네임 복원 전에 해야 영어 닉네임이 비율을 왜곡하지 않음)
   const koreanCount = (reply.match(/[가-힣]/g) || []).length;
   if (reply.length > 10 && koreanCount / reply.replace(/\s/g, "").length < 0.4) {
     history.pop();
     return "뭔가 잘 이해를 못했냥... 다시 한번 말해줘냥! 😅";
   }
 
+  // 닉네임 복원 (Discord 마크다운 이스케이프 적용)
+  if (hasEngName) reply = reply.replace(/■□/g, safeMarkdownName);
 
   history.push({ role: "assistant", content: reply });
   return reply;
