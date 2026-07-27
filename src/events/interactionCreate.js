@@ -1850,6 +1850,15 @@ function buildStreamAlertModal(platform) {
     ),
     new ActionRowBuilder().addComponents(
       new TextInputBuilder()
+        .setCustomId("name")
+        .setLabel("{name} 에 쓰일 채널 표시 이름 (비우면 자동)")
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder("예: 페헤, 강호동TV, ...")
+        .setRequired(false)
+        .setMaxLength(50),
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
         .setCustomId("text")
         .setLabel(isUpload ? "알림 메시지 (새 영상 올라왔을 때 · 비우면 기본값)" : "알림 메시지 (방송 켜졌을 때 · 비우면 기본값)")
         .setStyle(TextInputStyle.Paragraph)
@@ -1877,6 +1886,15 @@ function buildStreamAlertEditModal(alert) {
 
   const isUpload = alert.platform === "youtube_upload";
   modal.addComponents(
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId("name")
+        .setLabel("{name} 에 쓰일 채널 표시 이름")
+        .setStyle(TextInputStyle.Short)
+        .setValue(alert.channelName || "")
+        .setRequired(false)
+        .setMaxLength(50),
+    ),
     new ActionRowBuilder().addComponents(
       new TextInputBuilder()
         .setCustomId("text")
@@ -1914,6 +1932,7 @@ async function handleStreamAlertModal(interaction) {
   }
 
   const link = interaction.fields.getTextInputValue("link").trim();
+  const displayName = interaction.fields.getTextInputValue("name").trim();
   const customText = interaction.fields.getTextInputValue("text").trim();
   const mentionRaw = interaction.fields.getTextInputValue("mention").trim().toLowerCase();
   const mention = ["everyone", "here"].includes(mentionRaw) ? mentionRaw : "none";
@@ -1958,7 +1977,7 @@ async function handleStreamAlertModal(interaction) {
     ...pending,
     channelLink: link,
     channelId,
-    channelName: extractedId,
+    channelName: displayName || extractedId,
     customText,
     mention,
   });
@@ -2068,6 +2087,7 @@ async function handleStreamAlertActionButton(interaction) {
     }
     pendingEdits.delete(interaction.user.id);
     updateAlert(pending.guildId, pending.alertId, {
+      ...(pending.channelName ? { channelName: pending.channelName } : {}),
       customText: pending.customText,
       mention: pending.mention,
     });
@@ -2100,11 +2120,12 @@ async function handleStreamAlertEditModal(interaction) {
     return;
   }
 
+  const channelName = interaction.fields.getTextInputValue("name").trim();
   const customText = interaction.fields.getTextInputValue("text").trim();
   const mentionRaw = interaction.fields.getTextInputValue("mention").trim().toLowerCase();
   const mention = ["everyone", "here"].includes(mentionRaw) ? mentionRaw : "none";
 
-  pendingEdits.set(interaction.user.id, { ...pending, customText, mention });
+  pendingEdits.set(interaction.user.id, { ...pending, channelName, customText, mention });
 
   const alerts = getGuildAlerts(pending.guildId);
   const alert = alerts.find((a) => a.id === pending.alertId);
@@ -2138,6 +2159,7 @@ async function handleStreamAlertEditChannelSelect(interaction) {
   }
   pendingEdits.delete(interaction.user.id);
   updateAlert(pending.guildId, pending.alertId, {
+    ...(pending.channelName ? { channelName: pending.channelName } : {}),
     customText: pending.customText,
     mention: pending.mention,
     notifChannelId: interaction.values[0],
