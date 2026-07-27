@@ -107,7 +107,7 @@ function getAuthClient() {
   });
 }
 
-async function sheetsRequest(authClient, url, options = {}) {
+async function sheetsRequest(authClient, url, options = {}, retries = 3) {
   const { token } = await authClient.getAccessToken();
 
   const response = await fetch(url, {
@@ -121,6 +121,11 @@ async function sheetsRequest(authClient, url, options = {}) {
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
+    if ((response.status === 500 || response.status === 503) && retries > 0) {
+      const delay = (4 - retries) * 2000;
+      await new Promise((r) => setTimeout(r, delay));
+      return sheetsRequest(authClient, url, options, retries - 1);
+    }
     throw new Error(`Sheets API ${response.status}: ${text}`);
   }
 
@@ -175,12 +180,24 @@ async function syncDataToSheets(client) {
     const rows = GUILD_USER_MAP_FILES.has(fileName)
       ? guildUserMapToRows(data)
       : objectToRows(data);
-    await writeSheet(authClient, spreadsheetId, title, rows);
+    try {
+      await writeSheet(authClient, spreadsheetId, title, rows);
+    } catch (err) {
+      console.error(`[Sheets] '${title}' 시트 쓰기 실패:`, err.message);
+    }
   }
 
-  await writeSheet(authClient, spreadsheetId, "주식시세", stockPricesToRows(readJsonFile("stocks.json")));
-  await writeSheet(authClient, spreadsheetId, "주식포트폴리오", objectToRows(readJsonFile("stockPortfolios.json")));
-  await writeSheet(authClient, spreadsheetId, "서버목록", buildGuildListRows(client));
+  for (const [title, rows] of [
+    ["주식시세", stockPricesToRows(readJsonFile("stocks.json"))],
+    ["주식포트폴리오", objectToRows(readJsonFile("stockPortfolios.json"))],
+    ["서버목록", buildGuildListRows(client)],
+  ]) {
+    try {
+      await writeSheet(authClient, spreadsheetId, title, rows);
+    } catch (err) {
+      console.error(`[Sheets] '${title}' 시트 쓰기 실패:`, err.message);
+    }
+  }
 }
 
 module.exports = { syncDataToSheets };

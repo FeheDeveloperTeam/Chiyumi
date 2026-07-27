@@ -32,6 +32,10 @@ function buildAlertDetailEmbed(alert, index, total) {
         `**알림 채널** <#${alert.notifChannelId}>`,
         `**알림 메시지** ${alert.customText || "(기본 메시지)"}`,
         `**멘션** ${alert.mention === "none" ? "없음" : `@${alert.mention}`}`,
+        ``,
+        `📝 **알림 메시지 변수 안내**`,
+        `\`{name}\` → 채널명으로 자동 대체됩니다`,
+        `예시) \`{name}님이 방송을 시작했어요!\` → \`${alert.channelName}님이 방송을 시작했어요!\``,
       ].join("\n"),
     );
 }
