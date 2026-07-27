@@ -34,8 +34,13 @@ function buildAlertDetailEmbed(alert, index, total) {
         `**멘션** ${alert.mention === "none" ? "없음" : `@${alert.mention}`}`,
         ``,
         `📝 **알림 메시지 변수 안내**`,
-        `\`{name}\` → 채널명  \`{url}\` → 방송/영상 링크 (썸네일 위치 지정)${alert.platform === "youtube_upload" ? `  \`{title}\` → 영상 제목` : ""}`,
-        `\`{url}\` 를 넣지 않으면 링크가 메시지 맨 뒤에 자동으로 붙습니다`,
+        ...(alert.platform === "youtube_upload" ? [
+          `\`{name}\` 채널명 · \`{title}\` 영상 제목 · \`{url}\` 영상 링크 (썸네일)`,
+          `사용하지 않은 변수는 메시지 맨 뒤에 자동으로 붙습니다`,
+        ] : [
+          `\`{name}\` 채널명 · \`{url}\` 방송 링크 (썸네일)`,
+          `\`{url}\` 를 넣지 않으면 링크가 메시지 맨 뒤에 자동으로 붙습니다`,
+        ]),
       ].join("\n"),
     );
 }

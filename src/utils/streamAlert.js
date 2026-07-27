@@ -152,10 +152,10 @@ function buildUploadNotificationContent(alert, videoInfo) {
     .replace(/{title}/g, videoInfo.title)
     .replace(/{url}/g, videoUrl);
   parts.push(text);
-  if (!alert.customText?.includes("{url}")) {
-    parts.push(`**${videoInfo.title}**`);
-    parts.push(videoUrl);
-  }
+  const hasTitle = alert.customText?.includes("{title}");
+  const hasUrl = alert.customText?.includes("{url}");
+  if (!hasTitle) parts.push(`**${videoInfo.title}**`);
+  if (!hasUrl) parts.push(videoUrl);
   return parts.join("\n");
 }
 
