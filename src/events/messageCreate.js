@@ -296,7 +296,7 @@ module.exports = {
         await message.reply(`번호가 잘못됐냥! 1~${list.length} 사이로 입력해줘냥!`);
         return;
       }
-      const ok = await deleteMemory(message.channel.id, list[num - 1].id);
+      const ok = await deleteMemory(userId, list[num - 1].id);
       const r = ok ? `**${num}번** 기억을 잊었냥! 🗑️` : "삭제하기가 어렵냥... 잠깐 후에 다시 해줘냥! (오류 코드: MEM-002)";
       await message.reply(r);
       addToHistory(message.channel.id, userId, userLabel, input, r);
@@ -314,7 +314,7 @@ module.exports = {
         await message.reply(`번호가 잘못됐냥! 1~${list.length} 사이로 입력해줘냥!`);
         return;
       }
-      const ok = await updateMemory(message.channel.id, list[num - 1].id, newContent);
+      const ok = await updateMemory(userId, list[num - 1].id, newContent);
       const r = ok ? `**${num}번** 기억을 고쳤냥! 🐾` : "수정하기가 어렵냥... 잠깐 후에 다시 해줘냥! (오류 코드: MEM-003)";
       await message.reply(r);
       addToHistory(message.channel.id, userId, userLabel, input, r);
