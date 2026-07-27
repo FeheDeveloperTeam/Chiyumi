@@ -256,7 +256,16 @@ function buildNotificationContent(alert) {
     alert.channelName,
   );
   parts.push(text);
-  parts.push(`<${alert.channelLink}>`);
+  // YouTube는 /live URL로 → Discord가 oEmbed로 라이브 썸네일 표시
+  let notifUrl;
+  if (alert.platform === "youtube") {
+    notifUrl = alert.channelId.startsWith("@")
+      ? `https://www.youtube.com/${alert.channelId}/live`
+      : `https://www.youtube.com/channel/${alert.channelId}/live`;
+  } else {
+    notifUrl = alert.channelLink;
+  }
+  parts.push(notifUrl);
   return parts.join("\n");
 }
 
