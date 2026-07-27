@@ -34,8 +34,8 @@ function buildAlertDetailEmbed(alert, index, total) {
         `**멘션** ${alert.mention === "none" ? "없음" : `@${alert.mention}`}`,
         ``,
         `📝 **알림 메시지 변수 안내**`,
-        `\`{name}\` → 채널명으로 자동 대체됩니다`,
-        `예시) \`{name}님이 방송을 시작했어요!\` → \`${alert.channelName}님이 방송을 시작했어요!\``,
+        `\`{name}\` → 채널명  \`{url}\` → 방송/영상 링크 (썸네일 위치 지정)${alert.platform === "youtube_upload" ? `  \`{title}\` → 영상 제목` : ""}`,
+        `\`{url}\` 를 넣지 않으면 링크가 메시지 맨 뒤에 자동으로 붙습니다`,
       ].join("\n"),
     );
 }

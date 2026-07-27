@@ -144,15 +144,18 @@ function updateAlert(guildId, alertId, updates) {
 }
 
 function buildUploadNotificationContent(alert, videoInfo) {
+  const videoUrl = `https://www.youtube.com/watch?v=${videoInfo.videoId}`;
   const parts = [];
   if (alert.mention !== "none") parts.push(`@${alert.mention}`);
-  const text = (alert.customText || "{name}님의 새 영상이 올라왔습니다! 📹").replace(
-    /{name}/g,
-    alert.channelName,
-  );
+  const text = (alert.customText || "{name}님의 새 영상이 올라왔습니다! 📹")
+    .replace(/{name}/g, alert.channelName)
+    .replace(/{title}/g, videoInfo.title)
+    .replace(/{url}/g, videoUrl);
   parts.push(text);
-  parts.push(`**${videoInfo.title}**`);
-  parts.push(`https://www.youtube.com/watch?v=${videoInfo.videoId}`);
+  if (!alert.customText?.includes("{url}")) {
+    parts.push(`**${videoInfo.title}**`);
+    parts.push(videoUrl);
+  }
   return parts.join("\n");
 }
 
@@ -248,24 +251,26 @@ async function checkIsLive(alert) {
   }
 }
 
-function buildNotificationContent(alert) {
-  const parts = [];
-  if (alert.mention !== "none") parts.push(`@${alert.mention}`);
-  const text = (alert.customText || "{name}님이 방송을 시작했습니다! 🎉").replace(
-    /{name}/g,
-    alert.channelName,
-  );
-  parts.push(text);
-  // YouTube는 /live URL로 → Discord가 oEmbed로 라이브 썸네일 표시
-  let notifUrl;
+function buildLiveUrl(alert) {
   if (alert.platform === "youtube") {
-    notifUrl = alert.channelId.startsWith("@")
+    return alert.channelId.startsWith("@")
       ? `https://www.youtube.com/${alert.channelId}/live`
       : `https://www.youtube.com/channel/${alert.channelId}/live`;
-  } else {
-    notifUrl = alert.channelLink;
   }
-  parts.push(notifUrl);
+  return alert.channelLink;
+}
+
+function buildNotificationContent(alert) {
+  const liveUrl = buildLiveUrl(alert);
+  const parts = [];
+  if (alert.mention !== "none") parts.push(`@${alert.mention}`);
+  const text = (alert.customText || "{name}님이 방송을 시작했습니다! 🎉")
+    .replace(/{name}/g, alert.channelName)
+    .replace(/{url}/g, liveUrl);
+  parts.push(text);
+  if (!alert.customText?.includes("{url}")) {
+    parts.push(liveUrl);
+  }
   return parts.join("\n");
 }
 
