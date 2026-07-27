@@ -19,6 +19,7 @@ const EXTRA_STATUSES = [
   "주식 시세 분석 중이다냥 📈",
   "고양이는 원래 이렇게 바쁘다냥 😼",
   "졸린데 일해야 한다냥 😿",
+  "'유미야' 하고 나를 불러달라냥 🐾",
 ];
 
 function updatePresence(client) {
