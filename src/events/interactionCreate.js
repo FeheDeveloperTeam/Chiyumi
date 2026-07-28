@@ -2829,9 +2829,23 @@ async function handleButton(interaction) {
           { name: "이유",      value: "테스트" },
         )
         .setColor(0xffa500).setTimestamp();
+    } else if (type === "raidAlert") {
+      embed = new EmbedBuilder()
+        .setTitle("🚨 레이드 감지!" + TEST_SUFFIX)
+        .setColor(0xed4245)
+        .addFields(
+          { name: "감지 닉네임", value: "`TestRaider`",      inline: true },
+          { name: "입장 인원",   value: "3명",               inline: true },
+          { name: "조치",        value: "⚠️ 경고만",          inline: true },
+          { name: "입장자 목록", value: `${user} \`(테스트)\`` },
+        )
+        .setTimestamp();
     }
 
-    if (!embed) return;
+    if (!embed) {
+      await interaction.reply({ content: nya("해당 유형의 테스트 임베드가 없습니다."), ephemeral: true });
+      return;
+    }
 
     await logChannel.send({ embeds: [embed] }).catch(() => {});
     await interaction.reply({
