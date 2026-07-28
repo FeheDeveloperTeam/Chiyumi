@@ -135,12 +135,11 @@ function buildRaidEmbed(guildId) {
     .setTitle(locked ? "🚨 레이드 검열 설정 — 현재 잠금 중" : "레이드 검열 설정")
     .setDescription(nya("30초 안에 동일한 닉네임을 가진 멤버가 3명 이상 입장하면 레이드로 자동 감지합니다"))
     .addFields(
-      { name: "감지",        value: cfg.enabled ? "✅ 켜짐" : "⬜ 꺼짐",                           inline: true },
-      { name: "잠금 모드",   value: cfg.lockdown ? "🔒 켜짐" : "🔓 꺼짐",                          inline: true },
-      { name: "조치",        value: actionLabel,                                                     inline: true },
-      { name: "관리자 알림", value: cfg.alertChannelId ? `<#${cfg.alertChannelId}>` : "설정 안 됨", inline: true },
-      { name: "서버 공지 알림", value: announceChannelId ? `<#${announceChannelId}>` : "설정 안 됨", inline: true },
-      { name: "현재 상태",   value: locked ? "🔴 경보 중 (채널 잠금됨)" : "🟢 정상",               inline: true },
+      { name: "감지",                   value: cfg.enabled ? "✅ 켜짐" : "⬜ 꺼짐",                             inline: true },
+      { name: "잠금 모드",              value: cfg.lockdown ? "🔒 켜짐" : "🔓 꺼짐",                            inline: true },
+      { name: "조치",                   value: actionLabel,                                                       inline: true },
+      { name: "레이드 알림 채널(서버원)", value: announceChannelId ? `<#${announceChannelId}>` : "설정 안 됨",   inline: true },
+      { name: "현재 상태",              value: locked ? "🔴 경보 중 (채널 잠금됨)" : "🟢 정상",                 inline: true },
     )
     .setColor(locked ? 0xff0000 : 0xed4245);
 }
@@ -171,12 +170,8 @@ function buildRaidRows(guildId) {
 
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId("censor-raid-channel-btn")
-      .setLabel("관리자 알림 채널 설정")
-      .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
       .setCustomId("censor-raid-announce-btn")
-      .setLabel("서버 공지 채널 설정")
+      .setLabel("레이드 알림 채널(서버원) 설정")
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId("censor-raid-test-btn")

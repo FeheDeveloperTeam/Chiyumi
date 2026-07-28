@@ -2414,20 +2414,6 @@ async function handleChannelSelect(interaction) {
     return;
   }
 
-  if (interaction.customId === "censor-raid-channel-select") {
-    if (!hasManageGuild(interaction)) {
-      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
-      return;
-    }
-    setRaidConfig(interaction.guild.id, { alertChannelId: interaction.values[0] });
-    await interaction.update({
-      content: null,
-      embeds: [buildRaidEmbed(interaction.guild.id)],
-      components: buildRaidRows(interaction.guild.id),
-    });
-    return;
-  }
-
   if (interaction.customId === "censor-raid-announce-select") {
     if (!hasManageGuild(interaction)) {
       await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
@@ -3156,25 +3142,6 @@ async function handleButton(interaction) {
     return;
   }
 
-  if (interaction.customId === "censor-raid-channel-btn") {
-    if (!hasManageGuild(interaction)) {
-      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
-      return;
-    }
-    const channelSelect = new ChannelSelectMenuBuilder()
-      .setCustomId("censor-raid-channel-select")
-      .setPlaceholder("관리자 전용 레이드 알림 채널을 선택하세요")
-      .addChannelTypes(ChannelType.GuildText)
-      .setMinValues(1)
-      .setMaxValues(1);
-    await interaction.update({
-      content: nya("레이드 감지 시 관리자에게 상세 알림을 보낼 채널을 선택하세요."),
-      embeds: [],
-      components: [new ActionRowBuilder().addComponents(channelSelect)],
-    });
-    return;
-  }
-
   if (interaction.customId === "censor-raid-announce-btn") {
     if (!hasManageGuild(interaction)) {
       await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
@@ -3200,29 +3167,17 @@ async function handleButton(interaction) {
       return;
     }
 
-    const raidCfg         = getRaidConfig(interaction.guild.id);
-    const alertChannelId  = raidCfg.alertChannelId;
+    const raidCfg       = getRaidConfig(interaction.guild.id);
     const announceChannelId = getAnnounceChannelId(interaction.guild.id);
 
-    if (!alertChannelId && !announceChannelId) {
-      await interaction.reply({ content: nya("관리자 알림 채널과 서버 공지 채널이 모두 설정되어 있지 않습니다. 먼저 채널을 설정해주세요."), ephemeral: true });
+    if (!announceChannelId) {
+      await interaction.reply({ content: nya("레이드 알림 채널(서버원)이 설정되어 있지 않습니다. 먼저 채널을 설정해주세요."), ephemeral: true });
       return;
     }
 
-    const TEST_SUFFIX    = " *(🧪 테스트)*";
-    const actionLabel    = raidCfg.action === "ban" ? "🔨 자동 밴" : raidCfg.action === "kick" ? "👢 자동 킥" : "⚠️ 경고만";
-    const user           = interaction.user;
-
-    const adminEmbed = new EmbedBuilder()
-      .setTitle("🚨 레이드 감지!" + TEST_SUFFIX)
-      .setColor(0xed4245)
-      .addFields(
-        { name: "감지 닉네임", value: "`TestRaider`",                      inline: true },
-        { name: "입장 인원",   value: "3명",                               inline: true },
-        { name: "조치",        value: actionLabel,                          inline: true },
-        { name: "입장자 목록", value: `${user} \`(테스트 계정 1)\`\n${user} \`(테스트 계정 2)\`\n${user} \`(테스트 계정 3)\`` },
-      )
-      .setTimestamp();
+    const TEST_SUFFIX = " *(🧪 테스트)*";
+    const actionLabel = raidCfg.action === "ban" ? "🔨 자동 밴" : raidCfg.action === "kick" ? "👢 자동 킥" : "⚠️ 경고만";
+    const user        = interaction.user;
 
     const publicEmbed = new EmbedBuilder()
       .setTitle("⚠️ 서버 보안 경보" + TEST_SUFFIX)
@@ -3230,27 +3185,12 @@ async function handleButton(interaction) {
       .setColor(0xff9900)
       .setTimestamp();
 
-    const sent = [];
-
-    if (alertChannelId) {
-      const ch = interaction.guild.channels.cache.get(alertChannelId);
-      if (ch) {
-        await ch.send({ embeds: [adminEmbed] }).catch(() => {});
-        sent.push(`관리자 알림 채널 <#${alertChannelId}>`);
-      }
-    }
-
-    if (announceChannelId) {
-      const ch = interaction.guild.channels.cache.get(announceChannelId);
-      if (ch) {
-        await ch.send({ embeds: [publicEmbed] }).catch(() => {});
-        sent.push(`서버 공지 채널 <#${announceChannelId}>`);
-      }
-    }
+    const ch = interaction.guild.channels.cache.get(announceChannelId);
+    if (ch) await ch.send({ embeds: [publicEmbed] }).catch(() => {});
 
     await interaction.reply({
-      content: sent.length
-        ? nya(`테스트 알림을 보냈습니다 → ${sent.join(", ")}`)
+      content: ch
+        ? nya(`테스트 알림을 보냈습니다 → <#${announceChannelId}>`)
         : nya("채널을 찾을 수 없어 테스트 메시지를 보내지 못했습니다"),
       ephemeral: true,
     });

@@ -15,7 +15,7 @@ function getDisplayName(member) {
 async function checkRaid(member, raidConfig) {
   if (!raidConfig.enabled) return;
 
-  const { action, alertChannelId, lockdown } = raidConfig;
+  const { action, lockdown } = raidConfig;
   const announceChannelId = getAnnounceChannelId(member.guild.id);
   const now     = Date.now();
   const guildId = member.guild.id;
@@ -66,13 +66,7 @@ async function checkRaid(member, raidConfig) {
     .setColor(0xff9900)
     .setTimestamp();
 
-  // 1) 관리자 알림 채널
-  if (alertChannelId) {
-    const ch = member.guild.channels.cache.get(alertChannelId);
-    if (ch) await ch.send({ embeds: [adminEmbed] }).catch(() => {});
-  }
-
-  // 2) 로그 채널 (레이드 알림 옵션이 켜진 경우만)
+  // 로그 채널 (레이드 알림 옵션이 켜진 경우만)
   if (getLogOptions(member.guild.id).raidAlert) {
     await sendLog(member.guild, adminEmbed);
   }
