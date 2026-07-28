@@ -107,6 +107,28 @@ function getWelcomeChannelId(guildId) {
   return configs[guildId]?.welcomeChannelId ?? null;
 }
 
+function setJoinChannel(guildId, channelId) {
+  const configs = loadAll();
+  configs[guildId] = { ...(configs[guildId] ?? {}), joinChannelId: channelId };
+  saveAll(configs);
+}
+
+function getJoinChannelId(guildId) {
+  const configs = loadAll();
+  return configs[guildId]?.joinChannelId ?? configs[guildId]?.welcomeChannelId ?? null;
+}
+
+function setLeaveChannel(guildId, channelId) {
+  const configs = loadAll();
+  configs[guildId] = { ...(configs[guildId] ?? {}), leaveChannelId: channelId };
+  saveAll(configs);
+}
+
+function getLeaveChannelId(guildId) {
+  const configs = loadAll();
+  return configs[guildId]?.leaveChannelId ?? configs[guildId]?.welcomeChannelId ?? null;
+}
+
 function getWelcomeOptions(guildId) {
   const configs = loadAll();
   return { ...DEFAULT_WELCOME_OPTIONS, ...(configs[guildId]?.welcomeOptions ?? {}) };
@@ -273,6 +295,10 @@ module.exports = {
   setLogOption,
   setWelcomeChannel,
   getWelcomeChannelId,
+  setJoinChannel,
+  getJoinChannelId,
+  setLeaveChannel,
+  getLeaveChannelId,
   getWelcomeOptions,
   setWelcomeOption,
   setWelcomeMessage,

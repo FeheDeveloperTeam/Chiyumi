@@ -28,6 +28,10 @@ const {
   setLogOption,
   setWelcomeChannel,
   getWelcomeChannelId,
+  setJoinChannel,
+  getJoinChannelId,
+  setLeaveChannel,
+  getLeaveChannelId,
   getWelcomeOptions,
   setWelcomeOption,
   setWelcomeMessage,
@@ -174,6 +178,8 @@ const LOG_PERCHANNEL_SELECT_PREFIX = "log-perchannel-select:";
 const WELCOME_ACTION_PREFIX = "welcome-action:";
 const WELCOME_TOGGLE_PREFIX = "welcome-toggle:";
 const WELCOME_CHANNEL_SELECT_ID = "welcome-channel-select";
+const WELCOME_JOIN_CHANNEL_SELECT_ID = "welcome-join-channel-select";
+const WELCOME_LEAVE_CHANNEL_SELECT_ID = "welcome-leave-channel-select";
 const WELCOME_MODAL_PREFIX = "welcome-modal:";
 const COIN_DEV_ACTION_PREFIX = "coin-dev-action:";
 const COIN_DEV_MODAL_PREFIX = "coin-dev-modal:";
@@ -2327,6 +2333,45 @@ async function handleChannelSelect(interaction) {
     setWelcomeChannel(interaction.guild.id, channelId);
 
     await interaction.update({
+      content: null,
+      embeds: [buildWelcomeEmbed(interaction.guild.id)],
+      components: buildWelcomeRows(interaction.guild.id),
+    });
+    return;
+  }
+
+  if (interaction.customId === WELCOME_JOIN_CHANNEL_SELECT_ID) {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({
+        content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    setJoinChannel(interaction.guild.id, interaction.values[0]);
+
+    await interaction.update({
+      content: null,
+      embeds: [buildWelcomeEmbed(interaction.guild.id)],
+      components: buildWelcomeRows(interaction.guild.id),
+    });
+    return;
+  }
+
+  if (interaction.customId === WELCOME_LEAVE_CHANNEL_SELECT_ID) {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({
+        content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    setLeaveChannel(interaction.guild.id, interaction.values[0]);
+
+    await interaction.update({
+      content: null,
       embeds: [buildWelcomeEmbed(interaction.guild.id)],
       components: buildWelcomeRows(interaction.guild.id),
     });
@@ -2742,10 +2787,10 @@ async function handleButton(interaction) {
 
     const action = interaction.customId.slice(WELCOME_ACTION_PREFIX.length);
 
-    if (action === "channel") {
+    if (action === "join-channel") {
       const channelSelect = new ChannelSelectMenuBuilder()
-        .setCustomId(WELCOME_CHANNEL_SELECT_ID)
-        .setPlaceholder("입퇴장 알림을 받을 채널을 선택하세요")
+        .setCustomId(WELCOME_JOIN_CHANNEL_SELECT_ID)
+        .setPlaceholder("입장 알림을 받을 채널을 선택하세요")
         .addChannelTypes(ChannelType.GuildText)
         .setMinValues(1)
         .setMaxValues(1);
@@ -2753,7 +2798,26 @@ async function handleButton(interaction) {
       const row = new ActionRowBuilder().addComponents(channelSelect);
 
       await interaction.update({
-        content: nya("입퇴장 알림을 받을 채널을 선택하세요."),
+        content: nya("입장 알림을 받을 채널을 선택하세요."),
+        embeds: [],
+        components: [row],
+      });
+      return;
+    }
+
+    if (action === "leave-channel") {
+      const channelSelect = new ChannelSelectMenuBuilder()
+        .setCustomId(WELCOME_LEAVE_CHANNEL_SELECT_ID)
+        .setPlaceholder("퇴장 알림을 받을 채널을 선택하세요")
+        .addChannelTypes(ChannelType.GuildText)
+        .setMinValues(1)
+        .setMaxValues(1);
+
+      const row = new ActionRowBuilder().addComponents(channelSelect);
+
+      await interaction.update({
+        content: nya("퇴장 알림을 받을 채널을 선택하세요."),
+        embeds: [],
         components: [row],
       });
       return;
@@ -2766,10 +2830,13 @@ async function handleButton(interaction) {
     }
 
     if (action === "test-join" || action === "test-leave") {
-      const channelId = getWelcomeChannelId(interaction.guild.id);
+      const isJoin = action === "test-join";
+      const channelId = isJoin
+        ? getJoinChannelId(interaction.guild.id)
+        : getLeaveChannelId(interaction.guild.id);
       if (!channelId) {
         await interaction.reply({
-          content: nya("채널이 설정되어 있지 않습니다. 먼저 채널을 설정해주세요."),
+          content: nya(`${isJoin ? "입장" : "퇴장"} 채널이 설정되어 있지 않습니다. 먼저 채널을 설정해주세요.`),
           ephemeral: true,
         });
         return;
@@ -2784,7 +2851,6 @@ async function handleButton(interaction) {
         return;
       }
 
-      const isJoin = action === "test-join";
       const options = getWelcomeOptions(interaction.guild.id);
       const template = getWelcomeMessage(interaction.guild.id, isJoin ? "join" : "leave");
       const description = formatWelcomeMessage(template, {

@@ -8,7 +8,8 @@ const {
 } = require("discord.js");
 const { nya } = require("../utils/nya");
 const {
-  getWelcomeChannelId,
+  getJoinChannelId,
+  getLeaveChannelId,
   getWelcomeOptions,
   getWelcomeMessage,
 } = require("../utils/guildConfig");
@@ -22,8 +23,8 @@ const INFO_TOGGLES = [
 ];
 
 function buildWelcomeEmbed(guildId) {
-  const channelId = getWelcomeChannelId(guildId);
-  const channelText = channelId ? `<#${channelId}>` : "설정 안 됨";
+  const joinId = getJoinChannelId(guildId);
+  const leaveId = getLeaveChannelId(guildId);
   const options = getWelcomeOptions(guildId);
 
   const infoStatus = INFO_TOGGLES
@@ -36,7 +37,8 @@ function buildWelcomeEmbed(guildId) {
       nya("아래 버튼으로 채널, 문구, 알림 여부를 설정하세요 ({유저}, {서버} 치환 가능)"),
     )
     .addFields(
-      { name: "채널", value: channelText },
+      { name: "입장 채널", value: joinId ? `<#${joinId}>` : "설정 안 됨", inline: true },
+      { name: "퇴장 채널", value: leaveId ? `<#${leaveId}>` : "설정 안 됨", inline: true },
       {
         name: "알림 상태",
         value: `입장: ${options.joinEnabled ? "켜짐" : "꺼짐"} · 퇴장: ${options.leaveEnabled ? "켜짐" : "꺼짐"}`,
@@ -53,8 +55,12 @@ function buildWelcomeRows(guildId) {
 
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId("welcome-action:channel")
-      .setLabel("채널 설정")
+      .setCustomId("welcome-action:join-channel")
+      .setLabel("입장 채널 설정")
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId("welcome-action:leave-channel")
+      .setLabel("퇴장 채널 설정")
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId("welcome-action:join-message")

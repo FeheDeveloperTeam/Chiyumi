@@ -1,5 +1,5 @@
 const { Events, EmbedBuilder } = require("discord.js");
-const { getWelcomeChannelId, getWelcomeOptions, getWelcomeMessage } = require("../utils/guildConfig");
+const { getLeaveChannelId, getWelcomeOptions, getWelcomeMessage } = require("../utils/guildConfig");
 const { formatWelcomeMessage } = require("../utils/welcomeFormat");
 
 module.exports = {
@@ -8,7 +8,7 @@ module.exports = {
     const options = getWelcomeOptions(member.guild.id);
     if (!options.leaveEnabled) return;
 
-    const channelId = getWelcomeChannelId(member.guild.id);
+    const channelId = getLeaveChannelId(member.guild.id);
     if (!channelId) return;
 
     const channel = member.guild.channels.cache.get(channelId);
