@@ -167,6 +167,54 @@ function getWelcomeMessage(guildId, type) {
   return configs[guildId]?.welcomeMessages?.[type] ?? defaultMessage;
 }
 
+const DEFAULT_SPAM_LEVEL = 3;
+
+function setSpamLevel(guildId, level) {
+  const configs = loadAll();
+  configs[guildId] = { ...(configs[guildId] ?? {}), spamLevel: level };
+  saveAll(configs);
+}
+
+function getSpamLevel(guildId) {
+  const configs = loadAll();
+  return configs[guildId]?.spamLevel ?? DEFAULT_SPAM_LEVEL;
+}
+
+const DEFAULT_RAID_CONFIG = {
+  enabled: false,
+  threshold: 5,
+  windowSecs: 10,
+  action: "alert",
+  alertChannelId: null,
+  lockdown: false,
+};
+
+function getRaidConfig(guildId) {
+  const configs = loadAll();
+  return { ...DEFAULT_RAID_CONFIG, ...(configs[guildId]?.raidConfig ?? {}) };
+}
+
+function setRaidConfig(guildId, updates) {
+  const configs = loadAll();
+  const current = configs[guildId] ?? {};
+  configs[guildId] = {
+    ...current,
+    raidConfig: { ...DEFAULT_RAID_CONFIG, ...(current.raidConfig ?? {}), ...updates },
+  };
+  saveAll(configs);
+}
+
+function isRaidLocked(guildId) {
+  const configs = loadAll();
+  return configs[guildId]?.raidLocked ?? false;
+}
+
+function setRaidLocked(guildId, locked) {
+  const configs = loadAll();
+  configs[guildId] = { ...(configs[guildId] ?? {}), raidLocked: locked };
+  saveAll(configs);
+}
+
 const DEFAULT_LEVELUP_MESSAGE = "{유저}님이 레벨이 올라서 이제 {레벨}레벨이다";
 
 function setLevelUpChannel(guildId, channelId) {
@@ -315,6 +363,12 @@ module.exports = {
   setTicketMessage,
   getTicketMessage,
   DEFAULT_TICKET_MESSAGE,
+  setSpamLevel,
+  getSpamLevel,
+  getRaidConfig,
+  setRaidConfig,
+  isRaidLocked,
+  setRaidLocked,
   setWordChainChannel,
   getWordChainChannelId,
   setSupportMessage,

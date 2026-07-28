@@ -1,11 +1,15 @@
 const { Events, EmbedBuilder } = require("discord.js");
-const { getJoinChannelId, getWelcomeOptions, getWelcomeMessage } = require("../utils/guildConfig");
+const { getJoinChannelId, getWelcomeOptions, getWelcomeMessage, getRaidConfig } = require("../utils/guildConfig");
 const { formatWelcomeMessage } = require("../utils/welcomeFormat");
 const { findUsedInvite } = require("../utils/inviteTracker");
+const { checkRaid } = require("../utils/raidDetector");
 
 module.exports = {
   name: Events.GuildMemberAdd,
   async execute(member) {
+    // 레이드 감지는 입장 알림 설정과 무관하게 항상 실행
+    await checkRaid(member, getRaidConfig(member.guild.id));
+
     const options = getWelcomeOptions(member.guild.id);
     if (!options.joinEnabled) return;
 

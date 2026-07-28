@@ -2,7 +2,7 @@ const { Events, EmbedBuilder, AttachmentBuilder, escapeMarkdown } = require("dis
 const { nya } = require("../utils/nya");
 const { containsProfanity } = require("../utils/profanityFilter");
 const { isSpam } = require("../utils/spamFilter");
-const { getLogOptions, sendLog } = require("../utils/guildConfig");
+const { getLogOptions, getSpamLevel, sendLog } = require("../utils/guildConfig");
 const { grantActivityReward, levelFromXp } = require("../utils/levels");
 const { addBalance } = require("../utils/credits");
 const { announceLevelUp } = require("../utils/levelUpAnnounce");
@@ -199,7 +199,7 @@ module.exports = {
     if (
       message.guild &&
       getLogOptions(message.guild.id).spamFilter &&
-      isSpam(message.author.id, message.content)
+      isSpam(message.author.id, message.guild.id, message.content, getSpamLevel(message.guild.id))
     ) {
       await handleSpam(message);
       return;

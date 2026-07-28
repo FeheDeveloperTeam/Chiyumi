@@ -11,6 +11,7 @@ const {
   ModalBuilder,
   PermissionFlagsBits,
   RoleSelectMenuBuilder,
+  StringSelectMenuBuilder,
   TextInputBuilder,
   TextInputStyle,
   UserSelectMenuBuilder,
@@ -36,6 +37,12 @@ const {
   setWelcomeOption,
   setWelcomeMessage,
   getWelcomeMessage,
+  setSpamLevel,
+  getSpamLevel,
+  getRaidConfig,
+  setRaidConfig,
+  isRaidLocked,
+  setRaidLocked,
   setLevelUpChannel,
   getLevelUpMessage,
   setLevelUpMessage,
@@ -56,8 +63,14 @@ const { buildWarnEmbed, buildWarnRows, formatDuration: warnFormatDuration } = re
 const { buildSupportEmbed } = require("../utils/supportInfo");
 const { buildLogContent, buildLogRows, OPTION_DEFS: LOG_OPTION_DEFS } = require("../commands/log");
 const {
+  buildMenuEmbed: buildCensorMenuEmbed,
+  buildMenuRow: buildCensorMenuRow,
   buildFilterEmbed: buildCensorFilterEmbed,
   buildFilterRow: buildCensorFilterRow,
+  buildSpamEmbed,
+  buildSpamRows,
+  buildRaidEmbed,
+  buildRaidRows,
 } = require("../commands/censor");
 const { buildWelcomeEmbed, buildWelcomeRows } = require("../commands/welcome");
 const { formatWelcomeMessage } = require("../utils/welcomeFormat");
@@ -2238,6 +2251,32 @@ async function handleRoleSelect(interaction) {
 }
 
 async function handleStringSelect(interaction) {
+  if (interaction.customId === "censor-raid-threshold-select") {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
+      return;
+    }
+    setRaidConfig(interaction.guild.id, { threshold: parseInt(interaction.values[0], 10) });
+    await interaction.update({
+      embeds: [buildRaidEmbed(interaction.guild.id)],
+      components: buildRaidRows(interaction.guild.id),
+    });
+    return;
+  }
+
+  if (interaction.customId === "censor-raid-window-select") {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
+      return;
+    }
+    setRaidConfig(interaction.guild.id, { windowSecs: parseInt(interaction.values[0], 10) });
+    await interaction.update({
+      embeds: [buildRaidEmbed(interaction.guild.id)],
+      components: buildRaidRows(interaction.guild.id),
+    });
+    return;
+  }
+
   if (interaction.customId !== "help-category-select") return;
 
   const category = interaction.values[0];
@@ -2374,6 +2413,20 @@ async function handleChannelSelect(interaction) {
       content: null,
       embeds: [buildWelcomeEmbed(interaction.guild.id)],
       components: buildWelcomeRows(interaction.guild.id),
+    });
+    return;
+  }
+
+  if (interaction.customId === "censor-raid-channel-select") {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
+      return;
+    }
+    setRaidConfig(interaction.guild.id, { alertChannelId: interaction.values[0] });
+    await interaction.update({
+      content: null,
+      embeds: [buildRaidEmbed(interaction.guild.id)],
+      components: buildRaidRows(interaction.guild.id),
     });
     return;
   }
@@ -2926,43 +2979,174 @@ async function handleButton(interaction) {
     return;
   }
 
-  if (
-    interaction.customId === "censor-action:profanity" ||
-    interaction.customId === "censor-action:spam"
-  ) {
+  if (interaction.customId === "censor-action:back") {
     if (!hasManageGuild(interaction)) {
-      await interaction.reply({
-        content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
-        ephemeral: true,
-      });
+      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
       return;
     }
-
-    const key = interaction.customId === "censor-action:profanity" ? "profanityFilter" : "spamFilter";
-
     await interaction.update({
-      embeds: [buildCensorFilterEmbed(interaction.guild.id, key)],
-      components: [buildCensorFilterRow(interaction.guild.id, key)],
+      content: null,
+      embeds: [buildCensorMenuEmbed(interaction.guild.id)],
+      components: [buildCensorMenuRow()],
+    });
+    return;
+  }
+
+  if (interaction.customId === "censor-action:profanity") {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
+      return;
+    }
+    await interaction.update({
+      embeds: [buildCensorFilterEmbed(interaction.guild.id, "profanityFilter")],
+      components: [buildCensorFilterRow(interaction.guild.id, "profanityFilter")],
+    });
+    return;
+  }
+
+  if (interaction.customId === "censor-action:spam") {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
+      return;
+    }
+    await interaction.update({
+      embeds: [buildSpamEmbed(interaction.guild.id)],
+      components: buildSpamRows(interaction.guild.id),
+    });
+    return;
+  }
+
+  if (interaction.customId === "censor-action:raid") {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
+      return;
+    }
+    await interaction.update({
+      embeds: [buildRaidEmbed(interaction.guild.id)],
+      components: buildRaidRows(interaction.guild.id),
     });
     return;
   }
 
   if (interaction.customId.startsWith("censor-toggle:")) {
     if (!hasManageGuild(interaction)) {
-      await interaction.reply({
-        content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
-        ephemeral: true,
-      });
+      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
       return;
     }
-
     const key = interaction.customId.slice("censor-toggle:".length);
     const enabled = getLogOptions(interaction.guild.id)[key];
     setLogOption(interaction.guild.id, key, !enabled);
 
+    if (key === "spamFilter") {
+      await interaction.update({
+        embeds: [buildSpamEmbed(interaction.guild.id)],
+        components: buildSpamRows(interaction.guild.id),
+      });
+    } else {
+      await interaction.update({
+        embeds: [buildCensorFilterEmbed(interaction.guild.id, key)],
+        components: [buildCensorFilterRow(interaction.guild.id, key)],
+      });
+    }
+    return;
+  }
+
+  if (interaction.customId.startsWith("censor-spam-level:")) {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
+      return;
+    }
+    const level = parseInt(interaction.customId.slice("censor-spam-level:".length), 10);
+    setSpamLevel(interaction.guild.id, level);
     await interaction.update({
-      embeds: [buildCensorFilterEmbed(interaction.guild.id, key)],
-      components: [buildCensorFilterRow(interaction.guild.id, key)],
+      embeds: [buildSpamEmbed(interaction.guild.id)],
+      components: buildSpamRows(interaction.guild.id),
+    });
+    return;
+  }
+
+  if (interaction.customId.startsWith("censor-raid-toggle:")) {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
+      return;
+    }
+    const field = interaction.customId.slice("censor-raid-toggle:".length);
+    const cfg = getRaidConfig(interaction.guild.id);
+    setRaidConfig(interaction.guild.id, { [field]: !cfg[field] });
+    await interaction.update({
+      embeds: [buildRaidEmbed(interaction.guild.id)],
+      components: buildRaidRows(interaction.guild.id),
+    });
+    return;
+  }
+
+  if (interaction.customId.startsWith("censor-raid-action:")) {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
+      return;
+    }
+    const action = interaction.customId.slice("censor-raid-action:".length);
+    setRaidConfig(interaction.guild.id, { action });
+    await interaction.update({
+      embeds: [buildRaidEmbed(interaction.guild.id)],
+      components: buildRaidRows(interaction.guild.id),
+    });
+    return;
+  }
+
+  if (interaction.customId === "censor-raid-channel-btn") {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
+      return;
+    }
+    const channelSelect = new ChannelSelectMenuBuilder()
+      .setCustomId("censor-raid-channel-select")
+      .setPlaceholder("레이드 알림을 받을 채널을 선택하세요")
+      .addChannelTypes(ChannelType.GuildText)
+      .setMinValues(1)
+      .setMaxValues(1);
+    await interaction.update({
+      content: nya("레이드 알림을 받을 채널을 선택하세요."),
+      embeds: [],
+      components: [new ActionRowBuilder().addComponents(channelSelect)],
+    });
+    return;
+  }
+
+  if (interaction.customId === "censor-raid-unlock") {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
+      return;
+    }
+    if (!isRaidLocked(interaction.guild.id)) {
+      await interaction.reply({ content: nya("현재 레이드 경보가 활성화되어 있지 않습니다."), ephemeral: true });
+      return;
+    }
+
+    let unlockedCount = 0;
+    for (const [, channel] of interaction.guild.channels.cache) {
+      if (!channel.isTextBased?.() || !channel.permissionOverwrites) continue;
+      try {
+        await channel.permissionOverwrites.edit(
+          interaction.guild.roles.everyone,
+          { SendMessages: null },
+          { reason: "레이드 경보 해제" },
+        );
+        unlockedCount++;
+      } catch {
+        // 채널 접근 불가 무시
+      }
+    }
+
+    setRaidLocked(interaction.guild.id, false);
+
+    await interaction.update({
+      embeds: [buildRaidEmbed(interaction.guild.id)],
+      components: buildRaidRows(interaction.guild.id),
+    });
+    await interaction.followUp({
+      content: nya(`레이드 경보를 해제했습니다. ${unlockedCount}개 채널의 잠금을 풀었습니다`),
+      ephemeral: true,
     });
     return;
   }
