@@ -2740,7 +2740,8 @@ async function handleButton(interaction) {
       return;
     }
 
-    const channelId = getLogChannelId(interaction.guild.id);
+    const type       = interaction.customId.slice(LOG_TEST_PREFIX.length);
+    const channelId  = getLogTypeChannels(interaction.guild.id)[type] ?? getLogChannelId(interaction.guild.id);
     if (!channelId) {
       await interaction.reply({
         content: nya("로그 채널이 설정되어 있지 않습니다. 먼저 채널을 설정해주세요."),
@@ -2752,13 +2753,11 @@ async function handleButton(interaction) {
     const logChannel = interaction.guild.channels.cache.get(channelId);
     if (!logChannel) {
       await interaction.reply({
-        content: nya("설정된 로그 채널을 찾을 수 없습니다."),
+        content: nya("설정된 로그 채널을 찾을 수 없습니다. 채널이 삭제되었거나 봇의 접근 권한이 없을 수 있습니다."),
         ephemeral: true,
       });
       return;
     }
-
-    const type = interaction.customId.slice(LOG_TEST_PREFIX.length);
     const user = interaction.user;
     const channel = interaction.channel;
     const now = Math.floor(Date.now() / 1000);
