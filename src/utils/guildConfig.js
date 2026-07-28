@@ -22,6 +22,7 @@ const DEFAULT_LOG_OPTIONS = {
   profanityFilter: false,
   spamFilter: false,
   warnLog: false,
+  raidAlert: false,
 };
 
 function setLogChannel(guildId, channelId) {
@@ -182,12 +183,21 @@ function getSpamLevel(guildId) {
 
 const DEFAULT_RAID_CONFIG = {
   enabled: false,
-  threshold: 5,
-  windowSecs: 10,
   action: "alert",
   alertChannelId: null,
   lockdown: false,
 };
+
+function setAnnounceChannel(guildId, channelId) {
+  const configs = loadAll();
+  configs[guildId] = { ...(configs[guildId] ?? {}), announceChannelId: channelId };
+  saveAll(configs);
+}
+
+function getAnnounceChannelId(guildId) {
+  const configs = loadAll();
+  return configs[guildId]?.announceChannelId ?? null;
+}
 
 function getRaidConfig(guildId) {
   const configs = loadAll();
@@ -378,4 +388,6 @@ module.exports = {
   removeWarnThreshold,
   setWarnMaxCount,
   setWarnLogChannel,
+  setAnnounceChannel,
+  getAnnounceChannelId,
 };

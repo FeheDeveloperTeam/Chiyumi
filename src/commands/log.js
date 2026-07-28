@@ -16,6 +16,7 @@ const OPTION_DEFS = [
   { key: "profanityFilter", label: "욕설 검열" },
   { key: "spamFilter", label: "도배 검열" },
   { key: "warnLog", label: "경고" },
+  { key: "raidAlert", label: "레이드 알림" },
 ];
 
 function chunk(array, size) {

@@ -43,6 +43,7 @@ const {
   setRaidConfig,
   isRaidLocked,
   setRaidLocked,
+  setAnnounceChannel,
   setLevelUpChannel,
   getLevelUpMessage,
   setLevelUpMessage,
@@ -2251,32 +2252,6 @@ async function handleRoleSelect(interaction) {
 }
 
 async function handleStringSelect(interaction) {
-  if (interaction.customId === "censor-raid-threshold-select") {
-    if (!hasManageGuild(interaction)) {
-      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
-      return;
-    }
-    setRaidConfig(interaction.guild.id, { threshold: parseInt(interaction.values[0], 10) });
-    await interaction.update({
-      embeds: [buildRaidEmbed(interaction.guild.id)],
-      components: buildRaidRows(interaction.guild.id),
-    });
-    return;
-  }
-
-  if (interaction.customId === "censor-raid-window-select") {
-    if (!hasManageGuild(interaction)) {
-      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
-      return;
-    }
-    setRaidConfig(interaction.guild.id, { windowSecs: parseInt(interaction.values[0], 10) });
-    await interaction.update({
-      embeds: [buildRaidEmbed(interaction.guild.id)],
-      components: buildRaidRows(interaction.guild.id),
-    });
-    return;
-  }
-
   if (interaction.customId !== "help-category-select") return;
 
   const category = interaction.values[0];
@@ -3101,12 +3076,12 @@ async function handleButton(interaction) {
     }
     const channelSelect = new ChannelSelectMenuBuilder()
       .setCustomId("censor-raid-channel-select")
-      .setPlaceholder("레이드 알림을 받을 채널을 선택하세요")
+      .setPlaceholder("관리자 전용 레이드 알림 채널을 선택하세요")
       .addChannelTypes(ChannelType.GuildText)
       .setMinValues(1)
       .setMaxValues(1);
     await interaction.update({
-      content: nya("레이드 알림을 받을 채널을 선택하세요."),
+      content: nya("레이드 감지 시 관리자에게 상세 알림을 보낼 채널을 선택하세요."),
       embeds: [],
       components: [new ActionRowBuilder().addComponents(channelSelect)],
     });
@@ -3140,12 +3115,17 @@ async function handleButton(interaction) {
 
     setRaidLocked(interaction.guild.id, false);
 
+    // 초대 링크 재활성화
+    await interaction.guild.edit({
+      features: interaction.guild.features.filter((f) => f !== "INVITES_DISABLED"),
+    }).catch(() => {});
+
     await interaction.update({
       embeds: [buildRaidEmbed(interaction.guild.id)],
       components: buildRaidRows(interaction.guild.id),
     });
     await interaction.followUp({
-      content: nya(`레이드 경보를 해제했습니다. ${unlockedCount}개 채널의 잠금을 풀었습니다`),
+      content: nya(`레이드 경보를 해제했습니다. ${unlockedCount}개 채널의 잠금을 풀고 초대 링크도 다시 활성화했습니다`),
       ephemeral: true,
     });
     return;
@@ -4647,6 +4627,9 @@ async function handleAnnounceModal(interaction) {
     });
     return;
   }
+
+  // 공지를 보낸 채널을 레이드 공지 채널로 자동 저장
+  setAnnounceChannel(interaction.guild.id, channelId);
 
   await interaction.reply({
     content: nya(`${channel}에 공지를 보냈습니다.`),
