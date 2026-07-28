@@ -60,22 +60,27 @@ async function checkRaid(member, raidConfig) {
     .setTimestamp();
 
   // 서버 멤버용 공지 임베드
-  const publicEmbed = new EmbedBuilder()
+  const publicEmbedBuilder = new EmbedBuilder()
     .setTitle("🚨 서버 보안 경보")
-    .setDescription(
-      lockdown
-        ? [
-            "동일한 닉네임의 대량 입장이 감지되었습니다.",
-            "",
-            "**현재 상황**",
-            "🔴 모든 초대 링크가 일시 차단되었습니다",
-            "🔴 채널 메시지 전송이 임시 잠금되었습니다",
-            "🔧 관리자가 조치 중입니다 — 잠시 기다려 주세요",
-          ].join("\n")
-        : "동일한 닉네임의 대량 입장이 감지되었습니다.\n🔧 관리자가 상황을 확인 중입니다 — 잠시 기다려 주세요",
-    )
+    .setDescription("동일한 닉네임의 대량 입장이 감지되었습니다.")
     .setColor(0xed4245)
     .setTimestamp();
+
+  if (lockdown) {
+    publicEmbedBuilder.addFields(
+      { name: "초대 링크", value: "🔴 일시 차단",     inline: true },
+      { name: "채널 잠금", value: "🔴 임시 잠금",     inline: true },
+      { name: "상태",      value: "🔧 관리자 조치 중", inline: true },
+      { name: "안내", value: "관리자가 상황을 처리하고 있습니다. 잠시 기다려 주세요." },
+    );
+  } else {
+    publicEmbedBuilder.addFields(
+      { name: "상태", value: "🔧 관리자 확인 중", inline: true },
+      { name: "안내", value: "관리자가 상황을 확인하고 있습니다. 잠시 기다려 주세요.", inline: true },
+    );
+  }
+
+  const publicEmbed = publicEmbedBuilder;
 
   // 로그 채널 (레이드 알림 옵션이 켜진 경우만)
   if (getLogOptions(member.guild.id).raidAlert) {

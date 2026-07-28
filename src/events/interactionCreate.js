@@ -2840,16 +2840,23 @@ async function handleButton(interaction) {
     } else if (type === "raidAnnounce") {
       embed = new EmbedBuilder()
         .setTitle("🚨 서버 보안 경보" + TEST_SUFFIX)
-        .setDescription(
-          "동일한 닉네임의 대량 입장이 감지되었습니다.\n\n**현재 상황**\n🔴 모든 초대 링크가 일시 차단되었습니다\n🔴 채널 메시지 전송이 임시 잠금되었습니다\n🔧 관리자가 조치 중입니다 — 잠시 기다려 주세요",
+        .setDescription("동일한 닉네임의 대량 입장이 감지되었습니다.")
+        .addFields(
+          { name: "초대 링크", value: "🔴 일시 차단",     inline: true },
+          { name: "채널 잠금", value: "🔴 임시 잠금",     inline: true },
+          { name: "상태",      value: "🔧 관리자 조치 중", inline: true },
+          { name: "안내", value: "관리자가 상황을 처리하고 있습니다. 잠시 기다려 주세요." },
         )
         .setColor(0xed4245)
         .setTimestamp();
     } else if (type === "raidAnnounceRelease") {
       embed = new EmbedBuilder()
         .setTitle("✅ 서버 보안 경보 해제" + TEST_SUFFIX)
-        .setDescription(
-          "레이드 경보가 해제되었습니다. 서버가 정상 운영 상태로 돌아왔습니다.\n✅ 채널 잠금이 풀렸습니다\n✅ 초대 링크가 다시 활성화되었습니다",
+        .setDescription("레이드 경보가 해제되었습니다. 서버가 정상 운영 상태로 돌아왔습니다.")
+        .addFields(
+          { name: "초대 링크", value: "✅ 활성화됨",  inline: true },
+          { name: "채널 잠금", value: "✅ 해제됨",    inline: true },
+          { name: "상태",      value: "🟢 정상 운영", inline: true },
         )
         .setColor(0x57f287)
         .setTimestamp();
@@ -3194,8 +3201,11 @@ async function handleButton(interaction) {
         if (releaseCh) {
           const releaseEmbed = new EmbedBuilder()
             .setTitle("✅ 서버 보안 경보 해제")
-            .setDescription(
-              "레이드 경보가 해제되었습니다. 서버가 정상 운영 상태로 돌아왔습니다.\n✅ 채널 잠금이 풀렸습니다\n✅ 초대 링크가 다시 활성화되었습니다",
+            .setDescription("레이드 경보가 해제되었습니다. 서버가 정상 운영 상태로 돌아왔습니다.")
+            .addFields(
+              { name: "초대 링크", value: "✅ 활성화됨",  inline: true },
+              { name: "채널 잠금", value: "✅ 해제됨",    inline: true },
+              { name: "상태",      value: "🟢 정상 운영", inline: true },
             )
             .setColor(0x57f287)
             .setTimestamp();
