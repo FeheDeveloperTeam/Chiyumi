@@ -142,10 +142,6 @@ function buildRaidEmbed(guildId) {
       { name: "서버 공지 알림", value: announceChannelId ? `<#${announceChannelId}>` : "설정 안 됨", inline: true },
       { name: "현재 상태",   value: locked ? "🔴 경보 중 (채널 잠금됨)" : "🟢 정상",               inline: true },
     )
-    .addFields({
-      name: "📢 서버 공지 채널",
-      value: nya("/공지 명령어를 사용할 때마다 해당 채널이 자동으로 레이드 공지 채널로 고정됩니다"),
-    })
     .setColor(locked ? 0xff0000 : 0xed4245);
 }
 
@@ -177,6 +173,10 @@ function buildRaidRows(guildId) {
     new ButtonBuilder()
       .setCustomId("censor-raid-channel-btn")
       .setLabel("관리자 알림 채널 설정")
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId("censor-raid-announce-btn")
+      .setLabel("서버 공지 채널 설정")
       .setStyle(ButtonStyle.Primary),
   );
 

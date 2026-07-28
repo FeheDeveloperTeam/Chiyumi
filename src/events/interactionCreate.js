@@ -2427,6 +2427,20 @@ async function handleChannelSelect(interaction) {
     return;
   }
 
+  if (interaction.customId === "censor-raid-announce-select") {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
+      return;
+    }
+    setAnnounceChannel(interaction.guild.id, interaction.values[0]);
+    await interaction.update({
+      content: null,
+      embeds: [buildRaidEmbed(interaction.guild.id)],
+      components: buildRaidRows(interaction.guild.id),
+    });
+    return;
+  }
+
   if (interaction.customId === DEV_SUPPORT_CHANNEL_SELECT_ID) {
     if (!isDeveloper(interaction.user.id)) {
       await interaction.reply({
@@ -3154,6 +3168,25 @@ async function handleButton(interaction) {
       .setMaxValues(1);
     await interaction.update({
       content: nya("레이드 감지 시 관리자에게 상세 알림을 보낼 채널을 선택하세요."),
+      embeds: [],
+      components: [new ActionRowBuilder().addComponents(channelSelect)],
+    });
+    return;
+  }
+
+  if (interaction.customId === "censor-raid-announce-btn") {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
+      return;
+    }
+    const channelSelect = new ChannelSelectMenuBuilder()
+      .setCustomId("censor-raid-announce-select")
+      .setPlaceholder("서버 멤버에게 레이드 경보를 공지할 채널을 선택하세요")
+      .addChannelTypes(ChannelType.GuildText)
+      .setMinValues(1)
+      .setMaxValues(1);
+    await interaction.update({
+      content: nya("레이드 감지 시 서버 멤버들에게 공지를 보낼 채널을 선택하세요."),
       embeds: [],
       components: [new ActionRowBuilder().addComponents(channelSelect)],
     });
@@ -4699,9 +4732,6 @@ async function handleAnnounceModal(interaction) {
     });
     return;
   }
-
-  // 공지를 보낸 채널을 레이드 공지 채널로 자동 저장
-  setAnnounceChannel(interaction.guild.id, channelId);
 
   await interaction.reply({
     content: nya(`${channel}에 공지를 보냈습니다.`),
