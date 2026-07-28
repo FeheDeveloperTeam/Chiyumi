@@ -2462,7 +2462,7 @@ async function handleChannelSelect(interaction) {
     const label     = LOG_OPTION_DEFS.find((d) => d.key === type)?.label ?? type;
     setLogTypeChannel(interaction.guild.id, type, channelId);
     const notifCh = interaction.guild.channels.cache.get(channelId);
-    if (notifCh) await notifCh.send({ content: nya(`${label} 로그 채널이 <#${channelId}>으로 변경되었습니다`) }).catch(() => {});
+    if (notifCh) await notifCh.send({ embeds: [new EmbedBuilder().setDescription(nya(`${label} 로그 채널이 <#${channelId}>으로 변경되었습니다`)).setColor(0x57f287)] }).catch(() => {});
     await interaction.update({
       content: null,
       embeds: [buildLogTypeEmbed(interaction.guild.id, type)],
@@ -2482,7 +2482,7 @@ async function handleChannelSelect(interaction) {
     const label     = LOG_OPTION_DEFS.find((d) => d.key === type)?.label ?? type;
     setLogTypeChannel(interaction.guild.id, type, channelId);
     const notifCh = interaction.guild.channels.cache.get(channelId);
-    if (notifCh) await notifCh.send({ content: nya(`${label} 로그 채널이 <#${channelId}>으로 변경되었습니다`) }).catch(() => {});
+    if (notifCh) await notifCh.send({ embeds: [new EmbedBuilder().setDescription(nya(`${label} 로그 채널이 <#${channelId}>으로 변경되었습니다`)).setColor(0x57f287)] }).catch(() => {});
     await interaction.update({
       content: null,
       embeds: [buildLogTypeEmbed(interaction.guild.id, type)],
@@ -2503,7 +2503,7 @@ async function handleChannelSelect(interaction) {
       setLogTypeChannel(interaction.guild.id, key, null);
     }
     const notifCh = interaction.guild.channels.cache.get(channelId);
-    if (notifCh) await notifCh.send({ content: nya(`전체 로그 채널이 <#${channelId}>으로 변경되었습니다`) }).catch(() => {});
+    if (notifCh) await notifCh.send({ embeds: [new EmbedBuilder().setDescription(nya(`전체 로그 채널이 <#${channelId}>으로 변경되었습니다`)).setColor(0x57f287)] }).catch(() => {});
     await interaction.update({
       content: null,
       embeds: [buildLogEmbed(interaction.guild.id)],
