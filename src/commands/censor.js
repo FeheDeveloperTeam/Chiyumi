@@ -178,6 +178,10 @@ function buildRaidRows(guildId) {
       .setCustomId("censor-raid-announce-btn")
       .setLabel("서버 공지 채널 설정")
       .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId("censor-raid-test-btn")
+      .setLabel("🧪 레이드 테스트")
+      .setStyle(ButtonStyle.Secondary),
   );
 
   const row3 = new ActionRowBuilder().addComponents(

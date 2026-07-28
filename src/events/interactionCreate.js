@@ -44,6 +44,7 @@ const {
   isRaidLocked,
   setRaidLocked,
   setAnnounceChannel,
+  getAnnounceChannelId,
   setLevelUpChannel,
   getLevelUpMessage,
   setLevelUpMessage,
@@ -3189,6 +3190,69 @@ async function handleButton(interaction) {
       content: nya("레이드 감지 시 서버 멤버들에게 공지를 보낼 채널을 선택하세요."),
       embeds: [],
       components: [new ActionRowBuilder().addComponents(channelSelect)],
+    });
+    return;
+  }
+
+  if (interaction.customId === "censor-raid-test-btn") {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
+      return;
+    }
+
+    const raidCfg         = getRaidConfig(interaction.guild.id);
+    const alertChannelId  = raidCfg.alertChannelId;
+    const announceChannelId = getAnnounceChannelId(interaction.guild.id);
+
+    if (!alertChannelId && !announceChannelId) {
+      await interaction.reply({ content: nya("관리자 알림 채널과 서버 공지 채널이 모두 설정되어 있지 않습니다. 먼저 채널을 설정해주세요."), ephemeral: true });
+      return;
+    }
+
+    const TEST_SUFFIX    = " *(🧪 테스트)*";
+    const actionLabel    = raidCfg.action === "ban" ? "🔨 자동 밴" : raidCfg.action === "kick" ? "👢 자동 킥" : "⚠️ 경고만";
+    const user           = interaction.user;
+
+    const adminEmbed = new EmbedBuilder()
+      .setTitle("🚨 레이드 감지!" + TEST_SUFFIX)
+      .setColor(0xed4245)
+      .addFields(
+        { name: "감지 닉네임", value: "`TestRaider`",                      inline: true },
+        { name: "입장 인원",   value: "3명",                               inline: true },
+        { name: "조치",        value: actionLabel,                          inline: true },
+        { name: "입장자 목록", value: `${user} \`(테스트 계정 1)\`\n${user} \`(테스트 계정 2)\`\n${user} \`(테스트 계정 3)\`` },
+      )
+      .setTimestamp();
+
+    const publicEmbed = new EmbedBuilder()
+      .setTitle("⚠️ 서버 보안 경보" + TEST_SUFFIX)
+      .setDescription("동일한 닉네임의 대량 입장이 감지되어 채널이 임시 잠금되었습니다.\n관리자가 상황을 확인 중이니 잠시 기다려 주세요.")
+      .setColor(0xff9900)
+      .setTimestamp();
+
+    const sent = [];
+
+    if (alertChannelId) {
+      const ch = interaction.guild.channels.cache.get(alertChannelId);
+      if (ch) {
+        await ch.send({ embeds: [adminEmbed] }).catch(() => {});
+        sent.push(`관리자 알림 채널 <#${alertChannelId}>`);
+      }
+    }
+
+    if (announceChannelId) {
+      const ch = interaction.guild.channels.cache.get(announceChannelId);
+      if (ch) {
+        await ch.send({ embeds: [publicEmbed] }).catch(() => {});
+        sent.push(`서버 공지 채널 <#${announceChannelId}>`);
+      }
+    }
+
+    await interaction.reply({
+      content: sent.length
+        ? nya(`테스트 알림을 보냈습니다 → ${sent.join(", ")}`)
+        : nya("채널을 찾을 수 없어 테스트 메시지를 보내지 못했습니다"),
+      ephemeral: true,
     });
     return;
   }
