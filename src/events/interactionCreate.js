@@ -2457,8 +2457,12 @@ async function handleChannelSelect(interaction) {
       await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
       return;
     }
-    const type = interaction.customId.slice(LOG_TYPE_CHANNEL_SELECT_PREFIX.length);
-    setLogTypeChannel(interaction.guild.id, type, interaction.values[0]);
+    const type      = interaction.customId.slice(LOG_TYPE_CHANNEL_SELECT_PREFIX.length);
+    const channelId = interaction.values[0];
+    const label     = LOG_OPTION_DEFS.find((d) => d.key === type)?.label ?? type;
+    setLogTypeChannel(interaction.guild.id, type, channelId);
+    const notifCh = interaction.guild.channels.cache.get(channelId);
+    if (notifCh) await notifCh.send({ content: nya(`${label} 로그 채널이 <#${channelId}>으로 변경되었습니다`) }).catch(() => {});
     await interaction.update({
       content: null,
       embeds: [buildLogTypeEmbed(interaction.guild.id, type)],
@@ -2473,8 +2477,12 @@ async function handleChannelSelect(interaction) {
       await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
       return;
     }
-    const type = interaction.customId.slice(LOG_PERCHANNEL_SELECT_PREFIX.length);
-    setLogTypeChannel(interaction.guild.id, type, interaction.values[0]);
+    const type      = interaction.customId.slice(LOG_PERCHANNEL_SELECT_PREFIX.length);
+    const channelId = interaction.values[0];
+    const label     = LOG_OPTION_DEFS.find((d) => d.key === type)?.label ?? type;
+    setLogTypeChannel(interaction.guild.id, type, channelId);
+    const notifCh = interaction.guild.channels.cache.get(channelId);
+    if (notifCh) await notifCh.send({ content: nya(`${label} 로그 채널이 <#${channelId}>으로 변경되었습니다`) }).catch(() => {});
     await interaction.update({
       content: null,
       embeds: [buildLogTypeEmbed(interaction.guild.id, type)],
@@ -2489,10 +2497,13 @@ async function handleChannelSelect(interaction) {
       await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
       return;
     }
-    setLogChannel(interaction.guild.id, interaction.values[0]);
+    const channelId = interaction.values[0];
+    setLogChannel(interaction.guild.id, channelId);
     for (const { key } of LOG_OPTION_DEFS) {
       setLogTypeChannel(interaction.guild.id, key, null);
     }
+    const notifCh = interaction.guild.channels.cache.get(channelId);
+    if (notifCh) await notifCh.send({ content: nya(`전체 로그 채널이 <#${channelId}>으로 변경되었습니다`) }).catch(() => {});
     await interaction.update({
       content: null,
       embeds: [buildLogEmbed(interaction.guild.id)],
@@ -2512,7 +2523,10 @@ async function handleChannelSelect(interaction) {
     return;
   }
 
-  setLogChannel(interaction.guild.id, interaction.values[0]);
+  const channelId = interaction.values[0];
+  setLogChannel(interaction.guild.id, channelId);
+  const notifCh = interaction.guild.channels.cache.get(channelId);
+  if (notifCh) await notifCh.send({ content: nya(`전체 로그 채널이 <#${channelId}>으로 변경되었습니다`) }).catch(() => {});
   await interaction.update({
     content: null,
     embeds: [buildLogEmbed(interaction.guild.id)],
