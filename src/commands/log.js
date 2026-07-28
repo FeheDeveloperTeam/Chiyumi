@@ -20,7 +20,8 @@ const OPTION_DEFS = [
   { key: "spamFilter",    label: "도배 검열" },
   { key: "warnLog",       label: "경고" },
   { key: "raidAlert",    label: "레이드 알림" },
-  { key: "raidAnnounce", label: "레이드 공지(서버원)" },
+  { key: "raidAnnounce",        label: "레이드 공지(서버원)" },
+  { key: "raidAnnounceRelease", label: "레이드 해제 공지(서버원)" },
 ];
 
 function buildLogEmbed(guildId) {
@@ -34,7 +35,7 @@ function buildLogEmbed(guildId) {
     .addFields(
       OPTION_DEFS.map(({ key, label }) => {
         const enabled = options[key];
-        const ownId   = key === "raidAnnounce" ? getAnnounceChannelId(guildId) : typeChannels[key];
+        const ownId   = (key === "raidAnnounce" || key === "raidAnnounceRelease") ? getAnnounceChannelId(guildId) : typeChannels[key];
         const channelText = ownId
           ? `<#${ownId}>`
           : defaultId
@@ -83,7 +84,8 @@ function buildLogTypeEmbed(guildId, key) {
   const enabled = getLogOptions(guildId)[key];
   const typeChannels = getLogTypeChannels(guildId);
   const defaultId   = getLogChannelId(guildId);
-  const ownId       = key === "raidAnnounce" ? getAnnounceChannelId(guildId) : typeChannels[key];
+  const isAnnounceType = key === "raidAnnounce" || key === "raidAnnounceRelease";
+  const ownId          = isAnnounceType ? getAnnounceChannelId(guildId) : typeChannels[key];
 
   return new EmbedBuilder()
     .setTitle(`로그 설정 — ${label}`)
@@ -93,7 +95,7 @@ function buildLogTypeEmbed(guildId, key) {
         name: "전용 채널",
         value: ownId
           ? `<#${ownId}>`
-          : key === "raidAnnounce"
+          : isAnnounceType
             ? "설정 안 됨"
             : defaultId ? `<#${defaultId}> (기본)` : "설정 안 됨",
         inline: true,

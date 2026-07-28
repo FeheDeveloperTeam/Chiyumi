@@ -2447,7 +2447,7 @@ async function handleChannelSelect(interaction) {
     const type      = interaction.customId.slice(LOG_TYPE_CHANNEL_SELECT_PREFIX.length);
     const channelId = interaction.values[0];
     const label     = LOG_OPTION_DEFS.find((d) => d.key === type)?.label ?? type;
-    if (type === "raidAnnounce") {
+    if (type === "raidAnnounce" || type === "raidAnnounceRelease") {
       setAnnounceChannel(interaction.guild.id, channelId);
     } else {
       setLogTypeChannel(interaction.guild.id, type, channelId);
@@ -2471,7 +2471,7 @@ async function handleChannelSelect(interaction) {
     const type      = interaction.customId.slice(LOG_PERCHANNEL_SELECT_PREFIX.length);
     const channelId = interaction.values[0];
     const label     = LOG_OPTION_DEFS.find((d) => d.key === type)?.label ?? type;
-    if (type === "raidAnnounce") {
+    if (type === "raidAnnounce" || type === "raidAnnounceRelease") {
       setAnnounceChannel(interaction.guild.id, channelId);
     } else {
       setLogTypeChannel(interaction.guild.id, type, channelId);
@@ -2736,7 +2736,7 @@ async function handleButton(interaction) {
     }
 
     const type       = interaction.customId.slice(LOG_TEST_PREFIX.length);
-    const channelId  = type === "raidAnnounce"
+    const channelId  = (type === "raidAnnounce" || type === "raidAnnounceRelease")
       ? getAnnounceChannelId(interaction.guild.id)
       : (getLogTypeChannels(interaction.guild.id)[type] ?? getLogChannelId(interaction.guild.id));
     if (!channelId) {
@@ -2839,9 +2839,19 @@ async function handleButton(interaction) {
         .setTimestamp();
     } else if (type === "raidAnnounce") {
       embed = new EmbedBuilder()
-        .setTitle("⚠️ 서버 보안 경보" + TEST_SUFFIX)
-        .setDescription("동일한 닉네임의 대량 입장이 감지되었습니다.\n관리자가 상황을 확인 중이니 잠시 기다려 주세요.")
-        .setColor(0xff9900)
+        .setTitle("🚨 서버 보안 경보" + TEST_SUFFIX)
+        .setDescription(
+          "동일한 닉네임의 대량 입장이 감지되었습니다.\n\n**현재 상황**\n🔴 모든 초대 링크가 일시 차단되었습니다\n🔴 채널 메시지 전송이 임시 잠금되었습니다\n🔧 관리자가 조치 중입니다 — 잠시 기다려 주세요",
+        )
+        .setColor(0xed4245)
+        .setTimestamp();
+    } else if (type === "raidAnnounceRelease") {
+      embed = new EmbedBuilder()
+        .setTitle("✅ 서버 보안 경보 해제" + TEST_SUFFIX)
+        .setDescription(
+          "레이드 경보가 해제되었습니다. 서버가 정상 운영 상태로 돌아왔습니다.\n✅ 채널 잠금이 풀렸습니다\n✅ 초대 링크가 다시 활성화되었습니다",
+        )
+        .setColor(0x57f287)
         .setTimestamp();
     }
 
@@ -3175,6 +3185,24 @@ async function handleButton(interaction) {
     await interaction.guild.edit({
       features: interaction.guild.features.filter((f) => f !== "INVITES_DISABLED"),
     }).catch(() => {});
+
+    // 서버원 해제 공지 (raidAnnounceRelease 옵션이 켜진 경우)
+    if (getLogOptions(interaction.guild.id).raidAnnounceRelease) {
+      const announceChId = getAnnounceChannelId(interaction.guild.id);
+      if (announceChId) {
+        const releaseCh = interaction.guild.channels.cache.get(announceChId);
+        if (releaseCh) {
+          const releaseEmbed = new EmbedBuilder()
+            .setTitle("✅ 서버 보안 경보 해제")
+            .setDescription(
+              "레이드 경보가 해제되었습니다. 서버가 정상 운영 상태로 돌아왔습니다.\n✅ 채널 잠금이 풀렸습니다\n✅ 초대 링크가 다시 활성화되었습니다",
+            )
+            .setColor(0x57f287)
+            .setTimestamp();
+          await releaseCh.send({ embeds: [releaseEmbed] }).catch(() => {});
+        }
+      }
+    }
 
     await interaction.update({
       embeds: [buildRaidEmbed(interaction.guild.id)],

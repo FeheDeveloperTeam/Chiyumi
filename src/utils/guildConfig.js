@@ -24,6 +24,7 @@ const DEFAULT_LOG_OPTIONS = {
   warnLog: false,
   raidAlert: false,
   raidAnnounce: false,
+  raidAnnounceRelease: false,
 };
 
 function setLogChannel(guildId, channelId) {
