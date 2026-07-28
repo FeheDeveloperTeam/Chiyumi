@@ -23,6 +23,7 @@ const DEFAULT_LOG_OPTIONS = {
   spamFilter: false,
   warnLog: false,
   raidAlert: false,
+  raidAnnounce: false,
 };
 
 function setLogChannel(guildId, channelId) {

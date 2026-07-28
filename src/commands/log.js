@@ -9,7 +9,7 @@ const {
   StringSelectMenuOptionBuilder,
 } = require("discord.js");
 const { nya } = require("../utils/nya");
-const { getLogChannelId, getLogOptions, getLogTypeChannels } = require("../utils/guildConfig");
+const { getLogChannelId, getLogOptions, getLogTypeChannels, getAnnounceChannelId } = require("../utils/guildConfig");
 
 const OPTION_DEFS = [
   { key: "messageDelete", label: "메시지 삭제" },
@@ -19,7 +19,8 @@ const OPTION_DEFS = [
   { key: "profanityFilter", label: "욕설 검열" },
   { key: "spamFilter",    label: "도배 검열" },
   { key: "warnLog",       label: "경고" },
-  { key: "raidAlert",     label: "레이드 알림" },
+  { key: "raidAlert",    label: "레이드 알림" },
+  { key: "raidAnnounce", label: "레이드 공지(서버원)" },
 ];
 
 function buildLogEmbed(guildId) {
@@ -33,7 +34,7 @@ function buildLogEmbed(guildId) {
     .addFields(
       OPTION_DEFS.map(({ key, label }) => {
         const enabled = options[key];
-        const ownId = typeChannels[key];
+        const ownId   = key === "raidAnnounce" ? getAnnounceChannelId(guildId) : typeChannels[key];
         const channelText = ownId
           ? `<#${ownId}>`
           : defaultId
@@ -81,8 +82,8 @@ function buildLogTypeEmbed(guildId, key) {
   const label = OPTION_DEFS.find((d) => d.key === key)?.label ?? key;
   const enabled = getLogOptions(guildId)[key];
   const typeChannels = getLogTypeChannels(guildId);
-  const defaultId = getLogChannelId(guildId);
-  const ownId = typeChannels[key];
+  const defaultId   = getLogChannelId(guildId);
+  const ownId       = key === "raidAnnounce" ? getAnnounceChannelId(guildId) : typeChannels[key];
 
   return new EmbedBuilder()
     .setTitle(`로그 설정 — ${label}`)
@@ -90,7 +91,11 @@ function buildLogTypeEmbed(guildId, key) {
       { name: "현재 상태", value: enabled ? "✅ 켜짐" : "⬜ 꺼짐", inline: true },
       {
         name: "전용 채널",
-        value: ownId ? `<#${ownId}>` : defaultId ? `<#${defaultId}> (기본)` : "설정 안 됨",
+        value: ownId
+          ? `<#${ownId}>`
+          : key === "raidAnnounce"
+            ? "설정 안 됨"
+            : defaultId ? `<#${defaultId}> (기본)` : "설정 안 됨",
         inline: true,
       },
     )

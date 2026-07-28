@@ -2414,20 +2414,6 @@ async function handleChannelSelect(interaction) {
     return;
   }
 
-  if (interaction.customId === "censor-raid-announce-select") {
-    if (!hasManageGuild(interaction)) {
-      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
-      return;
-    }
-    setAnnounceChannel(interaction.guild.id, interaction.values[0]);
-    await interaction.update({
-      content: null,
-      embeds: [buildRaidEmbed(interaction.guild.id)],
-      components: buildRaidRows(interaction.guild.id),
-    });
-    return;
-  }
-
   if (interaction.customId === DEV_SUPPORT_CHANNEL_SELECT_ID) {
     if (!isDeveloper(interaction.user.id)) {
       await interaction.reply({
@@ -2461,9 +2447,13 @@ async function handleChannelSelect(interaction) {
     const type      = interaction.customId.slice(LOG_TYPE_CHANNEL_SELECT_PREFIX.length);
     const channelId = interaction.values[0];
     const label     = LOG_OPTION_DEFS.find((d) => d.key === type)?.label ?? type;
-    setLogTypeChannel(interaction.guild.id, type, channelId);
+    if (type === "raidAnnounce") {
+      setAnnounceChannel(interaction.guild.id, channelId);
+    } else {
+      setLogTypeChannel(interaction.guild.id, type, channelId);
+    }
     const notifCh = interaction.guild.channels.cache.get(channelId);
-    if (notifCh) await notifCh.send({ embeds: [new EmbedBuilder().setDescription(nya(`${label} 로그 채널이 <#${channelId}>으로 변경되었습니다`)).setColor(0x57f287)] }).catch(() => {});
+    if (notifCh) await notifCh.send({ embeds: [new EmbedBuilder().setDescription(nya(`${label} 채널이 <#${channelId}>으로 변경되었습니다`)).setColor(0x57f287)] }).catch(() => {});
     await interaction.update({
       content: null,
       embeds: [buildLogTypeEmbed(interaction.guild.id, type)],
@@ -2481,9 +2471,13 @@ async function handleChannelSelect(interaction) {
     const type      = interaction.customId.slice(LOG_PERCHANNEL_SELECT_PREFIX.length);
     const channelId = interaction.values[0];
     const label     = LOG_OPTION_DEFS.find((d) => d.key === type)?.label ?? type;
-    setLogTypeChannel(interaction.guild.id, type, channelId);
+    if (type === "raidAnnounce") {
+      setAnnounceChannel(interaction.guild.id, channelId);
+    } else {
+      setLogTypeChannel(interaction.guild.id, type, channelId);
+    }
     const notifCh = interaction.guild.channels.cache.get(channelId);
-    if (notifCh) await notifCh.send({ embeds: [new EmbedBuilder().setDescription(nya(`${label} 로그 채널이 <#${channelId}>으로 변경되었습니다`)).setColor(0x57f287)] }).catch(() => {});
+    if (notifCh) await notifCh.send({ embeds: [new EmbedBuilder().setDescription(nya(`${label} 채널이 <#${channelId}>으로 변경되었습니다`)).setColor(0x57f287)] }).catch(() => {});
     await interaction.update({
       content: null,
       embeds: [buildLogTypeEmbed(interaction.guild.id, type)],
@@ -2742,7 +2736,9 @@ async function handleButton(interaction) {
     }
 
     const type       = interaction.customId.slice(LOG_TEST_PREFIX.length);
-    const channelId  = getLogTypeChannels(interaction.guild.id)[type] ?? getLogChannelId(interaction.guild.id);
+    const channelId  = type === "raidAnnounce"
+      ? getAnnounceChannelId(interaction.guild.id)
+      : (getLogTypeChannels(interaction.guild.id)[type] ?? getLogChannelId(interaction.guild.id));
     if (!channelId) {
       await interaction.reply({
         content: nya("로그 채널이 설정되어 있지 않습니다. 먼저 채널을 설정해주세요."),
@@ -2840,6 +2836,12 @@ async function handleButton(interaction) {
           { name: "조치",        value: "⚠️ 경고만",          inline: true },
           { name: "입장자 목록", value: `${user} \`(테스트)\`` },
         )
+        .setTimestamp();
+    } else if (type === "raidAnnounce") {
+      embed = new EmbedBuilder()
+        .setTitle("⚠️ 서버 보안 경보" + TEST_SUFFIX)
+        .setDescription("동일한 닉네임의 대량 입장이 감지되었습니다.\n관리자가 상황을 확인 중이니 잠시 기다려 주세요.")
+        .setColor(0xff9900)
         .setTimestamp();
     }
 
@@ -3138,61 +3140,6 @@ async function handleButton(interaction) {
     await interaction.update({
       embeds: [buildRaidEmbed(interaction.guild.id)],
       components: buildRaidRows(interaction.guild.id),
-    });
-    return;
-  }
-
-  if (interaction.customId === "censor-raid-announce-btn") {
-    if (!hasManageGuild(interaction)) {
-      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
-      return;
-    }
-    const channelSelect = new ChannelSelectMenuBuilder()
-      .setCustomId("censor-raid-announce-select")
-      .setPlaceholder("서버 멤버에게 레이드 경보를 공지할 채널을 선택하세요")
-      .addChannelTypes(ChannelType.GuildText)
-      .setMinValues(1)
-      .setMaxValues(1);
-    await interaction.update({
-      content: nya("레이드 감지 시 서버 멤버들에게 공지를 보낼 채널을 선택하세요."),
-      embeds: [],
-      components: [new ActionRowBuilder().addComponents(channelSelect)],
-    });
-    return;
-  }
-
-  if (interaction.customId === "censor-raid-test-btn") {
-    if (!hasManageGuild(interaction)) {
-      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
-      return;
-    }
-
-    const raidCfg       = getRaidConfig(interaction.guild.id);
-    const announceChannelId = getAnnounceChannelId(interaction.guild.id);
-
-    if (!announceChannelId) {
-      await interaction.reply({ content: nya("레이드 알림 채널(서버원)이 설정되어 있지 않습니다. 먼저 채널을 설정해주세요."), ephemeral: true });
-      return;
-    }
-
-    const TEST_SUFFIX = " *(🧪 테스트)*";
-    const actionLabel = raidCfg.action === "ban" ? "🔨 자동 밴" : raidCfg.action === "kick" ? "👢 자동 킥" : "⚠️ 경고만";
-    const user        = interaction.user;
-
-    const publicEmbed = new EmbedBuilder()
-      .setTitle("⚠️ 서버 보안 경보" + TEST_SUFFIX)
-      .setDescription("동일한 닉네임의 대량 입장이 감지되어 채널이 임시 잠금되었습니다.\n관리자가 상황을 확인 중이니 잠시 기다려 주세요.")
-      .setColor(0xff9900)
-      .setTimestamp();
-
-    const ch = interaction.guild.channels.cache.get(announceChannelId);
-    if (ch) await ch.send({ embeds: [publicEmbed] }).catch(() => {});
-
-    await interaction.reply({
-      content: ch
-        ? nya(`테스트 알림을 보냈습니다 → <#${announceChannelId}>`)
-        : nya("채널을 찾을 수 없어 테스트 메시지를 보내지 못했습니다"),
-      ephemeral: true,
     });
     return;
   }

@@ -7,7 +7,7 @@ const {
   SlashCommandBuilder,
 } = require("discord.js");
 const { nya } = require("../utils/nya");
-const { getLogOptions, getSpamLevel, getRaidConfig, isRaidLocked, getAnnounceChannelId } = require("../utils/guildConfig");
+const { getLogOptions, getSpamLevel, getRaidConfig, isRaidLocked } = require("../utils/guildConfig");
 const { SPAM_LEVELS } = require("../utils/spamFilter");
 
 const FILTER_INFO = {
@@ -128,18 +128,16 @@ function buildSpamRows(guildId) {
 function buildRaidEmbed(guildId) {
   const cfg     = getRaidConfig(guildId);
   const locked  = isRaidLocked(guildId);
-  const announceChannelId = getAnnounceChannelId(guildId);
   const actionLabel = cfg.action === "ban" ? "🔨 자동 밴" : cfg.action === "kick" ? "👢 자동 킥" : "⚠️ 경고만";
 
   return new EmbedBuilder()
     .setTitle(locked ? "🚨 레이드 검열 설정 — 현재 잠금 중" : "레이드 검열 설정")
     .setDescription(nya("30초 안에 동일한 닉네임을 가진 멤버가 3명 이상 입장하면 레이드로 자동 감지합니다"))
     .addFields(
-      { name: "감지",                   value: cfg.enabled ? "✅ 켜짐" : "⬜ 꺼짐",                             inline: true },
-      { name: "잠금 모드",              value: cfg.lockdown ? "🔒 켜짐" : "🔓 꺼짐",                            inline: true },
-      { name: "조치",                   value: actionLabel,                                                       inline: true },
-      { name: "레이드 알림 채널(서버원)", value: announceChannelId ? `<#${announceChannelId}>` : "설정 안 됨",   inline: true },
-      { name: "현재 상태",              value: locked ? "🔴 경보 중 (채널 잠금됨)" : "🟢 정상",                 inline: true },
+      { name: "감지",      value: cfg.enabled ? "✅ 켜짐" : "⬜ 꺼짐",         inline: true },
+      { name: "잠금 모드", value: cfg.lockdown ? "🔒 켜짐" : "🔓 꺼짐",        inline: true },
+      { name: "조치",      value: actionLabel,                                  inline: true },
+      { name: "현재 상태", value: locked ? "🔴 경보 중 (채널 잠금됨)" : "🟢 정상", inline: true },
     )
     .setColor(locked ? 0xff0000 : 0xed4245);
 }
@@ -168,17 +166,6 @@ function buildRaidRows(guildId) {
       .setDisabled(!locked),
   );
 
-  const row2 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId("censor-raid-announce-btn")
-      .setLabel("레이드 알림 채널(서버원) 설정")
-      .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId("censor-raid-test-btn")
-      .setLabel("🧪 레이드 테스트")
-      .setStyle(ButtonStyle.Secondary),
-  );
-
   const row3 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("censor-raid-action:alert")
@@ -194,7 +181,7 @@ function buildRaidRows(guildId) {
       .setStyle(cfg.action === "ban" ? ButtonStyle.Danger : ButtonStyle.Secondary),
   );
 
-  return [row1, row2, row3];
+  return [row1, row3];
 }
 
 // ─── 슬래시 커맨드 ──────────────────────────────────────────────────────────

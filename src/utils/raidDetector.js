@@ -62,7 +62,11 @@ async function checkRaid(member, raidConfig) {
   // 서버 멤버용 공지 임베드
   const publicEmbed = new EmbedBuilder()
     .setTitle("⚠️ 서버 보안 경보")
-    .setDescription("동일한 닉네임의 대량 입장이 감지되어 채널이 임시 잠금되었습니다.\n관리자가 상황을 확인 중이니 잠시 기다려 주세요.")
+    .setDescription(
+      lockdown
+        ? "동일한 닉네임의 대량 입장이 감지되어 채널이 임시 잠금되었습니다.\n관리자가 상황을 확인 중이니 잠시 기다려 주세요."
+        : "동일한 닉네임의 대량 입장이 감지되었습니다.\n관리자가 상황을 확인 중이니 잠시 기다려 주세요.",
+    )
     .setColor(0xff9900)
     .setTimestamp();
 
@@ -87,11 +91,12 @@ async function checkRaid(member, raidConfig) {
     await member.guild.edit({
       features: [...member.guild.features, "INVITES_DISABLED"],
     }).catch(() => {});
+  }
 
-    if (announceChannelId) {
-      const announceChannel = member.guild.channels.cache.get(announceChannelId);
-      if (announceChannel) await announceChannel.send({ embeds: [publicEmbed] }).catch(() => {});
-    }
+  // 4) 서버원 공지 (raidAnnounce 옵션이 켜진 경우만)
+  if (getLogOptions(guildId).raidAnnounce && announceChannelId) {
+    const announceChannel = member.guild.channels.cache.get(announceChannelId);
+    if (announceChannel) await announceChannel.send({ embeds: [publicEmbed] }).catch(() => {});
   }
 
   // 4) 킥 / 밴
