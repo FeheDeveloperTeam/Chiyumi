@@ -2,74 +2,120 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  EmbedBuilder,
   PermissionFlagsBits,
   SlashCommandBuilder,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
 } = require("discord.js");
 const { nya } = require("../utils/nya");
 const { getLogChannelId, getLogOptions, getLogTypeChannels } = require("../utils/guildConfig");
 
 const OPTION_DEFS = [
   { key: "messageDelete", label: "메시지 삭제" },
-  { key: "messageEdit", label: "메시지 수정" },
-  { key: "voiceJoin", label: "음성 채널 입장" },
-  { key: "voiceLeave", label: "음성 채널 퇴장" },
+  { key: "messageEdit",   label: "메시지 수정" },
+  { key: "voiceJoin",     label: "음성 채널 입장" },
+  { key: "voiceLeave",    label: "음성 채널 퇴장" },
   { key: "profanityFilter", label: "욕설 검열" },
-  { key: "spamFilter", label: "도배 검열" },
-  { key: "warnLog", label: "경고" },
-  { key: "raidAlert", label: "레이드 알림" },
+  { key: "spamFilter",    label: "도배 검열" },
+  { key: "warnLog",       label: "경고" },
+  { key: "raidAlert",     label: "레이드 알림" },
 ];
 
-function chunk(array, size) {
-  const result = [];
-  for (let i = 0; i < array.length; i += size) {
-    result.push(array.slice(i, i + size));
-  }
-  return result;
-}
-
-function buildLogContent(guildId) {
-  const defaultId = getLogChannelId(guildId);
-  const defaultText = defaultId ? `<#${defaultId}>` : "설정 안 됨";
-  const typeChannels = getLogTypeChannels(guildId);
-
-  const typeLines = OPTION_DEFS.map(({ key, label }) => {
-    const chId = typeChannels[key];
-    return `${label}: ${chId ? `<#${chId}>` : "(기본 채널)"}`;
-  }).join("\n");
-
-  return nya(`기본 채널: ${defaultText}\n\n${typeLines}\n\n아래 버튼으로 채널과 로그 종류를 설정하세요.`);
-}
-
-function buildLogRows(guildId) {
+function buildLogEmbed(guildId) {
   const options = getLogOptions(guildId);
+  const typeChannels = getLogTypeChannels(guildId);
+  const defaultId = getLogChannelId(guildId);
 
-  const topRow = new ActionRowBuilder().addComponents(
+  return new EmbedBuilder()
+    .setTitle("로그 설정")
+    .setDescription(nya("항목을 선택해 채널과 활성화 여부를 개별 설정하거나, 아래 버튼으로 전체 일괄 설정할 수 있습니다"))
+    .addFields(
+      OPTION_DEFS.map(({ key, label }) => {
+        const enabled = options[key];
+        const ownId = typeChannels[key];
+        const channelText = ownId
+          ? `<#${ownId}>`
+          : defaultId
+            ? `<#${defaultId}>`
+            : "채널 없음";
+        return { name: label, value: `${enabled ? "✅" : "⬜"} ${channelText}`, inline: true };
+      }),
+    )
+    .setColor(0xe1aa74);
+}
+
+function buildLogMainRows() {
+  const typeSelect = new StringSelectMenuBuilder()
+    .setCustomId("log-type-select")
+    .setPlaceholder("로그 항목 선택 → 채널·켜기/끄기 개별 설정")
+    .addOptions(
+      OPTION_DEFS.map(({ key, label }) =>
+        new StringSelectMenuOptionBuilder().setLabel(label).setValue(key),
+      ),
+    );
+
+  const bulkRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId("log-action:channel")
-      .setLabel("기본 채널 설정")
+      .setCustomId("log-bulk-channel")
+      .setLabel("전체 채널 설정")
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
-      .setCustomId("log-action:per-channel")
-      .setLabel("채널별 설정")
-      .setStyle(ButtonStyle.Primary),
+      .setCustomId("log-bulk-on")
+      .setLabel("전체 켜기")
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId("log-bulk-off")
+      .setLabel("전체 끄기")
+      .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId("log-action:test")
       .setLabel("테스트")
       .setStyle(ButtonStyle.Secondary),
   );
 
-  const toggleButtons = OPTION_DEFS.map(({ key, label }) =>
-    new ButtonBuilder()
-      .setCustomId(`log-toggle:${key}`)
-      .setLabel(`${label}: ${options[key] ? "켜짐" : "꺼짐"}`)
-      .setStyle(options[key] ? ButtonStyle.Success : ButtonStyle.Secondary),
-  );
+  return [new ActionRowBuilder().addComponents(typeSelect), bulkRow];
+}
 
-  const toggleRows = chunk(toggleButtons, 5).map((group) =>
-    new ActionRowBuilder().addComponents(...group),
-  );
+function buildLogTypeEmbed(guildId, key) {
+  const label = OPTION_DEFS.find((d) => d.key === key)?.label ?? key;
+  const enabled = getLogOptions(guildId)[key];
+  const typeChannels = getLogTypeChannels(guildId);
+  const defaultId = getLogChannelId(guildId);
+  const ownId = typeChannels[key];
 
-  return [topRow, ...toggleRows];
+  return new EmbedBuilder()
+    .setTitle(`로그 설정 — ${label}`)
+    .addFields(
+      { name: "현재 상태", value: enabled ? "✅ 켜짐" : "⬜ 꺼짐", inline: true },
+      {
+        name: "전용 채널",
+        value: ownId ? `<#${ownId}>` : defaultId ? `<#${defaultId}> (기본)` : "설정 안 됨",
+        inline: true,
+      },
+    )
+    .setColor(0xe1aa74);
+}
+
+function buildLogTypeRows(guildId, key) {
+  const enabled = getLogOptions(guildId)[key];
+
+  return [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("log-action:back")
+        .setLabel("← 뒤로")
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId(`log-toggle:${key}`)
+        .setLabel(enabled ? "끄기" : "켜기")
+        .setStyle(enabled ? ButtonStyle.Success : ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId(`log-type-channel-btn:${key}`)
+        .setLabel("채널 설정")
+        .setStyle(ButtonStyle.Primary),
+    ),
+  ];
 }
 
 module.exports = {
@@ -85,12 +131,14 @@ module.exports = {
 
   async execute(interaction) {
     await interaction.reply({
-      content: buildLogContent(interaction.guild.id),
-      components: buildLogRows(interaction.guild.id),
+      embeds: [buildLogEmbed(interaction.guild.id)],
+      components: buildLogMainRows(),
       ephemeral: true,
     });
   },
 
-  buildLogContent,
-  buildLogRows,
+  buildLogEmbed,
+  buildLogMainRows,
+  buildLogTypeEmbed,
+  buildLogTypeRows,
 };

@@ -62,7 +62,7 @@ const {
 const { getUserWarnings, addWarning, removeWarning, resetWarnings } = require("../utils/warnData");
 const { buildWarnEmbed, buildWarnRows, formatDuration: warnFormatDuration } = require("../commands/warn");
 const { buildSupportEmbed } = require("../utils/supportInfo");
-const { buildLogContent, buildLogRows, OPTION_DEFS: LOG_OPTION_DEFS } = require("../commands/log");
+const { buildLogEmbed, buildLogMainRows, buildLogTypeEmbed, buildLogTypeRows, OPTION_DEFS: LOG_OPTION_DEFS } = require("../commands/log");
 const {
   buildMenuEmbed: buildCensorMenuEmbed,
   buildMenuRow: buildCensorMenuRow,
@@ -189,6 +189,10 @@ const LOG_TOGGLE_PREFIX = "log-toggle:";
 const LOG_TEST_PREFIX = "log-test:";
 const LOG_CHANNEL_SELECT_ID = "log-channel-select";
 const LOG_PERCHANNEL_SELECT_PREFIX = "log-perchannel-select:";
+const LOG_TYPE_SELECT_ID = "log-type-select";
+const LOG_TYPE_CHANNEL_BTN_PREFIX = "log-type-channel-btn:";
+const LOG_TYPE_CHANNEL_SELECT_PREFIX = "log-type-channel-select:";
+const LOG_BULK_CHANNEL_SELECT_ID = "log-bulk-channel-select";
 const WELCOME_ACTION_PREFIX = "welcome-action:";
 const WELCOME_TOGGLE_PREFIX = "welcome-toggle:";
 const WELCOME_CHANNEL_SELECT_ID = "welcome-channel-select";
@@ -2252,6 +2256,23 @@ async function handleRoleSelect(interaction) {
 }
 
 async function handleStringSelect(interaction) {
+  if (interaction.customId === LOG_TYPE_SELECT_ID) {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({
+        content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
+        ephemeral: true,
+      });
+      return;
+    }
+    const key = interaction.values[0];
+    await interaction.update({
+      content: null,
+      embeds: [buildLogTypeEmbed(interaction.guild.id, key)],
+      components: buildLogTypeRows(interaction.guild.id, key),
+    });
+    return;
+  }
+
   if (interaction.customId !== "help-category-select") return;
 
   const category = interaction.values[0];
@@ -2430,48 +2451,57 @@ async function handleChannelSelect(interaction) {
     return;
   }
 
-  if (interaction.customId.startsWith(LOG_PERCHANNEL_SELECT_PREFIX)) {
+  // 타입별 전용 채널 설정
+  if (interaction.customId.startsWith(LOG_TYPE_CHANNEL_SELECT_PREFIX)) {
     if (!hasManageGuild(interaction)) {
-      await interaction.reply({
-        content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
-        ephemeral: true,
-      });
+      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
       return;
     }
-
-    const type = interaction.customId.slice(LOG_PERCHANNEL_SELECT_PREFIX.length);
+    const type = interaction.customId.slice(LOG_TYPE_CHANNEL_SELECT_PREFIX.length);
     setLogTypeChannel(interaction.guild.id, type, interaction.values[0]);
-
-    const typeChannels = getLogTypeChannels(interaction.guild.id);
-    const lines = LOG_OPTION_DEFS.map(({ key, label }) => {
-      const chId = typeChannels[key];
-      return `**${label}**: ${chId ? `<#${chId}>` : "(기본 채널)"}`;
-    }).join("\n");
-
-    const typeButtons = LOG_OPTION_DEFS.map(({ key, label }) =>
-      new ButtonBuilder()
-        .setCustomId(`log-action:set-channel:${key}`)
-        .setLabel(label)
-        .setStyle(ButtonStyle.Secondary),
-    );
-    const backButton = new ButtonBuilder()
-      .setCustomId("log-action:back")
-      .setLabel("돌아가기")
-      .setStyle(ButtonStyle.Primary);
-
-    const allButtons = [...typeButtons, backButton];
-    const rows = [];
-    for (let i = 0; i < allButtons.length; i += 5) {
-      rows.push(new ActionRowBuilder().addComponents(...allButtons.slice(i, i + 5)));
-    }
-
     await interaction.update({
-      content: nya("채널별 로그 설정입니다. 설정하지 않은 항목은 기본 채널로 전송됩니다.") + "\n\n" + lines,
-      components: rows,
+      content: null,
+      embeds: [buildLogTypeEmbed(interaction.guild.id, type)],
+      components: buildLogTypeRows(interaction.guild.id, type),
     });
     return;
   }
 
+  // 레거시 per-channel 핸들러 (하위 호환)
+  if (interaction.customId.startsWith(LOG_PERCHANNEL_SELECT_PREFIX)) {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
+      return;
+    }
+    const type = interaction.customId.slice(LOG_PERCHANNEL_SELECT_PREFIX.length);
+    setLogTypeChannel(interaction.guild.id, type, interaction.values[0]);
+    await interaction.update({
+      content: null,
+      embeds: [buildLogTypeEmbed(interaction.guild.id, type)],
+      components: buildLogTypeRows(interaction.guild.id, type),
+    });
+    return;
+  }
+
+  // 전체 채널 일괄 설정
+  if (interaction.customId === LOG_BULK_CHANNEL_SELECT_ID) {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
+      return;
+    }
+    setLogChannel(interaction.guild.id, interaction.values[0]);
+    for (const { key } of LOG_OPTION_DEFS) {
+      setLogTypeChannel(interaction.guild.id, key, null);
+    }
+    await interaction.update({
+      content: null,
+      embeds: [buildLogEmbed(interaction.guild.id)],
+      components: buildLogMainRows(),
+    });
+    return;
+  }
+
+  // 기본 채널 설정
   if (interaction.customId !== LOG_CHANNEL_SELECT_ID) return;
 
   if (!hasManageGuild(interaction)) {
@@ -2482,12 +2512,11 @@ async function handleChannelSelect(interaction) {
     return;
   }
 
-  const channelId = interaction.values[0];
-  setLogChannel(interaction.guild.id, channelId);
-
+  setLogChannel(interaction.guild.id, interaction.values[0]);
   await interaction.update({
-    content: buildLogContent(interaction.guild.id),
-    components: buildLogRows(interaction.guild.id),
+    content: null,
+    embeds: [buildLogEmbed(interaction.guild.id)],
+    components: buildLogMainRows(),
   });
 }
 
@@ -2565,79 +2594,6 @@ async function handleButton(interaction) {
 
     const action = interaction.customId.slice(LOG_ACTION_PREFIX.length);
 
-    if (action === "channel") {
-      const channelSelect = new ChannelSelectMenuBuilder()
-        .setCustomId(LOG_CHANNEL_SELECT_ID)
-        .setPlaceholder("로그를 받을 채널을 선택하세요")
-        .addChannelTypes(ChannelType.GuildText)
-        .setMinValues(1)
-        .setMaxValues(1);
-
-      const row = new ActionRowBuilder().addComponents(channelSelect);
-
-      await interaction.update({
-        content: nya("로그를 받을 채널을 선택하세요."),
-        components: [row],
-      });
-      return;
-    }
-
-    if (action === "per-channel") {
-      const typeChannels = getLogTypeChannels(interaction.guild.id);
-      const lines = LOG_OPTION_DEFS.map(({ key, label }) => {
-        const chId = typeChannels[key];
-        return `**${label}**: ${chId ? `<#${chId}>` : "(기본 채널)"}`;
-      }).join("\n");
-
-      const typeButtons = LOG_OPTION_DEFS.map(({ key, label }) =>
-        new ButtonBuilder()
-          .setCustomId(`log-action:set-channel:${key}`)
-          .setLabel(label)
-          .setStyle(ButtonStyle.Secondary),
-      );
-      const backButton = new ButtonBuilder()
-        .setCustomId("log-action:back")
-        .setLabel("돌아가기")
-        .setStyle(ButtonStyle.Primary);
-
-      const allButtons = [...typeButtons, backButton];
-      const rows = [];
-      for (let i = 0; i < allButtons.length; i += 5) {
-        rows.push(new ActionRowBuilder().addComponents(...allButtons.slice(i, i + 5)));
-      }
-
-      await interaction.update({
-        content: nya("채널별 로그 설정입니다. 설정하지 않은 항목은 기본 채널로 전송됩니다.") + "\n\n" + lines,
-        components: rows,
-      });
-      return;
-    }
-
-    if (action.startsWith("set-channel:")) {
-      const type = action.slice("set-channel:".length);
-
-      const channelSelect = new ChannelSelectMenuBuilder()
-        .setCustomId(`${LOG_PERCHANNEL_SELECT_PREFIX}${type}`)
-        .setPlaceholder("채널을 선택하세요")
-        .addChannelTypes(ChannelType.GuildText)
-        .setMinValues(1)
-        .setMaxValues(1);
-
-      const cancelButton = new ButtonBuilder()
-        .setCustomId("log-action:per-channel")
-        .setLabel("취소")
-        .setStyle(ButtonStyle.Secondary);
-
-      await interaction.update({
-        content: nya(`${LOG_OPTION_DEFS.find((d) => d.key === type)?.label ?? type} 로그를 받을 채널을 선택하세요.`),
-        components: [
-          new ActionRowBuilder().addComponents(channelSelect),
-          new ActionRowBuilder().addComponents(cancelButton),
-        ],
-      });
-      return;
-    }
-
     if (action === "test") {
       const testButtons = LOG_OPTION_DEFS.map(({ key, label }) =>
         new ButtonBuilder()
@@ -2652,11 +2608,12 @@ async function handleButton(interaction) {
       const backRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId("log-action:back")
-          .setLabel("돌아가기")
-          .setStyle(ButtonStyle.Primary),
+          .setLabel("← 뒤로")
+          .setStyle(ButtonStyle.Secondary),
       );
       await interaction.update({
-        content: nya("테스트할 로그 유형을 선택하세요."),
+        content: null,
+        embeds: [],
         components: [...testRows, backRow],
       });
       return;
@@ -2664,12 +2621,99 @@ async function handleButton(interaction) {
 
     if (action === "back") {
       await interaction.update({
-        content: buildLogContent(interaction.guild.id),
-        components: buildLogRows(interaction.guild.id),
+        content: null,
+        embeds: [buildLogEmbed(interaction.guild.id)],
+        components: buildLogMainRows(),
       });
       return;
     }
 
+    return;
+  }
+
+  // 전체 채널 일괄 설정 버튼
+  if (interaction.customId === "log-bulk-channel") {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
+      return;
+    }
+    const channelSelect = new ChannelSelectMenuBuilder()
+      .setCustomId(LOG_BULK_CHANNEL_SELECT_ID)
+      .setPlaceholder("모든 로그 항목에 적용할 채널을 선택하세요")
+      .addChannelTypes(ChannelType.GuildText)
+      .setMinValues(1)
+      .setMaxValues(1);
+    await interaction.update({
+      content: null,
+      embeds: [],
+      components: [
+        new ActionRowBuilder().addComponents(channelSelect),
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId("log-action:back").setLabel("← 취소").setStyle(ButtonStyle.Secondary),
+        ),
+      ],
+    });
+    return;
+  }
+
+  // 전체 켜기
+  if (interaction.customId === "log-bulk-on") {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
+      return;
+    }
+    for (const { key } of LOG_OPTION_DEFS) {
+      setLogOption(interaction.guild.id, key, true);
+    }
+    await interaction.update({
+      content: null,
+      embeds: [buildLogEmbed(interaction.guild.id)],
+      components: buildLogMainRows(),
+    });
+    return;
+  }
+
+  // 전체 끄기
+  if (interaction.customId === "log-bulk-off") {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
+      return;
+    }
+    for (const { key } of LOG_OPTION_DEFS) {
+      setLogOption(interaction.guild.id, key, false);
+    }
+    await interaction.update({
+      content: null,
+      embeds: [buildLogEmbed(interaction.guild.id)],
+      components: buildLogMainRows(),
+    });
+    return;
+  }
+
+  // 타입별 채널 설정 버튼
+  if (interaction.customId.startsWith(LOG_TYPE_CHANNEL_BTN_PREFIX)) {
+    if (!hasManageGuild(interaction)) {
+      await interaction.reply({ content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)", ephemeral: true });
+      return;
+    }
+    const type = interaction.customId.slice(LOG_TYPE_CHANNEL_BTN_PREFIX.length);
+    const label = LOG_OPTION_DEFS.find((d) => d.key === type)?.label ?? type;
+    const channelSelect = new ChannelSelectMenuBuilder()
+      .setCustomId(`${LOG_TYPE_CHANNEL_SELECT_PREFIX}${type}`)
+      .setPlaceholder(`${label} 전용 채널을 선택하세요`)
+      .addChannelTypes(ChannelType.GuildText)
+      .setMinValues(1)
+      .setMaxValues(1);
+    await interaction.update({
+      content: null,
+      embeds: [],
+      components: [
+        new ActionRowBuilder().addComponents(channelSelect),
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId("log-action:back").setLabel("← 취소").setStyle(ButtonStyle.Secondary),
+        ),
+      ],
+    });
     return;
   }
 
@@ -2798,8 +2842,9 @@ async function handleButton(interaction) {
     setLogOption(interaction.guild.id, key, !options[key]);
 
     await interaction.update({
-      content: buildLogContent(interaction.guild.id),
-      components: buildLogRows(interaction.guild.id),
+      content: null,
+      embeds: [buildLogTypeEmbed(interaction.guild.id, key)],
+      components: buildLogTypeRows(interaction.guild.id, key),
     });
     return;
   }
