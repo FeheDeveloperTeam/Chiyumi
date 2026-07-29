@@ -2,8 +2,8 @@ const { EmbedBuilder } = require("discord.js");
 const { sendLog, setRaidLocked, getAnnounceChannelId, getLogOptions } = require("./guildConfig");
 
 // 같은 닉네임이 이 숫자 이상 윈도우 안에 입장하면 레이드로 판단
-const RAID_SAME_NAME_THRESHOLD = 3;
-const RAID_WINDOW_MS = 30_000; // 30초
+const RAID_SAME_NAME_THRESHOLD = 5;
+const RAID_WINDOW_MS = 10_000; // 10초
 
 // guildId → Map<normalizedName, { timestamps: number[], members: GuildMember[] }>
 const recentJoins = new Map();

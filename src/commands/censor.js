@@ -132,7 +132,7 @@ function buildRaidEmbed(guildId) {
 
   return new EmbedBuilder()
     .setTitle(locked ? "🚨 레이드 검열 설정 — 현재 잠금 중" : "레이드 검열 설정")
-    .setDescription(nya("30초 안에 동일한 닉네임을 가진 멤버가 3명 이상 입장하면 레이드로 자동 감지합니다"))
+    .setDescription(nya("10초 안에 동일한 닉네임을 가진 멤버가 5명 이상 입장하면 레이드로 자동 감지합니다"))
     .addFields(
       { name: "감지",      value: cfg.enabled ? "✅ 켜짐" : "⬜ 꺼짐",         inline: true },
       { name: "잠금 모드", value: cfg.lockdown ? "🔒 켜짐" : "🔓 꺼짐",        inline: true },
