@@ -250,6 +250,12 @@ module.exports = {
     // --- 기억 목록 ---
     if (input === "기억 목록" || input === "기억목록" || /^기억(해)?\s*(목록|리스트|보여|알려|말해)/.test(input)) {
       const list = await getMemoriesWithIds(message.channel.id, userId);
+      if (list === null) {
+        const r = "기억을 불러오지 못했냥... 잠깐 후에 다시 해줘냥! (오류 코드: MEM-004)";
+        await message.reply(r);
+        addToHistory(message.channel.id, userId, userLabel, input, r);
+        return;
+      }
       if (!list.length) {
         const r = "아직 배운 게 없냥! '유미야 기억해 [내용]'으로 가르쳐줘냥~ 🐾";
         await message.reply(r);
@@ -280,6 +286,7 @@ module.exports = {
     if (deleteMatch) {
       const num = parseInt(deleteMatch[1], 10);
       const list = await getMemoriesWithIds(message.channel.id, userId);
+      if (list === null) { await message.reply("기억을 불러오지 못했냥... 잠깐 후에 다시 해줘냥! (오류 코드: MEM-004)"); return; }
       if (!list.length) { await message.reply("기억이 아무것도 없냥!"); return; }
       if (num < 1 || num > list.length) {
         await message.reply(`번호가 잘못됐냥! 1~${list.length} 사이로 입력해줘냥!`);
@@ -298,6 +305,7 @@ module.exports = {
       const num = parseInt(editMatch[1], 10);
       const newContent = editMatch[2].trim();
       const list = await getMemoriesWithIds(message.channel.id, userId);
+      if (list === null) { await message.reply("기억을 불러오지 못했냥... 잠깐 후에 다시 해줘냥! (오류 코드: MEM-004)"); return; }
       if (!list.length) { await message.reply("기억이 아무것도 없냥!"); return; }
       if (num < 1 || num > list.length) {
         await message.reply(`번호가 잘못됐냥! 1~${list.length} 사이로 입력해줘냥!`);
@@ -319,7 +327,7 @@ module.exports = {
       }
       const currentCount = isDev ? 0 : await countUserMemories(userId);
       if (currentCount >= MEMORY_LIMIT) {
-        const list = await getMemoriesWithIds(message.channel.id, userId);
+        const list = await getMemoriesWithIds(message.channel.id, userId) ?? [];
         const embed = new EmbedBuilder()
           .setColor(0xe67e22)
           .setTitle("📝 기억 한도에 도달했다냥!")

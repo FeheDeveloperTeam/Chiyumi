@@ -39,20 +39,22 @@ async function getMemories(userId) {
       .select("content")
       .eq("user_id", userId)
       .order("created_at", { ascending: true });
-    if (error) { console.log("[Supabase] 기억 로드 실패:", error.message); }
-    memoriesCache.set(userId, error ? [] : (data ?? []).map((r) => r.content));
+    if (error) {
+      console.log("[Supabase] 기억 로드 실패:", error.message);
+      return []; // 오류 시 캐시하지 않고 빈 배열만 반환
+    }
+    memoriesCache.set(userId, (data ?? []).map((r) => r.content));
   }
   return memoriesCache.get(userId);
 }
 
 async function getMemoriesWithIds(channelId, userId) {
-  const query = supabase
+  const { data, error } = await supabase
     .from("memories")
     .select("id, content")
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
-  const { data, error } = await query;
-  if (error) { console.log("[Supabase] 기억 목록 실패:", error.message); return []; }
+  if (error) { console.log("[Supabase] 기억 목록 실패:", error.message); return null; }
   return data ?? [];
 }
 
