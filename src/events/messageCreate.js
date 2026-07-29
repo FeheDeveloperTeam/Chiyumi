@@ -265,7 +265,7 @@ module.exports = {
           .setColor(0xf5c518)
           .setTitle("📝 유미가 기억하고 있는 것들이냥! 🐾")
           .setDescription(list.map((m, i) => `**${i + 1}.** ${m.content}`).join("\n"))
-          .setFooter({ text: `${list.length} / ${MEMORY_LIMIT}개 사용 중` });
+          .setFooter({ text: isDev ? `${list.length}개 사용 중 (무제한)` : `${list.length} / ${MEMORY_LIMIT}개 사용 중` });
         await message.reply({ embeds: [embed] });
         addToHistory(message.channel.id, userId, userLabel, input, `기억 목록 (${list.length}개)`);
       }
