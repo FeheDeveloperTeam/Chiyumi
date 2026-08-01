@@ -227,7 +227,7 @@ function setRaidLocked(guildId, locked) {
   saveAll(configs);
 }
 
-const DEFAULT_LEVELUP_MESSAGE = "{유저}님이 레벨이 올라서 이제 {레벨}레벨이다";
+const DEFAULT_LEVELUP_MESSAGE = "{유저}님이 레벨이 올라서 이제 {레벨}레벨이다냥!";
 
 function setLevelUpChannel(guildId, channelId) {
   const configs = loadAll();
