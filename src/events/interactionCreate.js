@@ -2431,7 +2431,7 @@ async function handleChannelSelect(interaction) {
     setSupportMessage(interaction.guild.id, channelId, msg.id);
 
     await interaction.update({
-      content: nya(`${channel}에 운영 안내를 게시했습니다. 운영 시간 시작(10:00)·종료(19:00) KST에 자동으로 수정됩니다.`),
+      content: nya(`${channel}에 서포터 서버 안내를 게시했습니다. 운영 시간 시작(19:00)·종료(00:00) KST에 자동으로 수정됩니다.`),
       embeds: [],
       components: [],
     });
