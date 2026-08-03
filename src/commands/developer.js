@@ -11,24 +11,12 @@ const { isDeveloper } = require("../utils/devUser");
 function buildDeveloperEmbed() {
   return new EmbedBuilder()
     .setTitle("🛠️ 개발자 전용 메뉴")
-    .setDescription(nya("아래 버튼으로 사용자 이용제한을 관리하세요"))
+    .setDescription(nya("아래 버튼으로 개발자 기능을 사용하세요"))
     .setColor(0xe1aa74);
 }
 
 function buildDeveloperRow() {
   return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId("dev-action:restrict")
-      .setLabel("이용제한")
-      .setStyle(ButtonStyle.Danger),
-    new ButtonBuilder()
-      .setCustomId("dev-action:unrestrict")
-      .setLabel("이용제한 해제")
-      .setStyle(ButtonStyle.Success),
-    new ButtonBuilder()
-      .setCustomId("dev-action:check")
-      .setLabel("이용제한 확인")
-      .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId("dev-action:support")
       .setLabel("운영 안내 게시")
