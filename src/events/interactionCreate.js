@@ -1011,6 +1011,15 @@ async function handleDevAction(interaction) {
   const action = interaction.customId.slice(DEV_ACTION_PREFIX.length);
 
   if (action === "support") {
+    const kstHour = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" })).getHours();
+    if (kstHour < 19) {
+      await interaction.reply({
+        content: "운영 안내 게시는 오후 7시 ~ 자정 사이에만 사용할 수 있습니다냥!",
+        ephemeral: true,
+      });
+      return;
+    }
+
     const channelSelect = new ChannelSelectMenuBuilder()
       .setCustomId(DEV_SUPPORT_CHANNEL_SELECT_ID)
       .setPlaceholder("운영 안내를 게시할 채널을 선택하세요")
