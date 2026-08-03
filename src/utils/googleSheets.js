@@ -1,6 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { JWT } = require("google-auth-library");
+const { getAllStockDefs } = require("./stocks");
 
 const DATA_DIR = path.join(__dirname, "..", "..", "data");
 const SHEETS_API_BASE = "https://sheets.googleapis.com/v4/spreadsheets";
@@ -95,6 +96,24 @@ function guildUserMapToRows(data, config = {}) {
       rows.push([guildId, userId, stringifyCell(flatValue)]);
     }
   }
+
+  return [header, ...rows];
+}
+
+function stockPortfolioToRows(data) {
+  const defs = getAllStockDefs();
+  const header = ["유저ID", ...defs.flatMap(({ id, name }) => [`${id}(${name}) 수량`, `${id} 평균단가`])];
+
+  const rows = Object.entries(data).map(([userId, portfolio]) => {
+    const cells = defs.flatMap(({ id }) => {
+      const entry = portfolio[id];
+      if (!entry) return [0, ""];
+      const qty      = typeof entry === "number" ? entry : (entry.qty ?? 0);
+      const avgPrice = typeof entry === "number" ? "" : (entry.avgPrice ?? "");
+      return [qty, avgPrice];
+    });
+    return [userId, ...cells];
+  });
 
   return [header, ...rows];
 }
@@ -218,7 +237,7 @@ async function syncDataToSheets(client) {
 
   for (const [title, rows] of [
     ["주식시세", stockPricesToRows(readJsonFile("stocks.json"))],
-    ["주식포트폴리오", objectToRows(readJsonFile("stockPortfolios.json"), SHEET_COLUMN_CONFIG["주식포트폴리오"] ?? {})],
+    ["주식포트폴리오", stockPortfolioToRows(readJsonFile("stockPortfolios.json"))],
     ["서버목록", buildGuildListRows(client)],
   ]) {
     try {
