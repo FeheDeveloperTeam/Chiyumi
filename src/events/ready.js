@@ -114,7 +114,7 @@ function getMsUntilNextKstHour(targetHour) {
 }
 
 function scheduleSupportUpdates(client) {
-  for (const hour of [10, 19]) {
+  for (const hour of [19, 0]) {
     const delay = getMsUntilNextKstHour(hour);
     setTimeout(() => {
       updateSupportMessages(client);
