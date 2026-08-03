@@ -16,6 +16,32 @@ const SHEET_FILES = {
   약관동의: "consent.json",
 };
 
+// 시트별 컬럼명 설정
+const SHEET_COLUMN_CONFIG = {
+  코인:        { idCol: "유저ID", valCol: "잔액(코인)" },
+  출석:        { idCol: "유저ID", valCol: "마지막 출석일" },
+  레벨:        { idCol: "서버ID", userCol: "유저ID", valCol: "총 XP" },
+  음성시간:    { idCol: "서버ID", userCol: "유저ID", valCol: "음성시간(ms)" },
+  서버설정:    { idCol: "서버ID" },
+  주식포트폴리오: { idCol: "유저ID" },
+  키우기: {
+    idCol: "유저ID",
+    colRename: {
+      name: "이름", hunger: "배고픔", cleanliness: "청결도",
+      affection: "친밀도", lastFed: "마지막 밥", lastWashed: "마지막 목욕",
+      lastPlayed: "마지막 놀기", adoptedAt: "입양일",
+    },
+  },
+  이용제한: {
+    idCol: "유저ID",
+    colRename: { reason: "사유", restrictedBy: "제한 관리자", restrictedAt: "제한 일시" },
+  },
+  약관동의: {
+    idCol: "유저ID",
+    colRename: { agreedAt: "동의 일시" },
+  },
+};
+
 const STOCK_HISTORY_COLS = 6;
 
 const GUILD_USER_MAP_FILES = new Set(["levels.json", "voiceTime.json"]);
@@ -32,9 +58,10 @@ function stringifyCell(value) {
   return String(value);
 }
 
-function objectToRows(data) {
+function objectToRows(data, config = {}) {
+  const { idCol = "ID", valCol = "값", colRename = {} } = config;
   const entries = Object.entries(data);
-  if (entries.length === 0) return [["id"]];
+  if (entries.length === 0) return [[idCol]];
 
   const [, sample] = entries[0];
 
@@ -44,7 +71,7 @@ function objectToRows(data) {
       for (const key of Object.keys(value)) keySet.add(key);
     }
     const keys = [...keySet];
-    const header = ["id", ...keys];
+    const header = [idCol, ...keys.map((k) => colRename[k] ?? k)];
     const rows = entries.map(([id, value]) => [
       id,
       ...keys.map((key) => stringifyCell(value[key])),
@@ -52,13 +79,14 @@ function objectToRows(data) {
     return [header, ...rows];
   }
 
-  const header = ["id", "value"];
+  const header = [idCol, valCol];
   const rows = entries.map(([id, value]) => [id, stringifyCell(value)]);
   return [header, ...rows];
 }
 
-function guildUserMapToRows(data) {
-  const header = ["서버ID", "유저ID", "값"];
+function guildUserMapToRows(data, config = {}) {
+  const { idCol = "서버ID", userCol = "유저ID", valCol = "값" } = config;
+  const header = [idCol, userCol, valCol];
   const rows = [];
 
   for (const [guildId, users] of Object.entries(data)) {
@@ -177,9 +205,10 @@ async function syncDataToSheets(client) {
 
   for (const [title, fileName] of Object.entries(SHEET_FILES)) {
     const data = readJsonFile(fileName);
+    const config = SHEET_COLUMN_CONFIG[title] ?? {};
     const rows = GUILD_USER_MAP_FILES.has(fileName)
-      ? guildUserMapToRows(data)
-      : objectToRows(data);
+      ? guildUserMapToRows(data, config)
+      : objectToRows(data, config);
     try {
       await writeSheet(authClient, spreadsheetId, title, rows);
     } catch (err) {
@@ -189,7 +218,7 @@ async function syncDataToSheets(client) {
 
   for (const [title, rows] of [
     ["주식시세", stockPricesToRows(readJsonFile("stocks.json"))],
-    ["주식포트폴리오", objectToRows(readJsonFile("stockPortfolios.json"))],
+    ["주식포트폴리오", objectToRows(readJsonFile("stockPortfolios.json"), SHEET_COLUMN_CONFIG["주식포트폴리오"] ?? {})],
     ["서버목록", buildGuildListRows(client)],
   ]) {
     try {
