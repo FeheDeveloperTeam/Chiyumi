@@ -19,7 +19,7 @@ function buildDeveloperRow() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("dev-action:support")
-      .setLabel("운영 안내 게시")
+      .setLabel("서포터 서버")
       .setStyle(ButtonStyle.Secondary),
   );
 }
