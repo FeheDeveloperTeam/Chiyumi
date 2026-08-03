@@ -1080,7 +1080,7 @@ async function handleDevModal(interaction, action) {
 
   if (action === "restrict") {
     const reason = interaction.fields.getTextInputValue("reason").trim();
-    restrictUser(targetUserId, reason, interaction.user.id);
+    await restrictUser(targetUserId, reason, interaction.user.id);
 
     await interaction.update({
       content: nya(`<@${targetUserId}>님의 이용을 제한했습니다. 사유: ${reason || "사유 없음"}`),
@@ -1091,7 +1091,7 @@ async function handleDevModal(interaction, action) {
   }
 
   if (action === "unrestrict") {
-    const existed = unrestrictUser(targetUserId);
+    const existed = await unrestrictUser(targetUserId);
 
     await interaction.update({
       content: nya(
@@ -1106,7 +1106,7 @@ async function handleDevModal(interaction, action) {
   }
 
   if (action === "check") {
-    const restriction = getRestriction(targetUserId);
+    const restriction = await getRestriction(targetUserId);
 
     await interaction.update({
       content: restriction
@@ -1761,9 +1761,9 @@ async function safeHandle(interaction, fn) {
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction) {
-    if (!isDeveloper(interaction.user.id) && isRestricted(interaction.user.id)) {
+    if (!isDeveloper(interaction.user.id) && (await isRestricted(interaction.user.id))) {
       if (interaction.isRepliable()) {
-        const restriction = getRestriction(interaction.user.id);
+        const restriction = await getRestriction(interaction.user.id);
         await interaction.reply({
           content: nya(`이용이 제한된 사용자입니다. 제한 사유: ${restriction?.reason ?? "사유 없음"}`) + "\n(오류 코드: DEV-004)",
           ephemeral: true,
