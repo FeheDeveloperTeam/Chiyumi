@@ -19,7 +19,6 @@ const EXTRA_STATUSES = [
   "주식 시세 분석 중이다냥 📈",
   "고양이는 원래 이렇게 바쁘다냥 😼",
   "졸린데 일해야 한다냥 😿",
-  "'유미야' 하고 나를 불러달라냥 🐾",
 ];
 
 function updatePresence(client) {
@@ -27,9 +26,8 @@ function updatePresence(client) {
     status: "online",
     activities: [
       {
-        name: "status",
-        type: ActivityType.Custom,
-        state: nya(`${client.guilds.cache.size}개의 서버와 함께하는 중이다`),
+        name: nya("'유미야' 로 대화를 시작해 보세요"),
+        type: ActivityType.Watching,
       },
     ],
   });
@@ -37,14 +35,15 @@ function updatePresence(client) {
 
 function rotatePresence(client) {
   const all = [
+    nya("'유미야' 로 대화를 시작해 보세요"),
     nya(`${client.guilds.cache.size}개의 서버와 함께하는 중이다`),
     `${client.guilds.cache.size}개의 서버 집사들 돌보는 중이다냥 🐾`,
     ...EXTRA_STATUSES,
   ];
-  const state = all[Math.floor(Math.random() * all.length)];
+  const name = all[Math.floor(Math.random() * all.length)];
   client.user.setPresence({
     status: "online",
-    activities: [{ name: "status", type: ActivityType.Custom, state }],
+    activities: [{ name, type: ActivityType.Watching }],
   });
 }
 
