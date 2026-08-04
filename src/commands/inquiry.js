@@ -42,18 +42,18 @@ module.exports = {
       new ButtonBuilder()
         .setLabel("오류 코드 안내")
         .setStyle(ButtonStyle.Link)
-        .setURL("https://fehedeveloperteam.github.io/Chiyumi/errors.html"),
+        .setURL("https://www.fehe.dev/DiscordBot/Chiyumi/errors"),
     );
 
     const linkRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setLabel("이용약관")
         .setStyle(ButtonStyle.Link)
-        .setURL("https://fehedeveloperteam.github.io/Chiyumi/terms.html"),
+        .setURL("https://www.fehe.dev/DiscordBot/Chiyumi/terms"),
       new ButtonBuilder()
         .setLabel("개인정보처리방침")
         .setStyle(ButtonStyle.Link)
-        .setURL("https://fehedeveloperteam.github.io/Chiyumi/privacy.html"),
+        .setURL("https://www.fehe.dev/DiscordBot/Chiyumi/privacy"),
       new ButtonBuilder()
         .setLabel("FeheDevTeam")
         .setStyle(ButtonStyle.Link)

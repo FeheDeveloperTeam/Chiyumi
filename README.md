@@ -2,7 +2,9 @@
 
 Chiyumi는 디스코드 서버 운영과 놀이 기능을 함께 제공하는 Node.js 기반 디스코드 봇입니다.
 
-> 모든 명령어는 슬래시 명령어로 제공되며, 처음 사용 시 이용약관·개인정보 처리방침 동의 절차를 거칩니다.
+> 모든 명령어는 슬래시 명령어로 제공되며, 처음 사용 시 [이용약관](https://www.fehe.dev/DiscordBot/Chiyumi/terms)·[개인정보 처리방침](https://www.fehe.dev/DiscordBot/Chiyumi/privacy) 동의 절차를 거칩니다.
+>
+> [오류 코드 안내](https://www.fehe.dev/DiscordBot/Chiyumi/errors)
 
 ## 주요 명령어
 
