@@ -1,47 +1,43 @@
-const { createClient } = require("@supabase/supabase-js");
+const fs = require("node:fs");
+const path = require("node:path");
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
+const DATA_DIR = path.join(__dirname, "..", "..", "data");
+const DATA_FILE = path.join(DATA_DIR, "restrictions.json");
+
+function readData() {
+  if (!fs.existsSync(DATA_FILE)) return {};
+  return JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
+}
+
+function writeData(data) {
+  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+}
 
 async function isRestricted(userId) {
   return Boolean(await getRestriction(userId));
 }
 
 async function getRestriction(userId) {
-  const { data, error } = await supabase
-    .from("restrictions")
-    .select("reason, restricted_by, restricted_at")
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (error) {
-    console.log("[Supabase] 이용제한 조회 실패:", error.message);
-    return null;
-  }
-  if (!data) return null;
-  return {
-    reason: data.reason,
-    restrictedBy: data.restricted_by,
-    restrictedAt: data.restricted_at,
-  };
+  const data = readData();
+  return data[userId] ?? null;
 }
 
 async function restrictUser(userId, reason, byId) {
-  const { error } = await supabase.from("restrictions").upsert({
-    user_id: userId,
+  const data = readData();
+  data[userId] = {
     reason: reason || "사유 없음",
-    restricted_by: byId,
-    restricted_at: new Date().toISOString(),
-  });
-  if (error) console.log("[Supabase] 이용제한 등록 실패:", error.message);
+    restrictedBy: byId,
+    restrictedAt: new Date().toISOString(),
+  };
+  writeData(data);
 }
 
 async function unrestrictUser(userId) {
-  const existed = Boolean(await getRestriction(userId));
-  const { error } = await supabase.from("restrictions").delete().eq("user_id", userId);
-  if (error) {
-    console.log("[Supabase] 이용제한 해제 실패:", error.message);
-    return false;
-  }
-  return existed;
+  const data = readData();
+  if (!data[userId]) return false;
+  delete data[userId];
+  writeData(data);
+  return true;
 }
 
 module.exports = {
