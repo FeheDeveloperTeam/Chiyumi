@@ -7,6 +7,7 @@ const { buildSupportEmbed } = require("../utils/supportInfo");
 const { getAllConfigs } = require("../utils/guildConfig");
 const { checkAllStreams } = require("../utils/streamAlert");
 const { cacheGuildInvites } = require("../utils/inviteTracker");
+const { startPresenceSnapshotLoop } = require("../utils/presenceSnapshot");
 
 const SHEETS_SYNC_INTERVAL_MS = 15 * 60 * 1000;
 const KST_TIMEZONE = "Asia/Seoul";
@@ -134,5 +135,7 @@ module.exports = {
     scheduleDailyTasks();
     updateSupportMessages(client).catch(() => {});
     scheduleSupportUpdates(client);
+
+    startPresenceSnapshotLoop(client);
   },
 };
