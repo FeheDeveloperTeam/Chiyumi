@@ -28,11 +28,11 @@ module.exports = {
   async execute(interaction) {
     const userId = interaction.user.id;
     const guildId = interaction.guild?.id ?? "global";
-    const result = claimDaily(userId);
+    const result = claimDaily(userId, guildId);
 
     if (!result.success) {
       await interaction.reply({
-        content: nya(`이미 오늘 출석했습니다. ${formatRemainingTime(result.remainingMs)} 후에 다시 출석할 수 있습니다.`) + "\n(오류 코드: ATTEND-001)",
+        content: nya(`이미 오늘 이 서버에서 출석했습니다. ${formatRemainingTime(result.remainingMs)} 후에 다시 출석할 수 있습니다.`) + "\n(오류 코드: ATTEND-001)",
         ephemeral: true,
       });
       return;
@@ -46,12 +46,17 @@ module.exports = {
 
     const embed = new EmbedBuilder()
       .setTitle("출석 체크")
-      .setDescription(
-        nya(
-          `치유미코인 ${result.amount}개와 경험치 ${ATTENDANCE_XP_AMOUNT}을 받았습니다! 현재 보유: ${result.balance}개${streakText}`,
-        ),
-      )
       .setColor(0xe1aa74);
+
+    if (result.coinAlreadyClaimed) {
+      embed.setDescription(
+        nya(`오늘 코인은 이미 다른 서버에서 받았습니다. 이 서버 경험치 ${ATTENDANCE_XP_AMOUNT}만 받았습니다${streakText}`),
+      );
+    } else {
+      embed.setDescription(
+        nya(`치유미코인 ${result.amount}개와 경험치 ${ATTENDANCE_XP_AMOUNT}을 받았습니다! 현재 보유: ${result.balance}개${streakText}`),
+      );
+    }
 
     await interaction.reply({ embeds: [embed] });
 

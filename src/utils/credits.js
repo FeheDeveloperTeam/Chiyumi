@@ -68,24 +68,33 @@ function saveClaims(claims) {
   fs.writeFileSync(CLAIMS_FILE, JSON.stringify(claims, null, 2));
 }
 
-function claimDaily(userId) {
+function claimDaily(userId, guildId = "global") {
   const claims = loadClaims();
   const today = getKstDateString();
   const entry = claims[userId];
 
-  if (entry?.date === today) {
+  const coinClaimed = entry?.date === today;
+  const xpClaimed = entry?.xp?.[guildId] === today;
+
+  // 이 서버에서 코인도 XP도 이미 받음
+  if (coinClaimed && xpClaimed) {
     return { success: false, remainingMs: getMsUntilNextKstMidnight() };
   }
 
   const yesterday = getKstDateString(new Date(Date.now() - 24 * 60 * 60 * 1000));
-  const streak = entry?.date === yesterday ? entry.streak + 1 : 1;
+  const streak = coinClaimed ? (entry.streak ?? 1) : (entry?.date === yesterday ? entry.streak + 1 : 1);
 
-  claims[userId] = { date: today, streak };
+  const xp = { ...(entry?.xp ?? {}), [guildId]: today };
+  claims[userId] = { date: coinClaimed ? entry.date : today, streak, xp };
   saveClaims(claims);
 
-  const balance = addBalance(userId, DAILY_CLAIM_AMOUNT);
+  if (coinClaimed) {
+    // 코인은 이미 받았고 이 서버 XP만 지급
+    return { success: true, coinAlreadyClaimed: true, streak };
+  }
 
-  return { success: true, amount: DAILY_CLAIM_AMOUNT, balance, streak };
+  const balance = addBalance(userId, DAILY_CLAIM_AMOUNT);
+  return { success: true, coinAlreadyClaimed: false, amount: DAILY_CLAIM_AMOUNT, balance, streak };
 }
 
 function setBalance(userId, amount) {
