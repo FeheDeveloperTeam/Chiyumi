@@ -166,31 +166,26 @@ async function askGroq(channelId, userId, userMessage, displayName = "집사") {
       max_tokens: 500,
       temperature: 0.75,
     });
-  } catch (groqErr) {
-    if (groqErr?.status === 429) {
+  } catch {
+    try {
+      response = await openrouterClient.chat.completions.create({
+        model: "meta-llama/llama-3.3-70b-instruct",
+        messages,
+        max_tokens: 500,
+        temperature: 0.75,
+      });
+    } catch {
       try {
-        response = await openrouterClient.chat.completions.create({
-          model: "meta-llama/llama-3.3-70b-instruct",
+        response = await mistralClient.chat.completions.create({
+          model: "mistral-small-latest",
           messages,
           max_tokens: 500,
           temperature: 0.75,
         });
       } catch {
-        try {
-          response = await mistralClient.chat.completions.create({
-            model: "mistral-small-latest",
-            messages,
-            max_tokens: 500,
-            temperature: 0.75,
-          });
-        } catch {
-          history.pop();
-          return "지금 채팅 한도가 꽉 찼냥... 잠깐 후에 다시 말 걸어줘냥! (오류 코드: AI-003)";
-        }
+        history.pop();
+        return "지금 말하기가 어렵냥... 잠깐 후에 다시 말 걸어줘냥! (오류 코드: AI-004)";
       }
-    } else {
-      history.pop();
-      return "지금 말하기가 어렵냥... 잠깐 후에 다시 말 걸어줘냥! (오류 코드: AI-004)";
     }
   }
 
