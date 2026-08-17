@@ -1,6 +1,8 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require("discord.js");
 const { nya } = require("../utils/nya");
 
+const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
+
 module.exports = {
   category: "서버 관리",
   data: new SlashCommandBuilder()
@@ -8,7 +10,7 @@ module.exports = {
     .setNameLocalizations({ ko: "채팅청소" })
     .setDescription("Bulk delete messages in the current channel")
     .setDescriptionLocalizations({ ko: nya("현재 채널의 메시지를 한꺼번에 삭제합니다") })
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addIntegerOption((option) =>
       option
         .setName("수량")
@@ -21,16 +23,33 @@ module.exports = {
   async execute(interaction) {
     const amount = interaction.options.getInteger("수량");
 
-    const deleted = await interaction.channel.bulkDelete(amount, true).catch(() => null);
+    await interaction.deferReply({ ephemeral: true });
 
-    if (deleted === null) {
-      await interaction.reply({
-        content: nya("메시지 삭제에 실패했습니다. 봇 권한을 확인해주세요") + " (오류 코드: PURGE-001)",
-        ephemeral: true,
+    const messages = await interaction.channel.messages.fetch({ limit: amount }).catch(() => null);
+
+    if (!messages) {
+      await interaction.editReply({
+        content: nya("메시지를 불러오는 데 실패했습니다. 봇 권한을 확인해주세요") + " (오류 코드: PURGE-001)",
       });
       return;
     }
 
-    await interaction.reply({ content: nya(`메시지 ${deleted.size}개를 삭제했습니다`), ephemeral: true });
+    const cutoff = Date.now() - TWO_WEEKS_MS;
+    const recent = messages.filter((m) => m.createdTimestamp > cutoff);
+    const old = messages.filter((m) => m.createdTimestamp <= cutoff);
+
+    let deleted = 0;
+
+    if (recent.size > 0) {
+      const bulkResult = await interaction.channel.bulkDelete(recent, true).catch(() => null);
+      if (bulkResult) deleted += bulkResult.size;
+    }
+
+    for (const msg of old.values()) {
+      const ok = await msg.delete().catch(() => null);
+      if (ok) deleted++;
+    }
+
+    await interaction.editReply({ content: nya(`메시지 ${deleted}개를 삭제했습니다`) });
   },
 };
