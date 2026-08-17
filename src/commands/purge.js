@@ -10,7 +10,7 @@ module.exports = {
     .setNameLocalizations({ ko: "채팅청소" })
     .setDescription("Bulk delete messages in the current channel")
     .setDescriptionLocalizations({ ko: nya("현재 채널의 메시지를 한꺼번에 삭제합니다") })
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
     .addIntegerOption((option) =>
       option
         .setName("수량")
