@@ -1,6 +1,11 @@
 require("dotenv").config();
 require("./utils/logger");
 
+// 호스팅 컨테이너는 IPv6 경로가 불안정해서, AAAA 레코드가 있는 API(예: Open-Meteo 미세먼지)가
+// IPv6로 먼저 붙다가 "fetch failed"로 끝나곤 했다. IPv4를 먼저 쓰고 주소별 연결 대기 시간도 늘린다.
+require("node:dns").setDefaultResultOrder("ipv4first");
+require("node:net").setDefaultAutoSelectFamilyAttemptTimeout?.(1000);
+
 const fs = require("node:fs");
 const path = require("node:path");
 const { Client, Collection, GatewayIntentBits } = require("discord.js");

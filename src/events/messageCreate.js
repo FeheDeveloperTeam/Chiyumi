@@ -487,7 +487,7 @@ module.exports = {
           .setDescription(getWeatherComment(weather))
           .addFields(weatherEmbedFields(weather))
           .setImage("attachment://weather.png")
-          .setFooter({ text: `Open-Meteo · ${dateLabel}` })
+          .setFooter({ text: `${weather.source ?? "Open-Meteo"} · ${dateLabel}` })
           .setTimestamp();
 
         await message.reply({
@@ -510,7 +510,7 @@ module.exports = {
         }
         console.log("[날씨] 응답 완료");
       } catch (err) {
-        console.log("[날씨] 에러:", err?.message, err?.stack);
+        console.log("[날씨] 에러:", err?.message, err?.cause?.code ?? "", err?.cause?.message ?? "", err?.stack);
         await message.reply("날씨 정보를 가져오지 못했냥... 잠깐 후에 다시 물어봐달라냥ㅠ (오류 코드: WEATHER-001)");
       }
       return;

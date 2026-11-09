@@ -59,7 +59,7 @@ Chiyumi는 디스코드 서버 운영과 놀이 기능을 함께 제공하는 No
 
 | 키워드 | 설명 |
 |--------|------|
-| `[도시명] 날씨` | 기상청 API 기반 현재 날씨 카드 이미지 + 강수 레이더 |
+| `[도시명] 날씨` | Open-Meteo 기반 현재 날씨 카드 이미지 + 강수 레이더 (Open-Meteo 장애 시 MET Norway로 자동 전환, 미세먼지 조회 실패 시 "정보없음"으로 표시) |
 | `레이더` | 한반도 강수 레이더 이미지 |
 | `지진` | 최근 30일 USGS 지진 현황 및 지도 |
 | `태풍` | 현재 활성 태풍 정보 및 경로 지도 |
@@ -86,7 +86,9 @@ Chiyumi는 디스코드 서버 운영과 놀이 기능을 함께 제공하는 No
 - @supabase/supabase-js (AI 기억 저장)
 - google-auth-library (구글 시트 데이터 백업/뷰어 동기화, `.env`에 `GOOGLE_SHEET_ID`/`GOOGLE_SERVICE_ACCOUNT_EMAIL`/`GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` 설정 시에만 동작)
 - 국립국어원 우리말샘 Open API (끝말잇기 단어 사전 검증, `.env`에 `WORDCHAIN_DICT_API_KEY` 설정 시에만 동작, 미설정 시 끝말잇기 규칙만으로 검증)
-- 기상청 단기예보 API (날씨 조회, `.env`에 `KMA_API_KEY` 설정 필요)
+- Open-Meteo 날씨·대기질 API (날씨·미세먼지 조회, API 키 불필요) → 실패 시 MET Norway Locationforecast API로 전환 (API 키 불필요)
+- 기상청 API (강수 레이더·지진 지도, `.env`의 `KMA_API_KEY` 사용, 키가 유효하지 않으면 레이더는 RainViewer로 대체)
+- 호스팅 컨테이너의 IPv6 경로가 불안정해서 `src/index.js`에서 DNS를 IPv4 우선(`ipv4first`)으로 두고, 외부 요청 실패 로그에는 실제 원인 코드(`ENETUNREACH`, `ETIMEDOUT` 등)를 함께 남긴다
 
 ## 안내
 

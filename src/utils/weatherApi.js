@@ -1,4 +1,5 @@
-// Open-Meteo API 사용 (무료, API 키 불필요)
+// 날씨: Open-Meteo 기본, 실패 시 MET Norway로 전환 (둘 다 무료, API 키 불필요)
+// 미세먼지: Open-Meteo Air Quality (실패해도 날씨는 표시, pm25 = -1)
 
 const CITIES = {
   "서울":   { lat: 37.5665, lon: 126.9780, name: "서울" },
@@ -207,40 +208,147 @@ function getNowKST() {
   };
 }
 
-async function getWeather(cityQuery) {
-  const city = findCity(cityQuery);
-  if (!city) return null;
+const USER_AGENT = "ChiyumiBot/1.0 (+https://github.com/FeheDeveloperTeam/Chiyumi)";
 
-  const weatherUrl =
+// "fetch failed"만으로는 원인을 알 수 없어 undici가 cause에 담는 실제 코드(ENOTFOUND, ETIMEDOUT 등)를 함께 남긴다.
+function describeFetchError(err) {
+  const cause = err?.cause;
+  const code = cause?.code ?? cause?.name ?? err?.name;
+  return [err?.message, code, cause?.message].filter(Boolean).join(" / ");
+}
+
+// 호스팅 서버에서 외부 요청이 간헐적으로 끊겨서, 요청마다 타임아웃을 두고 몇 번 다시 시도한다.
+async function fetchJson(url, { label, attempts = 3, timeoutMs = 8000, headers } = {}) {
+  let lastErr;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(timeoutMs),
+        headers: { "User-Agent": USER_AGENT, Accept: "application/json", ...headers },
+      });
+      if (!res.ok) {
+        const err = new Error(`HTTP ${res.status}`);
+        err.status = res.status;
+        // 4xx(429 제외)는 다시 시도해도 같은 결과라 바로 넘긴다.
+        if (res.status < 500 && res.status !== 429) throw Object.assign(err, { fatal: true });
+        throw err;
+      }
+      return await res.json();
+    } catch (err) {
+      lastErr = err;
+      console.log(`[날씨] ${label} 요청 실패 (${i}/${attempts}): ${describeFetchError(err)}`);
+      if (err.fatal || i === attempts) break;
+      await new Promise((r) => setTimeout(r, 500 * i));
+    }
+  }
+  throw lastErr;
+}
+
+async function fetchOpenMeteo(city) {
+  const url =
     `https://api.open-meteo.com/v1/forecast` +
     `?latitude=${city.lat}&longitude=${city.lon}` +
     `&current=temperature_2m,apparent_temperature,relative_humidity_2m` +
     `,wind_speed_10m,wind_gusts_10m,precipitation_probability,weather_code` +
     `&wind_speed_unit=ms&timezone=Asia%2FSeoul`;
 
-  const aqUrl =
+  const json = await fetchJson(url, { label: "Open-Meteo" });
+  const cur = json?.current;
+  if (!cur || cur.temperature_2m == null) throw new Error("Open-Meteo 응답에 current 값이 없음");
+
+  return {
+    source:       "Open-Meteo",
+    temperature:  cur.temperature_2m,
+    apparentTemp: cur.apparent_temperature ?? cur.temperature_2m,
+    humidity:     cur.relative_humidity_2m ?? 0,
+    windSpeed:    cur.wind_speed_10m ?? 0,
+    windGust:     cur.wind_gusts_10m ?? cur.wind_speed_10m ?? 0,
+    precipProb:   cur.precipitation_probability ?? 0,
+    ...weatherCodeToCondition(cur.weather_code ?? 0),
+  };
+}
+
+// MET Norway symbol_code → 기존 카드가 쓰는 sky/pty 값
+function metSymbolToCondition(symbol = "") {
+  const s = symbol.replace(/_(day|night|polartwilight)$/, "");
+  if (s.includes("sleet"))                         return { sky: 4, pty: 2 };
+  if (s.includes("snow"))                          return { sky: 4, pty: 3 };
+  if (s.includes("rainshowers"))                   return { sky: 4, pty: 4 };
+  if (s.includes("rain"))                          return { sky: 4, pty: 1 };
+  if (s === "cloudy" || s === "fog")               return { sky: 4, pty: 0 };
+  if (s === "partlycloudy")                        return { sky: 3, pty: 0 };
+  return { sky: 1, pty: 0 };
+}
+
+// Open-Meteo가 막혔을 때 쓰는 예비 소스 (무료, 키 불필요, User-Agent 필수)
+async function fetchMetNorway(city) {
+  const url =
+    `https://api.met.no/weatherapi/locationforecast/2.0/complete` +
+    `?lat=${city.lat.toFixed(4)}&lon=${city.lon.toFixed(4)}`;
+
+  const json = await fetchJson(url, { label: "MET Norway", attempts: 2 });
+  const series = json?.properties?.timeseries ?? [];
+  // 현재 시각에 가장 가까운(이미 지난 것 중 마지막) 예보 시점을 쓴다.
+  const now = Date.now();
+  const point = series.filter((t) => Date.parse(t.time) <= now).pop() ?? series[0];
+  const d = point?.data?.instant?.details;
+  if (!d || d.air_temperature == null) throw new Error("MET Norway 응답에 현재 값이 없음");
+
+  const next = point.data.next_1_hours ?? point.data.next_6_hours;
+  return {
+    source:       "MET Norway",
+    temperature:  d.air_temperature,
+    apparentTemp: d.apparent_air_temperature ?? d.air_temperature,
+    humidity:     d.relative_humidity ?? 0,
+    windSpeed:    d.wind_speed ?? 0,
+    windGust:     d.wind_speed_of_gust ?? d.wind_speed ?? 0,
+    precipProb:   next?.details?.probability_of_precipitation ?? 0,
+    ...metSymbolToCondition(next?.summary?.symbol_code),
+  };
+}
+
+// 미세먼지는 부가 정보라 실패해도 날씨는 그대로 보여준다 (-1 = 정보없음).
+async function fetchPm25(city) {
+  const url =
     `https://air-quality-api.open-meteo.com/v1/air-quality` +
     `?latitude=${city.lat}&longitude=${city.lon}` +
     `&current=pm2_5&timezone=Asia%2FSeoul`;
+  try {
+    const json = await fetchJson(url, { label: "미세먼지", attempts: 2, timeoutMs: 6000 });
+    const value = json?.current?.pm2_5;
+    return typeof value === "number" ? Math.round(value) : -1;
+  } catch {
+    return -1;
+  }
+}
 
-  const [weatherRes, aqRes] = await Promise.all([fetch(weatherUrl), fetch(aqUrl)]);
-  const [weatherJson, aqJson] = await Promise.all([weatherRes.json(), aqRes.json()]);
+async function getWeather(cityQuery) {
+  const city = findCity(cityQuery);
+  if (!city) return null;
 
-  const cur = weatherJson?.current;
-  if (!cur) return null;
+  const current = (async () => {
+    try {
+      return await fetchOpenMeteo(city);
+    } catch (err) {
+      console.log(`[날씨] Open-Meteo 실패, MET Norway로 전환: ${describeFetchError(err)}`);
+      return fetchMetNorway(city);
+    }
+  })();
 
-  const pm25 = Math.round(aqJson?.current?.pm2_5 ?? -1);
-  const { sky, pty } = weatherCodeToCondition(cur.weather_code ?? 0);
+  const [cur, pm25] = await Promise.all([current, fetchPm25(city)]);
+  const { sky, pty } = cur;
   const { fcstDate, fcstTime } = getNowKST();
+  console.log(`[날씨] ${city.name} 데이터 출처: ${cur.source}, 미세먼지: ${pm25 < 0 ? "없음" : pm25}`);
 
   return {
     cityName:     city.name,
-    temperature:  Math.round(cur.temperature_2m ?? 0).toString(),
-    apparentTemp: Math.round(cur.apparent_temperature ?? 0).toString(),
-    humidity:     Math.round(cur.relative_humidity_2m ?? 0).toString(),
-    windSpeed:    (cur.wind_speed_10m  ?? 0).toFixed(1),
-    windGust:     (cur.wind_gusts_10m  ?? 0).toFixed(1),
-    precipProb:   Math.round(cur.precipitation_probability ?? 0).toString(),
+    source:       cur.source,
+    temperature:  Math.round(cur.temperature).toString(),
+    apparentTemp: Math.round(cur.apparentTemp).toString(),
+    humidity:     Math.round(cur.humidity).toString(),
+    windSpeed:    Number(cur.windSpeed).toFixed(1),
+    windGust:     Number(cur.windGust).toFixed(1),
+    precipProb:   Math.round(cur.precipProb).toString(),
     pm25,
     sky,
     pty,
