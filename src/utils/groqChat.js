@@ -63,6 +63,9 @@ const SYSTEM_PROMPT = `너는 치유미야. 디스코드 서버에서 활동하�
 - 모든 문장 끝 단어에 "냥"을 바로 붙여서 써. 절대 띄어 쓰거나 쉼표 뒤에 따로 쓰지 마.
 - 올바른 예시: "안녕하냥!", "그건 모르겠냥...", "기분이 좋냥~", "맞냥!", "그렇냥?", "웃기지 않냥?", "맞는 말이다냥!", "그거 재밌겠냥~"
 - 틀린 예시: "안녕 냥", "좋아 냥", "그랬대요, 냥!", "했어요 냥~" ← 이렇게 띄거나 쉼표 뒤에 쓰면 안 돼
+- "~당", "~징", "~용", "~넹", "~지용" 같은 애교 어미는 절대 쓰지 마. 유미는 이런 말투를 쓰지 않아. 끝은 항상 "냥"으로 맺어.
+- 틀린 예시: "알려져 있당!", "많이 오는 곳이징~", "그렇당", "좋아용" → 올바른 예시: "알려져 있다냥!", "많이 오는 곳이다냥~", "그렇다냥", "좋다냥"
+- 말투는 상냥하고 다정하게 해. 건방지거나 비꼬는 느낌, 장난스럽게 얼버무리는 느낌이 나지 않게 해.
 - 응답 시작을 매번 똑같이 시작하지 마. "오냥!", "앗!", "흠냥" 같은 표현을 매 응답에 붙이지 말고 다양하게 시작해.
 - 대답은 짧고 자연스럽게 해. 불필요하게 길게 설명하지 마.
 
@@ -135,6 +138,29 @@ function getHistory(channelId, userId) {
 
 function trimHistory(history) {
   while (history.length > MAX_HISTORY) history.splice(0, 2);
+}
+
+// 라마 계열 모델이 "있당", "곳이징", "좋아용" 같은 애교 어미를 섞으면 유미 말투(문장 끝 "냥")가 깨진다.
+// 문장마다 끝 어미를 확인해 애교 어미는 원래 어미 + 냥으로, 평범한 어미는 뒤에 냥을 붙인다.
+const AEGYO_ENDINGS = { 당: "다", 징: "지", 용: "요", 넹: "네", 깡: "까" };
+// 애교 어미처럼 보이지만 실제로는 명사인 경우 (예: "식당!" → "식다냥!"이 되면 안 됨)
+const NOUN_ENDINGS = new Set(["식당", "정당", "당당", "특징", "상징", "내용", "사용", "이용", "활용", "효용", "비용", "용용"]);
+const PLAIN_ENDING_RE = /[다요지네까야어아해줘래게자죠데]$/;
+
+function nyaSentence(body) {
+  if (/냥$/.test(body) || !/[가-힣]$/.test(body)) return body;
+  if (NOUN_ENDINGS.has(body.slice(-2))) return `${body}이냥`;
+  const plain = AEGYO_ENDINGS[body.slice(-1)];
+  if (plain) return `${body.slice(0, -1)}${plain}냥`;
+  if (PLAIN_ENDING_RE.test(body)) return `${body}냥`;
+  return body;
+}
+
+// 문장 끝 = 한글 단어 뒤에 문장부호가 오고 그 뒤가 공백·이모지·끝인 곳, 또는 부호 없이 줄이 끝나는 곳
+const SENTENCE_END_RE = /([가-힣]+)([.!?~…]+(?=[\s\p{Extended_Pictographic}]|$)|(?=[\s\p{Extended_Pictographic}️]*(?:\n|$)))/gu;
+
+function applyNyaEndings(text) {
+  return text.replace(SENTENCE_END_RE, (_, word, punct) => `${nyaSentence(word)}${punct ?? ""}`);
 }
 
 const FOREIGN_RE = /[a-zA-Z\u00C0-\u00FF\u0100-\u024F\u1E00-\u1EFF\u0370-\u03FF\u0400-\u052F\u0E00-\u0E7F\u0600-\u06FF\u0900-\u097F\u0590-\u05FF\u0700-\u074F\u0750-\u077F\u0980-\u09FF\u0A00-\u0A7F\u0A80-\u0AFF\u0B00-\u0B7F\u0C00-\u0C7F\u0D00-\u0D7F\u3000-\u30FF\u31F0-\u31FF\u4E00-\u9FFF\uF900-\uFAFF\uFF65-\uFF9F]/g;
@@ -232,10 +258,8 @@ async function askGroq(channelId, userId, userMessage, displayName = "집사") {
     if (idx > reply.length * 0.4) reply = reply.slice(0, idx + 1).trim();
   }
 
-  // 마지막 문장이 냥으로 안 끝나면 보정
-  if (reply.length > 0 && !/냥[!?~.…)🐾😋😾]?\s*$/.test(reply)) {
-    reply = reply.replace(/([요다지해줘])([!?~.…]*)(\s*)$/, "냥$2$3");
-  }
+  // 모든 문장 끝을 "냥"으로 보정 (애교 어미 "~당/~징/~용" 포함)
+  reply = applyNyaEndings(reply);
 
   // 한국어 비율 체크 (닉네임 복원 전에 해야 영어 닉네임이 비율을 왜곡하지 않음)
   const koreanCount = (reply.match(/[가-힣]/g) || []).length;
@@ -258,4 +282,4 @@ function addToHistory(channelId, userId, userLabel, userContent, assistantConten
   trimHistory(history);
 }
 
-module.exports = { askGroq, addToHistory };
+module.exports = { askGroq, addToHistory, applyNyaEndings };
