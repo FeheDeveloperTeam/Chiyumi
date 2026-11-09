@@ -237,8 +237,8 @@ const WARN_ACTION_LABEL = { none: "없음", mute: "뮤트", kick: "킥", ban: "�
 const warnWizardState = new Map(); // `${userId}:${guildId}` → wizard state
 
 const CONSENT_AGREE_ID = "consent-action:agree";
-const TERMS_URL = "https://fehedeveloperteam.github.io/Chiyumi/terms.html";
-const PRIVACY_URL = "https://fehedeveloperteam.github.io/Chiyumi/privacy.html";
+const TERMS_URL = "https://www.fehe.dev/DiscordBot/Chiyumi/terms";
+const PRIVACY_URL = "https://www.fehe.dev/DiscordBot/Chiyumi/privacy";
 
 function hasManageGuild(interaction) {
   return Boolean(interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild));
