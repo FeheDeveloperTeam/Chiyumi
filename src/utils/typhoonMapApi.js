@@ -1,8 +1,9 @@
-// 태풍 위치도 — CartoDB 지도 타일 위에 태풍 위치·이동 방향 합성
+// 태풍 위치도 — Natural Earth 배경 지도(baseMap.js) 위에 태풍 위치·이동 방향 합성
 // (강수 레이더가 아닌 위치 추적 지도)
 
-const { createCanvas, loadImage, GlobalFonts } = require("@napi-rs/canvas");
+const { createCanvas, GlobalFonts } = require("@napi-rs/canvas");
 const { boldBase64, regularBase64 } = require("../assets/fontData");
+const { drawBaseMap } = require("./baseMap");
 
 GlobalFonts.register(Buffer.from(boldBase64,    "base64"), "Plex Bold");
 GlobalFonts.register(Buffer.from(regularBase64, "base64"), "Plex Regular");
@@ -25,20 +26,6 @@ function llToPx(lat, lon) {
   const latR  = lat * Math.PI / 180;
   const yf    = (1 - Math.log(Math.tan(latR) + 1 / Math.cos(latR)) / Math.PI) / 2 * N;
   return { x: (xf - TX[0]) * TS, y: (yf - TY[0]) * TS };
-}
-
-async function safeTile(url) {
-  try {
-    const ctrl = new AbortController();
-    const t    = setTimeout(() => ctrl.abort(), 8000);
-    const res  = await fetch(url, {
-      signal:  ctrl.signal,
-      headers: { "User-Agent": "ChiyumiBot/1.0" },
-    });
-    clearTimeout(t);
-    if (!res.ok) return null;
-    return loadImage(Buffer.from(await res.arrayBuffer()));
-  } catch { return null; }
 }
 
 function intensityColor(windKt) {
@@ -91,29 +78,10 @@ const LEGEND = [
 ];
 
 async function buildTyphoonMapImage(typhoons) {
-  // 1. 지도 타일 병렬 다운로드
-  const coords = [];
-  for (const y of TY) for (const x of TX) coords.push([x, y]);
-
-  const tiles = await Promise.all(
-    coords.map(([x, y]) =>
-      safeTile(`https://basemaps.cartocdn.com/dark_all/${ZOOM}/${x}/${y}.png`)
-    )
-  );
-
-  // 2. 메인 캔버스
+  // 1~2. 메인 캔버스 + 배경 지도 (CARTO 타일이 API 키를 요구하게 바뀌어 직접 그린다)
   const canvas = createCanvas(IMG_W, IMG_H);
   const ctx    = canvas.getContext("2d");
-
-  ctx.fillStyle = "#111827";
-  ctx.fillRect(0, 0, IMG_W, IMG_H);
-
-  coords.forEach(([x, y], i) => {
-    if (!tiles[i]) return;
-    const xi = TX.indexOf(x);
-    const yi = TY.indexOf(y);
-    ctx.drawImage(tiles[i], xi * TS, yi * TS, TS, TS);
-  });
+  drawBaseMap(ctx, { zoom: ZOOM, x0: TX[0], y0: TY[0], ts: TS, cols: TX.length, rows: TY.length });
 
   // 3. 참조 도시 마커
   for (const city of CITIES) {
@@ -182,7 +150,7 @@ async function buildTyphoonMapImage(typhoons) {
     ctx.fillStyle = "#57f287";
     ctx.font      = "bold 36px 'Plex Bold'";
     ctx.textAlign = "center";
-    ctx.fillText("활동 중인 태풍 없음 😸", IMG_W / 2, IMG_H / 2 + 14);
+    ctx.fillText("활동 중인 태풍 없음", IMG_W / 2, IMG_H / 2 + 14);
     ctx.textAlign = "left";
   }
 
@@ -218,7 +186,7 @@ async function buildTyphoonMapImage(typhoons) {
   ctx.fillStyle = "#e1aa74";
   ctx.font      = "bold 28px 'Plex Bold'";
   ctx.textAlign = "left";
-  ctx.fillText("🌀 태풍 위치도", 20, IMG_H - 12);
+  ctx.fillText("태풍 위치도", 20, IMG_H - 12);
   ctx.fillStyle = "#cccccc";
   ctx.font      = "22px 'Plex Regular'";
   ctx.textAlign = "center";
@@ -226,7 +194,7 @@ async function buildTyphoonMapImage(typhoons) {
   ctx.fillStyle = "#666666";
   ctx.font      = "18px 'Plex Regular'";
   ctx.textAlign = "right";
-  ctx.fillText("© CARTO · IBTrACS (NOAA)", IMG_W - 20, IMG_H - 12);
+  ctx.fillText("© Natural Earth · IBTrACS (NOAA)", IMG_W - 20, IMG_H - 12);
 
   // 8. 900×900 리사이즈
   const out  = createCanvas(OUT_W, OUT_H);

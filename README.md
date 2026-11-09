@@ -88,6 +88,7 @@ Chiyumi는 디스코드 서버 운영과 놀이 기능을 함께 제공하는 No
 - 국립국어원 우리말샘 Open API (끝말잇기 단어 사전 검증, `.env`에 `WORDCHAIN_DICT_API_KEY` 설정 시에만 동작, 미설정 시 끝말잇기 규칙만으로 검증)
 - Open-Meteo 날씨·대기질 API (날씨·미세먼지 조회, API 키 불필요) → 실패 시 MET Norway Locationforecast API로 전환 (API 키 불필요)
 - 기상청 API (강수 레이더·지진 지도, `.env`의 `KMA_API_KEY` 사용, 키가 유효하지 않으면 레이더는 RainViewer로 대체)
+- 레이더·지진·태풍 지도의 배경 지도는 외부 타일 없이 `src/utils/baseMap.js`가 `src/assets/eastAsiaMap.json`(Natural Earth 1:10m, 퍼블릭 도메인, 경도 110~149°·위도 20~50°만 잘라 단순화)으로 직접 그린다. 이전에 쓰던 CARTO 무료 타일은 API 키를 요구하도록 바뀌어 "API KEY REQUIRED" 타일만 내려온다
 - 호스팅 컨테이너의 IPv6 경로가 불안정해서 `src/index.js`에서 DNS를 IPv4 우선(`ipv4first`)으로 두고, 외부 요청 실패 로그에는 실제 원인 코드(`ENETUNREACH`, `ETIMEDOUT` 등)를 함께 남긴다
 
 ## 안내

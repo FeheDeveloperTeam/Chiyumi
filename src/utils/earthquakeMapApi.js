@@ -1,8 +1,9 @@
 // 기상청 지진정보 조회서비스 (공공데이터포털 KMA_API_KEY)
-// 최근 30일 지진 발생 위치를 CartoDB 지도 위에 표시
+// 최근 30일 지진 발생 위치를 Natural Earth 배경 지도(baseMap.js) 위에 표시
 
-const { createCanvas, loadImage, GlobalFonts } = require("@napi-rs/canvas");
+const { createCanvas, GlobalFonts } = require("@napi-rs/canvas");
 const { boldBase64, regularBase64 } = require("../assets/fontData");
+const { drawBaseMap } = require("./baseMap");
 const { getRecentEarthquakes } = require("./earthquakeApi");
 
 GlobalFonts.register(Buffer.from(boldBase64,    "base64"), "Plex Bold");
@@ -104,17 +105,6 @@ async function fetchKmaEarthquakes() {
   throw lastErr ?? new Error("KMA 모든 엔드포인트 실패");
 }
 
-async function safeTile(url) {
-  try {
-    const ctrl = new AbortController();
-    const t    = setTimeout(() => ctrl.abort(), 8000);
-    const res  = await fetch(url, { signal: ctrl.signal, headers: { "User-Agent": "ChiyumiBot/1.0" } });
-    clearTimeout(t);
-    if (!res.ok) return null;
-    return loadImage(Buffer.from(await res.arrayBuffer()));
-  } catch { return null; }
-}
-
 async function buildEarthquakeMapImage() {
   // 1. 지진 데이터: KMA 우선, 실패 시 USGS fallback
   let quakes = [];
@@ -147,27 +137,10 @@ async function buildEarthquakeMapImage() {
     }
   }
 
-  // 2. 지도 타일
-  const coords = [];
-  for (const y of TILE_H) for (const x of TILE_W) coords.push([x, y]);
-
-  const tiles = await Promise.all(
-    coords.map(([x, y]) =>
-      safeTile(`https://basemaps.cartocdn.com/dark_all/${ZOOM}/${x}/${y}.png`)
-    )
-  );
-
-  // 3. 캔버스
+  // 2~3. 캔버스 + 배경 지도 (CARTO 타일이 API 키를 요구하게 바뀌어 직접 그린다)
   const canvas = createCanvas(IMG_W, IMG_H);
   const ctx    = canvas.getContext("2d");
-  ctx.fillStyle = "#111827";
-  ctx.fillRect(0, 0, IMG_W, IMG_H);
-
-  coords.forEach(([x, y], i) => {
-    if (!tiles[i]) return;
-    const xi = TILE_W.indexOf(x), yi = TILE_H.indexOf(y);
-    ctx.drawImage(tiles[i], xi * TS, yi * TS, TS, TS);
-  });
+  drawBaseMap(ctx, { zoom: ZOOM, x0: TILE_W[0], y0: TILE_H[0], ts: TS, cols: TILE_W.length, rows: TILE_H.length });
 
   // 4. 지진 마커 (작은 것 먼저 → 큰 것 위에)
   const sorted = [...quakes].sort((a, b) => a.mag - b.mag);
@@ -205,7 +178,7 @@ async function buildEarthquakeMapImage() {
     ctx.fillStyle = "#57f287";
     ctx.font      = "bold 34px 'Plex Bold'";
     ctx.textAlign = "center";
-    ctx.fillText("최근 30일 지진 없음 😸", IMG_W / 2, IMG_H / 2 + 13);
+    ctx.fillText("최근 30일 지진 없음", IMG_W / 2, IMG_H / 2 + 13);
     ctx.textAlign = "left";
   }
 
@@ -244,11 +217,11 @@ async function buildEarthquakeMapImage() {
   ctx.fillStyle = "#e1aa74";
   ctx.font      = "bold 28px 'Plex Bold'";
   ctx.textAlign = "left";
-  ctx.fillText("🔴 지진 발생 현황 (최근 30일)", 20, IMG_H - 12);
+  ctx.fillText("지진 발생 현황 (최근 30일)", 20, IMG_H - 12);
   ctx.fillStyle = "#cccccc";
   ctx.font      = "20px 'Plex Regular'";
   ctx.textAlign = "right";
-  ctx.fillText(`기준: ${nowStr} · 출처: ${dataSource} · CARTO`, IMG_W - 20, IMG_H - 12);
+  ctx.fillText(`기준: ${nowStr} · 출처: ${dataSource} · Natural Earth`, IMG_W - 20, IMG_H - 12);
 
   // 8. 리사이즈
   const out  = createCanvas(OUT_W, OUT_H);

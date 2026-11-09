@@ -383,7 +383,7 @@ module.exports = {
           .setTitle(title)
           .setDescription(formatEarthquakeResponse(quakes))
           .addFields(eqkFields)
-          .setFooter({ text: "출처: USGS · 기상청 지진정보 조회서비스 · CARTO" })
+          .setFooter({ text: "출처: USGS · 기상청 지진정보 조회서비스 · Natural Earth" })
           .setTimestamp();
 
         if (mapBuf) embed.setImage("attachment://earthquake_map.png");
@@ -409,7 +409,7 @@ module.exports = {
           .setColor(0x2c5aa0)
           .setTitle("📡 강수 레이더 (한반도 주변)")
           .setImage("attachment://radar.png")
-          .setFooter({ text: "RainViewer · CARTO" })
+          .setFooter({ text: "RainViewer · Natural Earth" })
           .setTimestamp();
         await message.reply({
           embeds: [radarEmbed],
@@ -501,7 +501,7 @@ module.exports = {
             .setColor(0x2c5aa0)
             .setTitle("📡 강수 레이더 (한반도 주변)")
             .setImage("attachment://radar.png")
-            .setFooter({ text: "RainViewer · CARTO" })
+            .setFooter({ text: "RainViewer · Natural Earth" })
             .setTimestamp();
           await message.channel.send({
             embeds: [radarEmbed],

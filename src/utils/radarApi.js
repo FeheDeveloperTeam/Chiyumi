@@ -1,5 +1,5 @@
 // 기상청 apihub 합성 레이더 이미지 (KMA_API_KEY 사용)
-// 실패 시 RainViewer + cors.eu.org 프록시로 fallback
+// 실패 시 RainViewer 타일 + 직접 그린 배경 지도(Natural Earth)로 fallback
 
 const { createCanvas, loadImage, GlobalFonts } = require("@napi-rs/canvas");
 const { boldBase64, regularBase64 } = require("../assets/fontData");
@@ -142,12 +142,6 @@ async function fetchRainViewerTiles() {
   const coords = [];
   for (const y of TILE_H) for (const x of TILE_W) coords.push([x, y]);
 
-  const baseTiles = await Promise.all(
-    coords.map(([x, y]) =>
-      safeTile(`https://basemaps.cartocdn.com/dark_all/${ZOOM}/${x}/${y}.png`, `base(${x},${y})`)
-    )
-  );
-
   // 타일: 직접 요청 먼저 (Node.js는 CORS 없음), 실패 시 프록시 순서대로
   const TILE_MAKERS = [
     (u) => u,  // 직접
@@ -165,8 +159,40 @@ async function fetchRainViewerTiles() {
     if (loaded >= 5) break;
   }
 
-  console.log(`[레이더] 최종 base=${baseTiles.filter(Boolean).length}/9, radar=${radarLoaded}/9`);
-  return { type: "rainviewer", baseTiles, radarTiles, coords, radarTime, radarLoaded };
+  console.log(`[레이더] 최종 radar=${radarLoaded}/9`);
+  return { type: "rainviewer", radarTiles, coords, radarTime, radarLoaded };
+}
+
+// ── 배경 지도: 공용 baseMap.js(Natural Earth 해안선·국경)로 그린다 ─────
+// CARTO 무료 타일이 API 키를 요구하도록 바뀌어 "API KEY REQUIRED" 타일만 내려와서 교체했다.
+const { drawBaseMap, makeProjector } = require("./baseMap");
+const GRID    = { zoom: ZOOM, x0: TILE_W[0], y0: TILE_H[0], ts: TS, cols: TILE_W.length, rows: TILE_H.length };
+const project = makeProjector(GRID);
+
+const MAP_CITIES = [
+  { name: "서울", lon: 126.978, lat: 37.566 },
+  { name: "강릉", lon: 128.876, lat: 37.752 },
+  { name: "대전", lon: 127.385, lat: 36.350 },
+  { name: "대구", lon: 128.601, lat: 35.871 },
+  { name: "광주", lon: 126.853, lat: 35.160 },
+  { name: "부산", lon: 129.076, lat: 35.180 },
+  { name: "제주", lon: 126.531, lat: 33.500 },
+];
+
+// 레이더를 덮은 뒤에도 위치를 알 수 있게 도시 표시는 맨 위에 그린다.
+function drawCityLabels(ctx) {
+  ctx.font      = "bold 26px 'Plex Bold'";
+  ctx.textAlign = "left";
+  for (const c of MAP_CITIES) {
+    const [x, y] = project(c.lon, c.lat);
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth   = 5;
+    ctx.strokeStyle = "rgba(0,0,0,0.85)";
+    ctx.strokeText(c.name, x + 11, y + 9);
+    ctx.fillStyle = "#f3f4f6";
+    ctx.fillText(c.name, x + 11, y + 9);
+  }
 }
 
 // ── 캔버스 합성 ───────────────────────────────────────────────
@@ -199,20 +225,21 @@ async function buildRadarImage() {
   if (!hasData) {
     const rv = await fetchRainViewerTiles();
     if (rv) {
+      drawBaseMap(ctx, GRID);
       rv.coords.forEach(([x, y], i) => {
         const xi = TILE_W.indexOf(x), yi = TILE_H.indexOf(y);
         const dx = xi * TS, dy = yi * TS;
-        if (rv.baseTiles[i])  ctx.drawImage(rv.baseTiles[i], dx, dy, TS, TS);
         if (rv.radarTiles[i]) {
           ctx.globalAlpha = 0.85;
           ctx.drawImage(rv.radarTiles[i], dx, dy, TS, TS);
           ctx.globalAlpha = 1.0;
         }
       });
+      drawCityLabels(ctx);
       if (rv.radarLoaded > 0) {
         hasData   = true;
         timeLabel = rv.radarTime ? kstLabel(rv.radarTime) : "시간 불명";
-        source    = "CARTO · RainViewer";
+        source    = "RainViewer · Natural Earth";
         console.log("[레이더] RainViewer 타일 사용");
       }
     }
@@ -265,7 +292,7 @@ async function buildRadarImage() {
   ctx.fillStyle = "#e1aa74";
   ctx.font      = "bold 28px 'Plex Bold'";
   ctx.textAlign = "left";
-  ctx.fillText("🌧 강수 레이더", 20, IMG_H - 12);
+  ctx.fillText("강수 레이더", 20, IMG_H - 12); // 캔버스 글꼴에 이모지가 없어 네모로 찍혀서 뺐다
   ctx.fillStyle = "#cccccc";
   ctx.font      = "22px 'Plex Regular'";
   ctx.textAlign = "center";
