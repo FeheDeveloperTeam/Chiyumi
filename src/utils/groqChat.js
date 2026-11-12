@@ -165,6 +165,23 @@ function applyNyaEndings(text) {
 
 const FOREIGN_RE = /[a-zA-Z\u00C0-\u00FF\u0100-\u024F\u1E00-\u1EFF\u0370-\u03FF\u0400-\u052F\u0E00-\u0E7F\u0600-\u06FF\u0900-\u097F\u0590-\u05FF\u0700-\u074F\u0750-\u077F\u0980-\u09FF\u0A00-\u0A7F\u0A80-\u0AFF\u0B00-\u0B7F\u0C00-\u0C7F\u0D00-\u0D7F\u3000-\u30FF\u31F0-\u31FF\u4E00-\u9FFF\uF900-\uFAFF\uFF65-\uFF9F]/g;
 
+// 위에서부터 차례로 시도하고, 실패하면 다음 모델로 넘어간다.
+// - Groq llama-3.3-70b-versatile은 2026-11 기준 Groq에서 내려가 404(model_not_found)를 낸다.
+// - OpenRouter 유료 llama는 무료 계정 크레딧이 바닥나 402가 나서 무료(:free) 모델을 쓴다.
+// Groq 추론 모델은 생각 토큰도 한도에 포함되므로 max_tokens를 넉넉히 둔다(답 길이는 프롬프트로 제한).
+const AI_PROVIDERS = [
+  { name: "Groq qwen3.8-27b", client: groqClient, params: { model: "qwen/qwen3.8-27b", reasoning_format: "hidden", max_tokens: 1024 } },
+  { name: "Groq gpt-oss-120b", client: groqClient, params: { model: "openai/gpt-oss-120b", reasoning_effort: "low", include_reasoning: false, max_tokens: 1024 } },
+  { name: "OpenRouter gemma-4-31b", client: openrouterClient, params: { model: "google/gemma-4-31b-it:free", max_tokens: 500 } },
+  { name: "Mistral small", client: mistralClient, params: { model: "mistral-small-latest", max_tokens: 500 } },
+];
+
+// 대체 AI로 넘어갈 때 원인을 남긴다. 예전에는 오류를 삼켜서 AI-004만 보이고 이유를 알 수 없었다.
+function logAiError(provider, err) {
+  const detail = err?.error?.error?.message ?? err?.error?.message ?? err?.message ?? String(err);
+  console.error(`[AI] ${provider} 실패 (${err?.status ?? err?.cause?.code ?? "?"}): ${String(detail).slice(0, 200)}`);
+}
+
 async function askGroq(channelId, userId, userMessage, displayName = "집사") {
   const isDev = userId === DEVELOPER_ID;
 
@@ -185,34 +202,21 @@ async function askGroq(channelId, userId, userMessage, displayName = "집사") {
 
   const messages = [{ role: "system", content: SYSTEM_PROMPT + memoryNote }, ...history];
   let response;
-  try {
-    response = await groqClient.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages,
-      max_tokens: 500,
-      temperature: 0.75,
-    });
-  } catch {
+  for (const { name, client, params } of AI_PROVIDERS) {
     try {
-      response = await openrouterClient.chat.completions.create({
-        model: "meta-llama/llama-3.3-70b-instruct",
-        messages,
-        max_tokens: 500,
-        temperature: 0.75,
-      });
-    } catch {
-      try {
-        response = await mistralClient.chat.completions.create({
-          model: "mistral-small-latest",
-          messages,
-          max_tokens: 500,
-          temperature: 0.75,
-        });
-      } catch {
-        history.pop();
-        return "지금 말하기가 어렵냥... 잠깐 후에 다시 말 걸어줘냥! (오류 코드: AI-004)";
+      const res = await client.chat.completions.create({ messages, temperature: 0.75, ...params });
+      if (!res.choices?.[0]?.message?.content?.trim() && res.choices?.[0]?.finish_reason !== "content_filter") {
+        throw new Error(`빈 응답 (finish_reason: ${res.choices?.[0]?.finish_reason})`);
       }
+      response = res;
+      break;
+    } catch (err) {
+      logAiError(name, err);
     }
+  }
+  if (!response) {
+    history.pop();
+    return "지금 말하기가 어렵냥... 잠깐 후에 다시 말 걸어줘냥! (오류 코드: AI-004)";
   }
 
   if (response.choices[0]?.finish_reason === "content_filter") {

@@ -42,7 +42,7 @@ Chiyumi는 디스코드 서버 운영과 놀이 기능을 함께 제공하는 No
 
 ### 🤖 AI 채팅
 
-"유미야"로 시작하는 메시지를 보내면 치유미가 AI로 응답합니다. Groq → OpenRouter → Mistral 순서로 자동 폴백되며, 채널별로 대화 맥락을 유지합니다. 응답은 문장마다 끝을 "냥"으로 보정하며, 모델이 섞는 "~당/~징/~용" 같은 애교 어미도 "~다냥/~지냥/~요냥"으로 바꿉니다(`src/utils/groqChat.js`의 `applyNyaEndings`).
+"유미야"로 시작하는 메시지를 보내면 치유미가 AI로 응답합니다. Groq(`qwen/qwen3.8-27b` → `openai/gpt-oss-120b`) → OpenRouter(`google/gemma-4-31b-it:free`) → Mistral 순서로 자동 폴백되며(모델 목록은 `groqChat.js`의 `AI_PROVIDERS`, 실패한 단계는 `[AI] … 실패` 로그로 남음), 채널별로 대화 맥락을 유지합니다. 응답은 문장마다 끝을 "냥"으로 보정하며, 모델이 섞는 "~당/~징/~용" 같은 애교 어미도 "~다냥/~지냥/~요냥"으로 바꿉니다(`src/utils/groqChat.js`의 `applyNyaEndings`).
 
 **기억 기능** — 유저별로 정보를 Supabase에 영구 저장하며, 이후 대화에 자동 반영됩니다.
 
