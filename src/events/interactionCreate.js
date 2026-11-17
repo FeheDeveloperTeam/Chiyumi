@@ -126,6 +126,7 @@ const { buildStreamAlertPage, buildPlatformButtons, PLATFORM_LABELS } = require(
 const { buildMarketEmbed, buildPortfolioEmbed, buildStockRow } = require("../commands/stock");
 const { buildGambleEmbed, buildGambleRow } = require("../commands/gamble");
 const { buildBankEmbed, buildBankRow } = require("../commands/bank");
+const { YUMI_CHANNEL_SELECT_ID, handleYumiChannelSelect } = require("../commands/yumiChannel");
 const { getStockDef, getCurrentPrices, getPortfolio, getPortfolioValue, clearPortfolio, buyStock, sellStock } = require("../utils/stocks");
 const { getAccount, getTotalOwed, deposit, withdraw, takeLoan, repayLoan, declareBankruptcy, getRebirthCooldownMs, MAX_LOAN, MIN_LOAN } = require("../utils/bank");
 const {
@@ -2286,6 +2287,11 @@ async function handleStringSelect(interaction) {
 }
 
 async function handleChannelSelect(interaction) {
+  if (interaction.customId === YUMI_CHANNEL_SELECT_ID) {
+    await handleYumiChannelSelect(interaction);
+    return;
+  }
+
   if (interaction.customId === STREAMALERT_NOTIFCHANNEL_SELECT) {
     await handleStreamAlertChannelSelect(interaction);
     return;

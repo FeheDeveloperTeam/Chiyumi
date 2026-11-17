@@ -336,7 +336,7 @@ function getWordChainChannelId(guildId) {
 }
 
 // AI 대화("유미야 …")를 쓸 수 있는 채널 목록. 비어 있으면 그 서버에서는 AI 대화를 쓸 수 없다.
-const AI_CHANNEL_LIMIT = 10;
+const AI_CHANNEL_LIMIT = 25; // 디스코드 채널 선택 메뉴 최대 선택 수와 같다
 
 function getAiChannelIds(guildId) {
   const configs = loadAll();
