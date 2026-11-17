@@ -152,7 +152,7 @@ async function handleProfanity(message) {
 }
 
 // ── AI 대화 채널 제한 ──
-// 서버 관리자가 /ai채널로 지정한 채널(과 그 안의 스레드)에서만 "유미야" 대화를 받는다.
+// 서버 관리자가 /유미채널설정로 지정한 채널(과 그 안의 스레드)에서만 "유미야" 대화를 받는다.
 // 지정한 채널이 없으면 그 서버에서는 아무도 쓸 수 없다. DM은 제한하지 않는다.
 function isAiChannelAllowed(message) {
   const allowed = getAiChannelIds(message.guild.id);
@@ -179,12 +179,12 @@ async function sendAiChannelNotice(message) {
   let text;
   if (!live.length) {
     text = isAdmin
-      ? "아직 AI 대화 채널이 지정되지 않았다냥! `/ai채널 추가`로 유미와 대화할 채널을 먼저 지정한 다음 그 채널에서 불러줘냥~ (오류 코드: AI-007)"
+      ? "아직 AI 대화 채널이 지정되지 않았다냥! `/유미채널설정 추가`로 유미와 대화할 채널을 먼저 지정한 다음 그 채널에서 불러줘냥~ (오류 코드: AI-007)"
       : "이 서버에서는 아직 유미와 AI 대화를 할 수 있는 채널이 정해지지 않았다냥. 서버 관리진에게 문의해줘냥! (오류 코드: AI-007)";
   } else {
     const where = live.map((id) => `<#${id}>`).join(", ");
     text = isAdmin
-      ? `여기는 AI 대화 채널이 아니다냥! ${where}에서 불러주거나, 이 채널도 쓰려면 \`/ai채널 추가\`로 지정해줘냥~ (오류 코드: AI-008)`
+      ? `여기는 AI 대화 채널이 아니다냥! ${where}에서 불러주거나, 이 채널도 쓰려면 \`/유미채널설정 추가\`로 지정해줘냥~ (오류 코드: AI-008)`
       : `여기서는 유미와 AI 대화를 할 수 없다냥! ${where}에서 "유미야"로 불러줘냥~ (오류 코드: AI-008)`;
   }
 
