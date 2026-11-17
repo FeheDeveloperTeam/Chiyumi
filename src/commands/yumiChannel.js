@@ -2,7 +2,6 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  ChannelSelectMenuBuilder,
   ChannelType,
   EmbedBuilder,
   PermissionFlagsBits,
@@ -15,22 +14,39 @@ const { AI_CHANNEL_LIMIT, getAiChannelIds, setAiChannelIds } = require("../utils
 // /유미채널설정 — "유미야 …" AI 대화를 쓸 수 있는 채널을 정하는 설정 패널(관리자 전용, 나만 보기).
 // 채널을 하나도 정하지 않으면 그 서버에서는 AI 대화를 쓸 수 없다. 정한 채널 안의 스레드에서도 대화할 수 있다
 // (messageCreate의 isAiChannelAllowed 참고).
-//  - 채널 추가: 채널 선택 메뉴에서 여러 채널을 한꺼번에 골라 더한다.
-//  - 채널 빼기: 지금 목록에서 뺄 채널을 여러 개 고른다.
+//  - 채널 추가: 아직 추가하지 않은 채널만 보여 주는 선택 메뉴(25개씩 쪽 넘김)에서 여러 개 골라 더한다.
+//    디스코드 기본 채널 선택 메뉴는 특정 채널을 숨길 수 없어서 일반 선택 메뉴로 직접 목록을 만든다.
+//  - 채널 제거: 이미 등록된 채널만 보여 주는 메뉴에서 뺄 채널을 여러 개 고른다.
 //  - 모두 삭제: 확인 버튼을 한 번 더 눌러야 지운다.
 
 const PREFIX = "yumichannel:";
 const IDS = {
-  add: `${PREFIX}add`,
+  add: `${PREFIX}add:`, // 뒤에 쪽 번호
+  page: `${PREFIX}page:`, // 뒤에 이동할 쪽 번호
   remove: `${PREFIX}remove`,
   reset: `${PREFIX}reset`,
   resetConfirm: `${PREFIX}reset-confirm`,
   resetCancel: `${PREFIX}reset-cancel`,
 };
+const PAGE_SIZE = 25; // 선택 메뉴 한 개에 넣을 수 있는 최대 항목 수
 const ALLOWED_TYPES = [ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildForum];
 
 function liveChannelIds(guild) {
-  return getAiChannelIds(guild.id).filter((id) => guild.channels.cache.has(id));
+  // 최대 개수를 넘는 값이 들어 있어도(예: 파일 직접 수정) 선택 메뉴 한도(25개)를 넘지 않게 자른다.
+  return getAiChannelIds(guild.id).filter((id) => guild.channels.cache.has(id)).slice(0, AI_CHANNEL_LIMIT);
+}
+
+// 아직 추가하지 않은 채널(텍스트·공지·포럼)을 디스코드 채널 목록 순서대로 돌려준다.
+function addableChannels(guild) {
+  const live = new Set(liveChannelIds(guild));
+  const order = (c) => [c.parent?.rawPosition ?? -1, c.rawPosition ?? 0];
+  return [...guild.channels.cache.values()]
+    .filter((c) => ALLOWED_TYPES.includes(c.type) && !live.has(c.id))
+    .sort((a, b) => {
+      const [pa, ca] = order(a);
+      const [pb, cb] = order(b);
+      return pa - pb || ca - cb;
+    });
 }
 
 function buildEmbed(guild, notice) {
@@ -51,8 +67,8 @@ function buildEmbed(guild, notice) {
     .addFields({
       name: "사용 방법",
       value: [
-        "➕ **채널 추가** — 메뉴에서 여러 채널을 한꺼번에 골라 더합니다",
-        "➖ **채널 빼기** — 지금 목록에서 뺄 채널을 고릅니다",
+        "➕ **채널 추가** — 아직 추가하지 않은 채널 중에서 여러 개를 골라 더합니다",
+        "➖ **채널 제거** — 이미 등록된 채널 중에서 뺄 채널을 고릅니다",
         "🗑️ **모두 삭제** — 정한 채널을 전부 지워 AI 대화를 끕니다",
       ].join("\n"),
     })
@@ -60,47 +76,89 @@ function buildEmbed(guild, notice) {
   return embed;
 }
 
-function buildPanel(guild, notice) {
+function buildPanel(guild, notice, page = 0) {
   const live = liveChannelIds(guild);
   const rows = [];
 
+  // ➕ 채널 추가: 등록되지 않은 채널만, 25개씩 쪽으로 나눈다.
+  const candidates = addableChannels(guild);
+  const pageCount = Math.max(1, Math.ceil(candidates.length / PAGE_SIZE));
+  page = Math.min(Math.max(0, page), pageCount - 1);
+  const pageItems = candidates.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const room = AI_CHANNEL_LIMIT - live.length;
-  rows.push(
-    new ActionRowBuilder().addComponents(
-      new ChannelSelectMenuBuilder()
-        .setCustomId(IDS.add)
-        .setPlaceholder(room > 0 ? "➕ 채널 추가 (여러 개 선택 가능)" : `최대 ${AI_CHANNEL_LIMIT}개까지 정할 수 있습니다`)
-        .setChannelTypes(...ALLOWED_TYPES)
-        .setMinValues(1)
-        .setMaxValues(Math.max(1, room))
-        .setDisabled(room <= 0),
-    ),
-  );
+  const canAdd = room > 0 && pageItems.length > 0;
+  const addMenu = new StringSelectMenuBuilder()
+    .setCustomId(`${IDS.add}${page}`)
+    .setPlaceholder(
+      room <= 0
+        ? `최대 ${AI_CHANNEL_LIMIT}개까지 정할 수 있습니다`
+        : candidates.length
+          ? `➕ 채널 추가 (여러 개 선택 가능)${pageCount > 1 ? ` · ${page + 1}/${pageCount}쪽` : ""}`
+          : "추가할 수 있는 채널이 없습니다",
+    )
+    .setMinValues(1)
+    .setMaxValues(canAdd ? Math.min(room, pageItems.length) : 1)
+    .setDisabled(!canAdd);
+  if (pageItems.length) {
+    addMenu.addOptions(
+      pageItems.map((c) => ({
+        label: `#${c.name}`.slice(0, 100),
+        value: c.id,
+        ...(c.parent ? { description: c.parent.name.slice(0, 100) } : {}),
+      })),
+    );
+  } else {
+    addMenu.addOptions({ label: "추가할 수 있는 채널이 없습니다", value: "none" });
+  }
+  rows.push(new ActionRowBuilder().addComponents(addMenu));
 
+  // ➖ 채널 제거: 이미 등록된 채널만.
   if (live.length) {
-    const names = live.map((id) => ({ id, name: guild.channels.cache.get(id)?.name ?? id }));
     rows.push(
       new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
           .setCustomId(IDS.remove)
-          .setPlaceholder("➖ 채널 빼기 (여러 개 선택 가능)")
+          .setPlaceholder("➖ 채널 제거 (여러 개 선택 가능)")
           .setMinValues(1)
-          .setMaxValues(names.length)
-          .addOptions(names.map(({ id, name }) => ({ label: `#${name}`.slice(0, 100), value: id }))),
+          .setMaxValues(live.length)
+          .addOptions(
+            live.map((id) => {
+              const c = guild.channels.cache.get(id);
+              return {
+                label: `#${c?.name ?? id}`.slice(0, 100),
+                value: id,
+                ...(c?.parent ? { description: c.parent.name.slice(0, 100) } : {}),
+              };
+            }),
+          ),
       ),
     );
   }
 
-  rows.push(
-    new ActionRowBuilder().addComponents(
+  const buttons = [];
+  if (pageCount > 1) {
+    buttons.push(
       new ButtonBuilder()
-        .setCustomId(IDS.reset)
-        .setLabel("모두 삭제")
-        .setEmoji("🗑️")
-        .setStyle(ButtonStyle.Danger)
-        .setDisabled(!live.length),
-    ),
+        .setCustomId(`${IDS.page}${page - 1}`)
+        .setLabel("◀ 이전 쪽")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(page === 0),
+      new ButtonBuilder()
+        .setCustomId(`${IDS.page}${page + 1}`)
+        .setLabel("다음 쪽 ▶")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(page >= pageCount - 1),
+    );
+  }
+  buttons.push(
+    new ButtonBuilder()
+      .setCustomId(IDS.reset)
+      .setLabel("모두 삭제")
+      .setEmoji("🗑️")
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(!live.length),
   );
+  rows.push(new ActionRowBuilder().addComponents(buttons));
 
   return { content: null, embeds: [buildEmbed(guild, notice)], components: rows };
 }
@@ -134,21 +192,27 @@ async function handleComponent(interaction) {
   const { guild, customId } = interaction;
   const live = liveChannelIds(guild);
 
-  if (customId === IDS.add) {
-    const fresh = interaction.values.filter((id) => !live.includes(id));
+  if (customId.startsWith(IDS.page)) {
+    await interaction.update(buildPanel(guild, null, Number(customId.slice(IDS.page.length)) || 0));
+    return;
+  }
+
+  if (customId.startsWith(IDS.add)) {
+    const page = Number(customId.slice(IDS.add.length)) || 0;
+    const fresh = interaction.values.filter((id) => id !== "none" && !live.includes(id) && guild.channels.cache.has(id));
     const added = fresh.slice(0, AI_CHANNEL_LIMIT - live.length);
     const skipped = fresh.length - added.length;
     if (added.length) setAiChannelIds(guild.id, [...live, ...added]);
     const notice = added.length
       ? `${added.map((id) => `<#${id}>`).join(", ")} 추가 완료냥!${skipped ? ` (최대 개수를 넘어 ${skipped}개는 추가하지 못했다냥)` : ""}`
       : "고른 채널은 이미 모두 목록에 있다냥";
-    await interaction.update(buildPanel(guild, notice));
+    await interaction.update(buildPanel(guild, notice, page));
     return;
   }
 
   if (customId === IDS.remove) {
     setAiChannelIds(guild.id, live.filter((id) => !interaction.values.includes(id)));
-    await interaction.update(buildPanel(guild, `${interaction.values.map((id) => `<#${id}>`).join(", ")} 빼기 완료냥!`));
+    await interaction.update(buildPanel(guild, `${interaction.values.map((id) => `<#${id}>`).join(", ")} 제거 완료냥!`));
     return;
   }
 
@@ -168,7 +232,7 @@ async function handleComponent(interaction) {
   }
 }
 
-const DESCRIPTION = nya("유미와 \"유미야\" AI 대화를 할 수 있는 채널을 추가·빼기·삭제하는 설정 패널을 여는 명령어입니다");
+const DESCRIPTION = nya("유미와 \"유미야\" AI 대화를 할 수 있는 채널을 추가·제거·삭제하는 설정 패널을 여는 명령어입니다");
 
 module.exports = {
   category: "관리",
