@@ -80,6 +80,8 @@ Chiyumi는 디스코드 서버 운영과 놀이 기능을 함께 제공하는 No
 
 ## 개발 정보
 
+- 호스팅(CoredLab) 제어: `node scripts/coredlab.js status | restart | start | stop | logs [초]` — `.env`의 `COREDLAB_API_KEY`, `COREDLAB_SERVER_ID`(선택 `COREDLAB_BASE_URL`, 기본 `https://host.coredlabgame.cloud`)를 사용합니다.
+
 - Node.js
 - discord.js
 - @napi-rs/canvas (순위 카드 이미지 생성)
