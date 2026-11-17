@@ -335,6 +335,21 @@ function getWordChainChannelId(guildId) {
   return configs[guildId]?.wordChainChannelId ?? null;
 }
 
+// AI 대화("유미야 …")를 쓸 수 있는 채널 목록. 비어 있으면 그 서버에서는 AI 대화를 쓸 수 없다.
+const AI_CHANNEL_LIMIT = 10;
+
+function getAiChannelIds(guildId) {
+  const configs = loadAll();
+  const ids = configs[guildId]?.aiChannelIds;
+  return Array.isArray(ids) ? ids : [];
+}
+
+function setAiChannelIds(guildId, channelIds) {
+  const configs = loadAll();
+  configs[guildId] = { ...(configs[guildId] ?? {}), aiChannelIds: [...new Set(channelIds)] };
+  saveAll(configs);
+}
+
 function setSupportMessage(guildId, channelId, messageId) {
   const configs = loadAll();
   configs[guildId] = { ...(configs[guildId] ?? {}), supportChannelId: channelId, supportMessageId: messageId };
@@ -383,6 +398,9 @@ module.exports = {
   setRaidLocked,
   setWordChainChannel,
   getWordChainChannelId,
+  AI_CHANNEL_LIMIT,
+  getAiChannelIds,
+  setAiChannelIds,
   setSupportMessage,
   getAllConfigs,
   getWarnConfig,

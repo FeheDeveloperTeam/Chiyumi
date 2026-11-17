@@ -1,8 +1,8 @@
-const { Events, EmbedBuilder, AttachmentBuilder, escapeMarkdown } = require("discord.js");
+const { Events, EmbedBuilder, AttachmentBuilder, PermissionFlagsBits, escapeMarkdown } = require("discord.js");
 const { nya } = require("../utils/nya");
 const { containsProfanity } = require("../utils/profanityFilter");
 const { isSpam } = require("../utils/spamFilter");
-const { getLogOptions, getSpamLevel, sendLog } = require("../utils/guildConfig");
+const { getLogOptions, getSpamLevel, sendLog, getAiChannelIds } = require("../utils/guildConfig");
 const { grantActivityReward, levelFromXp } = require("../utils/levels");
 const { addBalance } = require("../utils/credits");
 const { announceLevelUp } = require("../utils/levelUpAnnounce");
@@ -151,6 +151,49 @@ async function handleProfanity(message) {
   await sendLog(message.guild, embed, "profanityFilter");
 }
 
+// ── AI 대화 채널 제한 ──
+// 서버 관리자가 /ai채널로 지정한 채널(과 그 안의 스레드)에서만 "유미야" 대화를 받는다.
+// 지정한 채널이 없으면 그 서버에서는 아무도 쓸 수 없다. DM은 제한하지 않는다.
+function isAiChannelAllowed(message) {
+  const allowed = getAiChannelIds(message.guild.id);
+  if (!allowed.length) return false;
+  const channelId = message.channel.isThread() ? message.channel.parentId : message.channel.id;
+  return allowed.includes(channelId);
+}
+
+const AI_NOTICE_DELETE_MS = 10_000;
+const AI_NOTICE_COOLDOWN_MS = 30_000;
+const aiNoticeCooldown = new Map(); // `${guildId}_${userId}` → 마지막 안내 시각
+
+// 일반 메시지에는 "나만 보기"(ephemeral)를 쓸 수 없어서, 답장으로 안내하고 10초 뒤 지운다.
+// 같은 사람에게 30초 안에 또 안내하지는 않는다(안내 메시지로 채널이 도배되지 않게).
+async function sendAiChannelNotice(message) {
+  const key = `${message.guild.id}_${message.author.id}`;
+  const now = Date.now();
+  if (now - (aiNoticeCooldown.get(key) ?? 0) < AI_NOTICE_COOLDOWN_MS) return;
+  aiNoticeCooldown.set(key, now);
+
+  const isAdmin = message.member?.permissions.has(PermissionFlagsBits.ManageGuild) ?? false;
+  const live = getAiChannelIds(message.guild.id).filter((id) => message.guild.channels.cache.has(id));
+
+  let text;
+  if (!live.length) {
+    text = isAdmin
+      ? "아직 AI 대화 채널이 지정되지 않았다냥! `/ai채널 추가`로 유미와 대화할 채널을 먼저 지정한 다음 그 채널에서 불러줘냥~ (오류 코드: AI-007)"
+      : "이 서버에서는 아직 유미와 AI 대화를 할 수 있는 채널이 정해지지 않았다냥. 서버 관리진에게 문의해줘냥! (오류 코드: AI-007)";
+  } else {
+    const where = live.map((id) => `<#${id}>`).join(", ");
+    text = isAdmin
+      ? `여기는 AI 대화 채널이 아니다냥! ${where}에서 불러주거나, 이 채널도 쓰려면 \`/ai채널 추가\`로 지정해줘냥~ (오류 코드: AI-008)`
+      : `여기서는 유미와 AI 대화를 할 수 없다냥! ${where}에서 "유미야"로 불러줘냥~ (오류 코드: AI-008)`;
+  }
+
+  const notice = await message
+    .reply({ content: `${text}\n-# 이 안내는 10초 뒤에 사라집니다`, allowedMentions: { repliedUser: false } })
+    .catch(() => null);
+  if (notice) setTimeout(() => notice.delete().catch(() => {}), AI_NOTICE_DELETE_MS);
+}
+
 async function handleSpam(message) {
   await message.delete().catch(() => {});
 
@@ -222,6 +265,11 @@ module.exports = {
 
     const match = message.content.match(CALL_NAME_PATTERN);
     if (!match) return;
+
+    if (message.guild && !isAiChannelAllowed(message)) {
+      await sendAiChannelNotice(message);
+      return;
+    }
 
     const rest = match[1].trim();
     const input = rest || "불렀어?";
