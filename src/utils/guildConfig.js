@@ -251,6 +251,26 @@ function getLevelUpMessage(guildId) {
   return configs[guildId]?.levelUpMessage ?? DEFAULT_LEVELUP_MESSAGE;
 }
 
+function resetLevelUpMessage(guildId) {
+  const configs = loadAll();
+  if (configs[guildId]) delete configs[guildId].levelUpMessage;
+  saveAll(configs);
+}
+
+// 레벨업 알림은 서버 관리자가 /레벨업알림설정에서 켜야만 보낸다.
+// levelUpEnabled 키가 없던 예전 서버는 관리자가 채널이나 문구를 이미 정해 두었으면 켜진 것으로 본다.
+function isLevelUpEnabled(guildId) {
+  const config = loadAll()[guildId] ?? {};
+  if (typeof config.levelUpEnabled === "boolean") return config.levelUpEnabled;
+  return Boolean(config.levelUpChannelId || config.levelUpMessage);
+}
+
+function setLevelUpEnabled(guildId, enabled) {
+  const configs = loadAll();
+  configs[guildId] = { ...(configs[guildId] ?? {}), levelUpEnabled: Boolean(enabled) };
+  saveAll(configs);
+}
+
 const DEFAULT_TICKET_MESSAGE = "문의사항이 있으면 아래 버튼을 눌러 티켓을 생성해주세요";
 
 function setTicketChannel(guildId, channelId) {
@@ -385,6 +405,9 @@ module.exports = {
   setLevelUpMessage,
   getLevelUpMessage,
   DEFAULT_LEVELUP_MESSAGE,
+  resetLevelUpMessage,
+  isLevelUpEnabled,
+  setLevelUpEnabled,
   setTicketChannel,
   getTicketChannelId,
   setTicketMessage,

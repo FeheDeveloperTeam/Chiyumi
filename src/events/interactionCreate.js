@@ -45,9 +45,6 @@ const {
   setRaidLocked,
   setAnnounceChannel,
   getAnnounceChannelId,
-  setLevelUpChannel,
-  getLevelUpMessage,
-  setLevelUpMessage,
   setTicketChannel,
   getTicketChannelId,
   getTicketMessage,
@@ -77,7 +74,6 @@ const {
 const { buildWelcomeEmbed, buildWelcomeRows } = require("../commands/welcome");
 const { formatWelcomeMessage } = require("../utils/welcomeFormat");
 const { getCommandsByCategory, buildCategoryEmbed } = require("../commands/help");
-const { buildLevelUpEmbed, buildLevelUpRow } = require("../commands/rank");
 const { buildTicketEmbed, buildTicketRow } = require("../commands/ticket");
 const { buildPetEmbed, buildPetRow, petMessageTimeouts, PET_IDLE_TIMEOUT_MS } = require("../commands/pet");
 const { getAgeDays, getStage, getMoodText, performAction, setPetName, ACTIONS } = require("../utils/pets");
@@ -127,6 +123,7 @@ const { buildMarketEmbed, buildPortfolioEmbed, buildStockRow } = require("../com
 const { buildGambleEmbed, buildGambleRow } = require("../commands/gamble");
 const { buildBankEmbed, buildBankRow } = require("../commands/bank");
 const { YUMI_CHANNEL_PREFIX, handleYumiChannelComponent } = require("../commands/yumiChannel");
+const { LEVELUP_ALERT_PREFIX, handleLevelUpAlertComponent, buildLevelUpAlertPanel } = require("../commands/levelUpAlert");
 const { getStockDef, getCurrentPrices, getPortfolio, getPortfolioValue, clearPortfolio, buyStock, sellStock } = require("../utils/stocks");
 const { getAccount, getTotalOwed, deposit, withdraw, takeLoan, repayLoan, declareBankruptcy, getRebirthCooldownMs, MAX_LOAN, MIN_LOAN } = require("../utils/bank");
 const {
@@ -263,8 +260,6 @@ const RANK_ACTION_PREFIX = "rank-action:";
 const RANK_PAGE_PREFIX = "rank-page:";
 const RANK_PAGE_SIZE = 5;
 const RANK_LEVELUP_ACTION_PREFIX = "rank-levelup-action:";
-const RANK_LEVELUP_CHANNEL_SELECT_ID = "rank-levelup-channel-select";
-const RANK_LEVELUP_MODAL_ID = "rank-levelup-modal";
 const TICKET_ACTION_PREFIX = "ticket-action:";
 const TICKET_CHANNEL_SELECT_ID = "ticket-channel-select";
 const DEV_SUPPORT_CHANNEL_SELECT_ID = "dev-support-channel-select";
@@ -359,6 +354,7 @@ async function handleRankLeaderboard(interaction) {
   await interaction.editReply({ embeds: [embed], components: [row] });
 }
 
+// 예전 /순위 카드에 남아 있는 "레벨업 알림 설정" 버튼은 새 /레벨업알림설정 패널을 연다.
 async function handleLevelUpSettingsButton(interaction) {
   if (!interaction.inGuild()) {
     await interaction.reply({
@@ -376,59 +372,7 @@ async function handleLevelUpSettingsButton(interaction) {
     return;
   }
 
-  await interaction.reply({
-    embeds: [buildLevelUpEmbed(interaction.guild.id)],
-    components: [buildLevelUpRow()],
-    ephemeral: true,
-  });
-}
-
-async function handleLevelUpActionButton(interaction) {
-  if (!hasManageGuild(interaction)) {
-    await interaction.reply({
-      content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
-      ephemeral: true,
-    });
-    return;
-  }
-
-  const action = interaction.customId.slice(RANK_LEVELUP_ACTION_PREFIX.length);
-
-  if (action === "channel") {
-    const channelSelect = new ChannelSelectMenuBuilder()
-      .setCustomId(RANK_LEVELUP_CHANNEL_SELECT_ID)
-      .setPlaceholder("레벨업 알림을 받을 채널을 선택하세요")
-      .addChannelTypes(ChannelType.GuildText)
-      .setMinValues(1)
-      .setMaxValues(1);
-
-    const row = new ActionRowBuilder().addComponents(channelSelect);
-
-    await interaction.update({
-      content: nya("레벨업 알림을 받을 채널을 선택하세요."),
-      embeds: [],
-      components: [row],
-    });
-    return;
-  }
-
-  if (action === "message") {
-    const modal = new ModalBuilder()
-      .setCustomId(RANK_LEVELUP_MODAL_ID)
-      .setTitle("레벨업 알림 문구 설정");
-
-    const messageInput = new TextInputBuilder()
-      .setCustomId("message")
-      .setLabel("{유저}, {레벨} 치환 가능")
-      .setStyle(TextInputStyle.Paragraph)
-      .setValue(getLevelUpMessage(interaction.guild.id))
-      .setRequired(true)
-      .setMaxLength(1000);
-
-    modal.addComponents(new ActionRowBuilder().addComponents(messageInput));
-
-    await interaction.showModal(modal);
-  }
+  await interaction.reply({ ...buildLevelUpAlertPanel(interaction.guild, interaction.user), ephemeral: true });
 }
 
 async function handleTicketActionButton(interaction) {
@@ -2292,6 +2236,11 @@ async function handleStringSelect(interaction) {
 }
 
 async function handleChannelSelect(interaction) {
+  if (interaction.customId.startsWith(LEVELUP_ALERT_PREFIX)) {
+    await handleLevelUpAlertComponent(interaction);
+    return;
+  }
+
   if (interaction.customId.startsWith(YUMI_CHANNEL_PREFIX)) {
     await handleYumiChannelComponent(interaction);
     return;
@@ -2304,26 +2253,6 @@ async function handleChannelSelect(interaction) {
 
   if (interaction.customId === STREAMALERT_EDIT_NOTIFCHANNEL_SELECT) {
     await handleStreamAlertEditChannelSelect(interaction);
-    return;
-  }
-
-  if (interaction.customId === RANK_LEVELUP_CHANNEL_SELECT_ID) {
-    if (!hasManageGuild(interaction)) {
-      await interaction.reply({
-        content: nya("이 설정은 서버 관리 권한이 있는 관리자만 사용할 수 있습니다.") + "\n(오류 코드: AUTH-001)",
-        ephemeral: true,
-      });
-      return;
-    }
-
-    const channelId = interaction.values[0];
-    setLevelUpChannel(interaction.guild.id, channelId);
-
-    await interaction.update({
-      content: null,
-      embeds: [buildLevelUpEmbed(interaction.guild.id)],
-      components: [buildLevelUpRow()],
-    });
     return;
   }
 
@@ -2541,6 +2470,11 @@ async function handleChannelSelect(interaction) {
 }
 
 async function handleButton(interaction) {
+  if (interaction.customId.startsWith(LEVELUP_ALERT_PREFIX)) {
+    await handleLevelUpAlertComponent(interaction);
+    return;
+  }
+
   if (interaction.customId.startsWith(YUMI_CHANNEL_PREFIX)) {
     await handleYumiChannelComponent(interaction);
     return;
@@ -3380,7 +3314,7 @@ async function handleButton(interaction) {
   }
 
   if (interaction.customId.startsWith(RANK_LEVELUP_ACTION_PREFIX)) {
-    await handleLevelUpActionButton(interaction);
+    await handleLevelUpSettingsButton(interaction);
     return;
   }
 
@@ -4776,6 +4710,11 @@ async function showMessageModal(interaction, setup) {
 }
 
 async function handleModalSubmit(interaction) {
+  if (interaction.customId.startsWith(LEVELUP_ALERT_PREFIX)) {
+    await handleLevelUpAlertComponent(interaction);
+    return;
+  }
+
   if (interaction.customId === STREAMALERT_MODAL_ID) {
     await handleStreamAlertModal(interaction);
     return;
@@ -4832,21 +4771,6 @@ async function handleModalSubmit(interaction) {
   if (interaction.customId.startsWith(DEV_MODAL_PREFIX)) {
     const action = interaction.customId.slice(DEV_MODAL_PREFIX.length);
     await handleDevModal(interaction, action);
-    return;
-  }
-
-  if (interaction.customId === RANK_LEVELUP_MODAL_ID) {
-    const message = interaction.fields.getTextInputValue("message").trim();
-    if (!message) {
-      await interaction.reply({ content: nya("문구는 비워둘 수 없습니다.") + "\n(오류 코드: MSG-001)", ephemeral: true });
-      return;
-    }
-    setLevelUpMessage(interaction.guild.id, message);
-
-    await interaction.update({
-      embeds: [buildLevelUpEmbed(interaction.guild.id)],
-      components: [buildLevelUpRow()],
-    });
     return;
   }
 

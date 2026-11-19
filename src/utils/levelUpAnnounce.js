@@ -1,8 +1,10 @@
 const { EmbedBuilder } = require("discord.js");
-const { getLevelUpChannelId, getLevelUpMessage } = require("./guildConfig");
+const { getLevelUpChannelId, getLevelUpMessage, isLevelUpEnabled } = require("./guildConfig");
 const { formatLevelUpMessage } = require("./levelUpFormat");
 
+// 서버 관리자가 /레벨업알림설정에서 알림을 켠 서버에만 보낸다.
 async function announceLevelUp(guild, user, defaultChannel, newLevel) {
+  if (!guild || !isLevelUpEnabled(guild.id)) return;
   const channelId = getLevelUpChannelId(guild.id);
   const targetChannel = channelId ? guild.channels.cache.get(channelId) : defaultChannel;
   if (!targetChannel) return;
