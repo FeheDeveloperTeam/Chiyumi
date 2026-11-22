@@ -3,6 +3,35 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 
 const DATA_FILE = path.join(__dirname, "../../data/streamAlerts.json");
+// 보낸 알림 기록(봇 전용). streamAlerts.json은 사이트 관리 화면도 SFTP로 고쳐 쓰므로,
+// 그쪽 쓰기와 겹쳐 "본 영상" 기록이 덮여도 같은 알림을 다시 보내지 않게 따로 둔다.
+const SENT_FILE = path.join(__dirname, "../../data/streamAlertSent.json");
+const SENT_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
+
+function loadSent() {
+  try {
+    return JSON.parse(fs.readFileSync(SENT_FILE, "utf-8"));
+  } catch {
+    return {};
+  }
+}
+
+function wasSent(key) {
+  return Boolean(loadSent()[key]);
+}
+
+function markSent(key) {
+  const sent = loadSent();
+  const cutoff = Date.now() - SENT_KEEP_MS;
+  for (const [k, at] of Object.entries(sent)) if (at < cutoff) delete sent[k];
+  sent[key] = Date.now();
+  fs.writeFileSync(SENT_FILE, JSON.stringify(sent));
+}
+
+// 방송 알림 확인은 호스팅 서버(CoredLab 컨테이너, 작업 폴더 /home/container)에서만 돌린다.
+// 개발하려고 PC에서 같은 토큰으로 봇을 켜면 두 곳이 동시에 알림을 보내 중복이 되기 때문이다.
+// PC에서 일부러 시험하려면 .env에 STREAM_ALERTS_ENABLED=1을 둔다.
+const STREAM_ALERTS_ENABLED = process.cwd() === "/home/container" || process.env.STREAM_ALERTS_ENABLED === "1";
 const SEEN_IDS_MAX = 30; // 저장할 최대 영상 ID 수
 const FETCH_TIMEOUT_MS = 15_000;
 const BROWSER_HEADERS = {
@@ -266,7 +295,7 @@ async function checkYouTubeLive(channelId) {
       html.includes('"isLiveNow":true') ||
       html.includes('"hlsManifestUrl"') ||
       (html.includes('"isLive":true') && !html.includes('"isUpcoming":true'));
-    if (live) return { live: true, title: await getLiveTitle(html) };
+    if (live) return { live: true, title: await getLiveTitle(html), streamId: getLiveVideoId(html) };
     // 채널 페이지(방송 없음)나 예약 방송 페이지가 제대로 왔을 때만 꺼짐으로 본다.
     return html.includes("ytInitialData") ? { live: false } : null;
   } catch {
@@ -284,7 +313,7 @@ async function checkChzzkLive(channelId) {
     if (!res.ok) return null;
     const json = await res.json();
     if (json.code !== 200) return null;
-    return { live: json.content?.status === "OPEN", title: json.content?.liveTitle ?? "" };
+    return { live: json.content?.status === "OPEN", title: json.content?.liveTitle ?? "", streamId: String(json.content?.liveId ?? "") };
   } catch {
     return null;
   }
@@ -299,19 +328,25 @@ async function checkSoopLive(userId) {
     if (!res.ok) return null;
     const json = await res.json();
     if (!json.station) return null; // {"code":9000} 없는 방송국 등
-    return { live: Boolean(json.broad?.broad_no), title: json.broad?.broad_title ?? "" };
+    return { live: Boolean(json.broad?.broad_no), title: json.broad?.broad_title ?? "", streamId: String(json.broad?.broad_no ?? "") };
   } catch {
     return null;
   }
+}
+
+function getLiveVideoId(html) {
+  return (
+    html.match(/<link rel="canonical" href="https:\/\/www\.youtube\.com\/watch\?v=([\w-]{11})"/)?.[1] ??
+    html.match(/"videoId":"([\w-]{11})"/)?.[1] ??
+    ""
+  );
 }
 
 // 방송 제목: 페이지의 <meta name="title">에서 읽고, 없으면(봇 서버에서는 빠져 있다) 방송 영상 ID로 oEmbed에서 가져온다.
 async function getLiveTitle(html) {
   const meta = decodeHtml(html.match(/<meta name="title" content="([^"]*)"/)?.[1] ?? "");
   if (meta) return meta;
-  const videoId =
-    html.match(/<link rel="canonical" href="https:\/\/www\.youtube\.com\/watch\?v=([\w-]{11})"/)?.[1] ??
-    html.match(/"videoId":"([\w-]{11})"/)?.[1];
+  const videoId = getLiveVideoId(html);
   if (!videoId) return "";
   try {
     const res = await fetchWithTimeout(
@@ -378,7 +413,10 @@ function buildNotificationContent(alert, info = {}) {
 // 그때 메시지가 이미 올라가 있으면 같은 알림이 15초 간격으로 4번까지 올라간다(2026-11-22 실제 발생).
 // nonce + enforceNonce를 주면 디스코드가 몇 분 안에 같은 nonce로 온 요청을 새 메시지로 만들지 않는다.
 // 같은 알림·같은 영상이면 nonce도 같게 만들어, 확인이 겹쳐 돌아도 한 번만 올라가게 한다.
+// key는 "알림 ID + 영상/방송 ID"라 같은 알림이면 늘 같다. 이미 보낸 key면 보내지 않고, 보내기 전에 먼저 기록한다.
 function sendAlertOnce(channel, content, key) {
+  if (wasSent(key)) return Promise.resolve(null);
+  markSent(key);
   const nonce = crypto.createHash("sha1").update(key).digest("base64url").slice(0, 25);
   return channel.send({ content, nonce, enforceNonce: true });
 }
@@ -409,6 +447,13 @@ async function runSelfCheck(data) {
 const warnedAlerts = new Set(); // 같은 경고를 5분마다 되풀이해 찍지 않게
 
 async function checkAllStreams(client) {
+  if (!STREAM_ALERTS_ENABLED) {
+    if (!selfCheckDone) {
+      selfCheckDone = true;
+      console.log("[방송알림] 호스팅 서버가 아니라서 방송 알림 확인을 끕니다(시험하려면 STREAM_ALERTS_ENABLED=1).");
+    }
+    return;
+  }
   // 한 바퀴가 5분보다 오래 걸려도 다음 확인이 겹쳐 돌지 않게 한다(겹치면 둘 다 새 영상으로 보고 알린다).
   if (checking) return;
   checking = true;
@@ -494,7 +539,7 @@ async function checkAllStreamsOnce(client) {
               const guild = client.guilds.cache.get(guildId);
               const channel = guild?.channels.cache.get(alert.notifChannelId);
               if (channel?.isTextBased()) {
-                await sendAlertOnce(channel, buildNotificationContent(alert, result), `${alert.id}:live:${Date.now()}`);
+                await sendAlertOnce(channel, buildNotificationContent(alert, result), `${alert.id}:live:${result.streamId || Math.floor(Date.now() / 600_000)}`);
               }
             }
             if (alert.offlineChecks) updateAlert(guildId, alert.id, { offlineChecks: 0 });
