@@ -162,7 +162,8 @@ module.exports = {
     .setNameLocalizations({ ko: "방송알림" })
     .setDescription("방송 알림을 관리합니다")
     .setDescriptionLocalizations({ ko: "방송 알림을 관리합니다" })
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .setDMPermission(false),
   execute,
   buildStreamAlertPage,
   buildPlatformButtons,

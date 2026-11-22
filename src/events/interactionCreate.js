@@ -1919,7 +1919,8 @@ async function handleStreamAlertModal(interaction) {
   }
 
   let channelId = extractedId;
-  if (pending.platform === "youtube_upload") {
+  // 유튜브는 라이브·업로드 모두 바뀌지 않는 채널 ID(UC...)로 저장한다. 핸들(@...)은 바뀌면 알림이 끊긴다.
+  if (pending.platform === "youtube_upload" || pending.platform === "youtube") {
     const resolved = await resolveYouTubeChannelId(extractedId);
     if (!resolved) {
       pendingSetups.delete(interaction.user.id);
@@ -2023,7 +2024,13 @@ async function handleStreamAlertTestButton(interaction) {
     alert.platform === "youtube_upload"
       ? buildUploadNotificationContent(alert, { videoId: "dQw4w9WgXcQ", title: "테스트 영상 제목" })
       : buildNotificationContent(alert);
-  await channel.send(testContent);
+  // 테스트라서 @everyone/@here가 실제로 울리지 않게 하고, 재전송돼도 한 번만 올라가게 nonce를 붙인다.
+  await channel.send({
+    content: `${testContent}\n-# 🧪 테스트 알림이라 멘션은 울리지 않습니다`,
+    allowedMentions: { parse: [] },
+    nonce: `t${Date.now()}`,
+    enforceNonce: true,
+  });
   await interaction.update({
     ...buildStreamAlertPage(alerts, alertIndex),
     content: nya(`<#${alert.notifChannelId}>에 테스트 알림을 전송했습니다`),
