@@ -53,7 +53,12 @@ function addSeenVideoIds(guildId, alertId, newIds) {
     : alert.lastVideoId
     ? new Set([alert.lastVideoId])
     : new Set();
-  for (const id of newIds) existing.add(id);
+  // 지금 RSS에 보이는 ID는 맨 뒤로 옮겨, 오래된 것부터 잘라낼 때 아직 피드에 있는 영상이 빠지지 않게 한다
+  // (빠지면 다음 확인 때 새 영상으로 보고 다시 알린다).
+  for (const id of newIds) {
+    existing.delete(id);
+    existing.add(id);
+  }
   alert.seenVideoIds = [...existing].slice(-SEEN_IDS_MAX);
   delete alert.lastVideoId; // 구버전 필드 제거
   save(data);
@@ -274,7 +279,29 @@ function buildNotificationContent(alert) {
   return parts.join("\n");
 }
 
+// 알림 전송. 디스코드 응답이 15초 안에 안 오면 discord.js가 같은 요청을 최대 3번 다시 보내는데,
+// 그때 메시지가 이미 올라가 있으면 같은 알림이 15초 간격으로 4번까지 올라간다(2026-11-22 실제 발생).
+// nonce + enforceNonce를 주면 디스코드가 몇 분 안에 같은 nonce로 온 요청을 새 메시지로 만들지 않는다.
+// 같은 알림·같은 영상이면 nonce도 같게 만들어, 확인이 겹쳐 돌아도 한 번만 올라가게 한다.
+function sendAlertOnce(channel, content, key) {
+  const nonce = crypto.createHash("sha1").update(key).digest("base64url").slice(0, 25);
+  return channel.send({ content, nonce, enforceNonce: true });
+}
+
+let checking = false;
+
 async function checkAllStreams(client) {
+  // 한 바퀴가 5분보다 오래 걸려도 다음 확인이 겹쳐 돌지 않게 한다(겹치면 둘 다 새 영상으로 보고 알린다).
+  if (checking) return;
+  checking = true;
+  try {
+    await checkAllStreamsOnce(client);
+  } finally {
+    checking = false;
+  }
+}
+
+async function checkAllStreamsOnce(client) {
   const data = load();
   for (const [guildId, alerts] of Object.entries(data)) {
     for (const alert of alerts) {
@@ -306,7 +333,7 @@ async function checkAllStreams(client) {
             const guild = client.guilds.cache.get(guildId);
             const channel = guild?.channels.cache.get(alert.notifChannelId);
             if (channel?.isTextBased()) {
-              await channel.send(buildUploadNotificationContent(alert, entry));
+              await sendAlertOnce(channel, buildUploadNotificationContent(alert, entry), `${alert.id}:upload:${entry.videoId}`);
             }
           }
         } else {
@@ -316,7 +343,7 @@ async function checkAllStreams(client) {
             const guild = client.guilds.cache.get(guildId);
             const channel = guild?.channels.cache.get(alert.notifChannelId);
             if (channel?.isTextBased()) {
-              await channel.send(buildNotificationContent(alert));
+              await sendAlertOnce(channel, buildNotificationContent(alert), `${alert.id}:live:${Date.now()}`);
             }
           }
           if (live !== alert.isLive) setLiveStatus(guildId, alert.id, live);
