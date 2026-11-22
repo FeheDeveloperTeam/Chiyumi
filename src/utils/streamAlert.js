@@ -4,6 +4,12 @@ const crypto = require("node:crypto");
 
 const DATA_FILE = path.join(__dirname, "../../data/streamAlerts.json");
 const SEEN_IDS_MAX = 30; // 저장할 최대 영상 ID 수
+const FETCH_TIMEOUT_MS = 15_000;
+
+// 응답이 오지 않는 요청이 한 바퀴 전체(그리고 겹침 방지 잠금)를 영원히 붙잡지 않게 모든 요청에 시간 제한을 둔다.
+function fetchWithTimeout(url, options = {}) {
+  return fetch(url, { ...options, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+}
 
 function load() {
   if (!fs.existsSync(DATA_FILE)) return {};
@@ -59,7 +65,10 @@ function addSeenVideoIds(guildId, alertId, newIds) {
     existing.delete(id);
     existing.add(id);
   }
-  alert.seenVideoIds = [...existing].slice(-SEEN_IDS_MAX);
+  const next = [...existing].slice(-SEEN_IDS_MAX);
+  // 바뀐 게 없으면 파일을 다시 쓰지 않는다(사이트 관리 화면도 이 파일을 SFTP로 쓰므로 쓰기를 줄인다).
+  if (!alert.lastVideoId && JSON.stringify(next) === JSON.stringify(alert.seenVideoIds)) return;
+  alert.seenVideoIds = next;
   delete alert.lastVideoId; // 구버전 필드 제거
   save(data);
 }
@@ -67,7 +76,7 @@ function addSeenVideoIds(guildId, alertId, newIds) {
 async function resolveYouTubeChannelId(handle) {
   if (!handle.startsWith("@")) return handle;
   try {
-    const res = await fetch(`https://www.youtube.com/${handle}`, {
+    const res = await fetchWithTimeout(`https://www.youtube.com/${handle}`, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
@@ -89,7 +98,7 @@ async function resolveYouTubeChannelId(handle) {
 // RSS 피드에서 모든 영상 entry 반환
 async function checkYouTubeUpload(channelId) {
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`,
       { headers: { "User-Agent": "Mozilla/5.0" } },
     );
@@ -128,7 +137,7 @@ async function checkYouTubeUpload(channelId) {
 // videoDetails.isLiveContent(라이브면 true)와 isUpcoming(공개 전이면 true)으로만 구분된다.
 async function classifyUploadVideo(videoId) {
   try {
-    const res = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+    const res = await fetchWithTimeout(`https://www.youtube.com/watch?v=${videoId}`, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Accept-Language": "ko-KR,ko;q=0.9",
@@ -211,7 +220,7 @@ async function checkYouTubeLive(channelId) {
     const url = channelId.startsWith("@")
       ? `https://www.youtube.com/${channelId}/live`
       : `https://www.youtube.com/channel/${channelId}/live`;
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -234,7 +243,7 @@ async function checkYouTubeLive(channelId) {
 // 치지직: v1 live-detail은 2026-11 기준 500을 돌려줘서 v2를 쓴다.
 async function checkChzzkLive(channelId) {
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `https://api.chzzk.naver.com/service/v2/channels/${channelId}/live-detail`,
       { headers: { "User-Agent": "Mozilla/5.0" } },
     );
@@ -250,7 +259,7 @@ async function checkChzzkLive(channelId) {
 // SOOP: 방송 중이면 응답에 broad(방송 정보)가 있고, 아니면 null이다. (예전에 보던 station.user_status는 없다)
 async function checkSoopLive(userId) {
   try {
-    const res = await fetch(`https://chapi.sooplive.co.kr/api/${userId}/station`, {
+    const res = await fetchWithTimeout(`https://chapi.sooplive.co.kr/api/${userId}/station`, {
       headers: { "User-Agent": "Mozilla/5.0", Referer: "https://www.sooplive.co.kr/" },
     });
     if (!res.ok) return null;
@@ -366,7 +375,7 @@ async function checkAllStreamsOnce(client) {
           // 피드에서 사라진 대기 영상은 지운다.
           for (const id of Object.keys(waiting)) if (!entries.some((e) => e.videoId === id)) delete waiting[id];
           addSeenVideoIds(guildId, alert.id, done);
-          updateAlert(guildId, alert.id, { uploadWaits: waiting });
+          if (JSON.stringify(waiting) !== JSON.stringify(alert.uploadWaits ?? {})) updateAlert(guildId, alert.id, { uploadWaits: waiting });
         } else {
           if (alert.platform === "youtube" && alert.channelId.startsWith("@")) {
             // 예전에 핸들(@...)로 저장된 라이브 알림은 핸들이 바뀌면 끊기므로, 바뀌지 않는 채널 ID(UC...)로 옮긴다.

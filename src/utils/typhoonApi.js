@@ -1,9 +1,12 @@
 // IBTrACS ACTIVE — NOAA (무료, API 키 불필요)
 // 서태평양(WP) 활동 태풍 중 한반도 주변 3500km 이내만 필터링
 
+// v04r00의 ACTIVE 파일은 2024년 5월(EWINIAR) 이후 갱신이 멈춰, 2년 넘게 지난 태풍을 "활동 중"으로 보여 줬다(2026-11-22 확인).
+// 지금 갱신되는 것은 v04r01이다. 버전이 또 바뀌어도 옛 태풍을 보여 주지 않게 마지막 관측이 오래된 태풍은 뺀다(STALE_MS).
 const IBTRACS_URL =
   "https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs" +
-  "/v04r00/access/csv/ibtracs.ACTIVE.list.v04r00.csv";
+  "/v04r01/access/csv/ibtracs.ACTIVE.list.v04r01.csv";
+const STALE_MS = 3 * 24 * 60 * 60 * 1000;
 
 // 주요 지점
 const SEOUL   = { lat: 37.5,  lon: 126.9 };
@@ -139,6 +142,7 @@ async function getActiveTyphoons() {
   const I = {
     sid: col("SID"), name: col("NAME"), basin: col("BASIN"),
     lat: col("LAT"), lon: col("LON"), wind: col("WMO_WIND"),
+    usaWind: col("USA_WIND"), tokyoWind: col("TOKYO_WIND"), time: col("ISO_TIME"),
   };
 
   const storms = new Map();
@@ -150,12 +154,14 @@ async function getActiveTyphoons() {
 
     const lat  = parseFloat(c[I.lat]);
     const lon  = parseFloat(c[I.lon]);
-    const wind = parseInt(c[I.wind]) || 0;
+    // 속보 단계에서는 WMO_WIND가 비어 있는 경우가 많아 미국(JTWC)·일본 기상청 값으로 채운다(모두 노트).
+    const wind = parseInt(c[I.wind]) || parseInt(c[I.usaWind]) || parseInt(c[I.tokyoWind]) || 0;
+    const time = Date.parse(`${c[I.time]?.replace(" ", "T")}Z`);
     if (isNaN(lat) || isNaN(lon)) continue;
 
     const sid = c[I.sid];
     if (!storms.has(sid)) storms.set(sid, { name: c[I.name] || "", points: [] });
-    storms.get(sid).points.push({ lat, lon, wind });
+    storms.get(sid).points.push({ lat, lon, wind, time });
   }
 
   const result = [];
@@ -165,6 +171,7 @@ async function getActiveTyphoons() {
 
     const pts    = storm.points;
     const latest = pts[pts.length - 1];
+    if (!Number.isFinite(latest.time) || Date.now() - latest.time > STALE_MS) continue; // 이미 끝난 태풍
     const dist   = distKm(latest.lat, latest.lon, SEOUL.lat, SEOUL.lon);
 
     if (dist > MAX_DIST_KM) continue; // 너무 먼 태풍 제외

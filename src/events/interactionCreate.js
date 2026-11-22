@@ -4689,7 +4689,8 @@ async function handleAnnounceModal(interaction) {
     .addFields(
       { name: "채널", value: `${channel}`, inline: true },
       { name: "작성자", value: `${interaction.user}`, inline: true },
-      { name: "제목", value: title || "(없음)" },
+      // 공지 모달에는 제목 입력이 없다(예전에는 없는 변수 title을 써서 로그가 늘 실패했다).
+      { name: "내용", value: content.length > 1024 ? `${content.slice(0, 1021)}...` : content || "(없음)" },
     )
     .setColor(0xe1aa74)
     .setTimestamp();

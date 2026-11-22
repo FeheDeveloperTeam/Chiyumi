@@ -48,8 +48,10 @@ async function fetchKmaEarthquakes() {
   // serviceKey는 포털에서 받은 값 그대로 사용 (이미 URL 인코딩됨 — encodeURIComponent 금지)
   const key    = process.env.KMA_API_KEY ?? "";
   const today  = new Date();
-  const past30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const params = `pageNo=1&numOfRows=100&dataType=JSON&startDt=${fmtDate(past30)}&endDt=${fmtDate(today)}`;
+  // getEqkMsg는 fromTmFc/toTmFc(YYYYMMDD)를 받고 최대 3일 전까지만 조회된다(2026-11-22 확인).
+  // 예전에는 startDt/endDt를 보내 늘 resultCode=11(필수 값 누락)로 실패했다. 30일 범위는 USGS로 채운다.
+  const past3 = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+  const params = `pageNo=1&numOfRows=100&dataType=JSON&fromTmFc=${fmtDate(past3)}&toTmFc=${fmtDate(today)}`;
 
   // https → http 순서로 시도 (일부 data.go.kr 서비스는 http만 허용)
   const BASE_URLS = [
@@ -92,10 +94,10 @@ async function fetchKmaEarthquakes() {
       return list.map((item) => ({
         lat:  parseFloat(item.eqLat  ?? item.lat),
         lon:  parseFloat(item.eqLon  ?? item.lon),
-        mag:  parseFloat(item.eqMag  ?? item.mag),
-        dep:  parseFloat(item.eqDep  ?? item.dep ?? 0),
-        loc:  item.eqArea ?? item.loc ?? "",
-        time: item.eqKiDate ?? item.tmEqk ?? "",
+        mag:  parseFloat(item.mt ?? item.eqMag ?? item.mag), // getEqkMsg의 규모 필드는 mt
+        dep:  parseFloat(item.dep ?? item.eqDep ?? 0),
+        loc:  item.loc ?? item.eqArea ?? "",
+        time: String(item.tmEqk ?? item.eqKiDate ?? ""),
       })).filter((e) => !isNaN(e.lat) && !isNaN(e.lon) && e.mag >= 1.0);
     } catch (e) {
       console.log("[지진지도] KMA 요청 실패:", e?.message);
@@ -106,36 +108,28 @@ async function fetchKmaEarthquakes() {
 }
 
 async function buildEarthquakeMapImage() {
-  // 1. 지진 데이터: KMA 우선, 실패 시 USGS fallback
-  let quakes = [];
-  let dataSource = "기상청";
-
+  // 1. 지진 데이터: 기상청(최근 3일, 국내 소규모 지진까지) + USGS(최근 30일)를 합친다.
+  //    같은 지진이 두 곳에 다 있으면(위치 0.5° 안, 규모 0.5 안) 기상청 것만 남긴다.
+  let kma = [];
+  let usgs = [];
   try {
-    quakes = await fetchKmaEarthquakes();
-    console.log(`[지진지도] KMA ${quakes.length}건 로드`);
+    kma = await fetchKmaEarthquakes();
+    console.log(`[지진지도] KMA ${kma.length}건 로드`);
   } catch (e) {
     console.log("[지진지도] KMA 실패:", e?.message);
   }
-
-  if (!quakes.length) {
-    try {
-      const usgs = await getRecentEarthquakes();
-      quakes = usgs
-        .filter((q) => q.lat != null && q.lon != null)
-        .map((q) => ({
-          lat:  q.lat,
-          lon:  q.lon,
-          mag:  q.magnitude,
-          dep:  q.depth,
-          loc:  q.place,
-          time: String(q.time),
-        }));
-      if (quakes.length) dataSource = "USGS";
-      console.log(`[지진지도] USGS fallback ${quakes.length}건`);
-    } catch (e) {
-      console.log("[지진지도] USGS fallback 실패:", e?.message);
-    }
+  try {
+    usgs = (await getRecentEarthquakes())
+      .filter((q) => q.lat != null && q.lon != null)
+      .map((q) => ({ lat: q.lat, lon: q.lon, mag: q.magnitude, dep: q.depth, loc: q.place, time: String(q.time), ms: q.time }));
+    console.log(`[지진지도] USGS ${usgs.length}건`);
+  } catch (e) {
+    console.log("[지진지도] USGS 실패:", e?.message);
   }
+  const kmaRecentFrom = Date.now() - 4 * 24 * 60 * 60 * 1000;
+  const isSame = (a, b) => Math.abs(a.lat - b.lat) < 0.5 && Math.abs(a.lon - b.lon) < 0.5 && Math.abs(a.mag - b.mag) < 0.5;
+  const quakes = [...kma, ...usgs.filter((u) => !(u.ms >= kmaRecentFrom && kma.some((k) => isSame(k, u))))];
+  const dataSource = kma.length && usgs.length ? "기상청·USGS" : kma.length ? "기상청" : usgs.length ? "USGS" : "기상청·USGS";
 
   // 2~3. 캔버스 + 배경 지도 (CARTO 타일이 API 키를 요구하게 바뀌어 직접 그린다)
   const canvas = createCanvas(IMG_W, IMG_H);

@@ -157,6 +157,7 @@ async function execute(interaction) {
 }
 
 module.exports = {
+  category: "관리",
   data: new SlashCommandBuilder()
     .setName("streamalert")
     .setNameLocalizations({ ko: "방송알림" })

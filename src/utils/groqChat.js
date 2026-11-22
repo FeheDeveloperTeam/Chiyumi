@@ -169,8 +169,10 @@ const FOREIGN_RE = /[a-zA-Z\u00C0-\u00FF\u0100-\u024F\u1E00-\u1EFF\u0370-\u03FF\
 // - Groq llama-3.3-70b-versatile은 2026-11 기준 Groq에서 내려가 404(model_not_found)를 낸다.
 // - OpenRouter 유료 llama는 무료 계정 크레딧이 바닥나 402가 나서 무료(:free) 모델을 쓴다.
 // Groq 추론 모델은 생각 토큰도 한도에 포함되므로 max_tokens를 넉넉히 둔다(답 길이는 프롬프트로 제한).
+// - qwen3.8-27b는 무료 등급의 분당 출력 토큰 한도(OTPM)가 1000이라, max_tokens를 1024로 주면 요청마다 429로 거절됐다(2026-11-22 확인).
+//   한도 안인 900으로 두고, 한도에 걸리면 SDK가 기다렸다 다시 보내지 않고(maxRetries 0) 바로 다음 모델로 넘어가게 한다.
 const AI_PROVIDERS = [
-  { name: "Groq qwen3.8-27b", client: groqClient, params: { model: "qwen/qwen3.8-27b", reasoning_format: "hidden", max_tokens: 1024 } },
+  { name: "Groq qwen3.8-27b", client: groqClient, params: { model: "qwen/qwen3.8-27b", reasoning_format: "hidden", max_tokens: 900 }, options: { maxRetries: 0 } },
   { name: "Groq gpt-oss-120b", client: groqClient, params: { model: "openai/gpt-oss-120b", reasoning_effort: "low", include_reasoning: false, max_tokens: 1024 } },
   { name: "OpenRouter gemma-4-31b", client: openrouterClient, params: { model: "google/gemma-4-31b-it:free", max_tokens: 500 } },
   { name: "Mistral small", client: mistralClient, params: { model: "mistral-small-latest", max_tokens: 500 } },
@@ -202,9 +204,9 @@ async function askGroq(channelId, userId, userMessage, displayName = "집사") {
 
   const messages = [{ role: "system", content: SYSTEM_PROMPT + memoryNote }, ...history];
   let response;
-  for (const { name, client, params } of AI_PROVIDERS) {
+  for (const { name, client, params, options } of AI_PROVIDERS) {
     try {
-      const res = await client.chat.completions.create({ messages, temperature: 0.75, ...params });
+      const res = await client.chat.completions.create({ messages, temperature: 0.75, ...params }, options);
       if (!res.choices?.[0]?.message?.content?.trim() && res.choices?.[0]?.finish_reason !== "content_filter") {
         throw new Error(`빈 응답 (finish_reason: ${res.choices?.[0]?.finish_reason})`);
       }
