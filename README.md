@@ -81,6 +81,7 @@ Chiyumi는 디스코드 서버 운영과 놀이 기능을 함께 제공하는 No
 
 ## 개발 정보
 
+- **서버 전용**: 모든 슬래시 명령어는 서버에서만 보이고 실행됩니다(`contexts: [0]`, `integration_types: [0]`, `src/utils/guildOnly.js`의 `toGuildOnlyCommandJSON`으로 등록). 앱의 사용자 설치(User Install)는 꺼져 있고, DM 메시지 인텐트도 받지 않습니다. 서버 밖이나 봇이 없는 서버에서 온 요청은 `interactionCreate`가 GUILD-001로 막습니다.
 - 호스팅(CoredLab) 제어: `node scripts/coredlab.js status | restart | start | stop | logs [초]` — `.env`의 `COREDLAB_API_KEY`, `COREDLAB_SERVER_ID`(선택 `COREDLAB_BASE_URL`, 기본 `https://host.coredlabgame.cloud`)를 사용합니다.
 
 - Node.js

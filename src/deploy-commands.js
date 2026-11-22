@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { REST, Routes } = require("discord.js");
 const { requireEnv } = require("./utils/env");
+const { toGuildOnlyCommandJSON } = require("./utils/guildOnly");
 
 const token = requireEnv("DISCORD_TOKEN");
 const clientId = requireEnv("DISCORD_CLIENT_ID");
@@ -18,7 +19,7 @@ for (const file of commandFiles) {
   const command = require(path.join(commandsPath, file));
 
   if ("data" in command && "execute" in command) {
-    commands.push(command.data.toJSON());
+    commands.push(toGuildOnlyCommandJSON(command.data)); // 모든 명령어는 서버 전용
   } else {
     console.warn(`[WARN] ${file} 파일에는 data 또는 execute가 없습니다.`);
   }

@@ -1706,6 +1706,18 @@ async function safeHandle(interaction, fn) {
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction) {
+    // 치유미는 서버 안에서만 쓴다. 명령어도 서버 전용으로 등록하지만(utils/guildOnly.js),
+    // 예전 등록이 남아 있거나 봇이 없는 서버에서 온 요청까지 여기서 한 번 더 막는다.
+    if (!interaction.inGuild() || !interaction.guild) {
+      if (interaction.isRepliable()) {
+        await interaction.reply({
+          content: nya("치유미는 봇이 들어가 있는 서버 안에서만 사용할 수 있습니다") + "\n(오류 코드: GUILD-001)",
+          ephemeral: true,
+        }).catch(() => {});
+      }
+      return;
+    }
+
     if (!isDeveloper(interaction.user.id) && (await isRestricted(interaction.user.id))) {
       if (interaction.isRepliable()) {
         const restriction = await getRestriction(interaction.user.id);
