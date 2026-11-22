@@ -2035,7 +2035,7 @@ async function handleStreamAlertTestButton(interaction) {
   const testContent =
     alert.platform === "youtube_upload"
       ? buildUploadNotificationContent(alert, { videoId: "dQw4w9WgXcQ", title: "테스트 영상 제목" })
-      : buildNotificationContent(alert);
+      : buildNotificationContent(alert, { title: "테스트 방송 제목" });
   // 테스트라서 @everyone/@here가 실제로 울리지 않게 하고, 재전송돼도 한 번만 올라가게 nonce를 붙인다.
   await channel.send({
     content: `${testContent}\n-# 🧪 테스트 알림이라 멘션은 울리지 않습니다`,

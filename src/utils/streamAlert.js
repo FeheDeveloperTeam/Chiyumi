@@ -5,6 +5,10 @@ const crypto = require("node:crypto");
 const DATA_FILE = path.join(__dirname, "../../data/streamAlerts.json");
 const SEEN_IDS_MAX = 30; // 저장할 최대 영상 ID 수
 const FETCH_TIMEOUT_MS = 15_000;
+const BROWSER_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
+};
 
 // 응답이 오지 않는 요청이 한 바퀴 전체(그리고 겹침 방지 잠금)를 영원히 붙잡지 않게 모든 요청에 시간 제한을 둔다.
 function fetchWithTimeout(url, options = {}) {
@@ -135,24 +139,57 @@ async function checkYouTubeUpload(channelId) {
 //  "notify"  — 일반 영상·쇼츠
 // 2026-11 기준 유튜브는 예전에 보던 liveBroadcastContent / isLiveBroadcast 표시를 더는 주지 않고,
 // videoDetails.isLiveContent(라이브면 true)와 isUpcoming(공개 전이면 true)으로만 구분된다.
-async function classifyUploadVideo(videoId) {
+async function classifyByWatchPage(videoId) {
   try {
-    const res = await fetchWithTimeout(`https://www.youtube.com/watch?v=${videoId}`, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept-Language": "ko-KR,ko;q=0.9",
-      },
-    });
+    const res = await fetchWithTimeout(`https://www.youtube.com/watch?v=${videoId}`, { headers: BROWSER_HEADERS });
     if (!res.ok) return "wait";
     const html = await res.text();
     const liveContent = html.match(/"isLiveContent":(true|false)/)?.[1];
     if (liveContent === "true" || html.includes('"isLiveBroadcast":true')) return "skip";
     if (html.includes('"isUpcoming":true')) return "upcoming";
     if (liveContent === "false") return "notify";
-    return "wait"; // 동의 화면·차단 페이지 등 영상 정보가 없는 응답
+    return "wait"; // 봇 확인·동의 화면 등 영상 정보가 없는 응답
   } catch {
     return "wait";
   }
+}
+
+// 채널 탭(라이브 /streams, 동영상 /videos, Shorts /shorts)에 있는 영상 ID 목록.
+// 그 탭이 없는 채널은 YouTube가 홈 탭을 대신 보여 주므로, 요청한 탭이 실제로 선택됐을 때만 목록을 믿는다.
+// 반환: Set(영상 ID) / 탭이 없으면 빈 Set / 읽기 실패면 null
+async function getChannelTabIds(channelId, tab) {
+  try {
+    const res = await fetchWithTimeout(`https://www.youtube.com/channel/${channelId}/${tab}`, { headers: BROWSER_HEADERS });
+    if (!res.ok) return null;
+    const html = await res.text();
+    if (!html.includes("ytInitialData")) return null;
+    const selected = [...html.matchAll(/"tabRenderer":\{"endpoint":([\s\S]{0,1500}?)"selected":true/g)].some((m) =>
+      new RegExp(`"url":"[^"]*/${tab}"`).test(m[1]),
+    );
+    if (!selected) return new Set();
+    return new Set([...html.matchAll(/"videoId":"([\w-]{11})"/g)].map((m) => m[1]));
+  } catch {
+    return null;
+  }
+}
+
+// 봇 서버(데이터센터 IP)에서는 YouTube가 영상 페이지 대신 봇 확인 페이지를 줘서 영상 정보를 못 읽는다(2026-11-22 확인).
+// 그때는 채널 탭으로 구분한다: 라이브 탭에 있으면 라이브(다시보기 포함), 동영상·Shorts 탭에 있으면 일반 영상.
+async function classifyByChannelTabs(videoId, channelId) {
+  const streams = await getChannelTabIds(channelId, "streams");
+  if (streams === null) return "wait";
+  if (streams.has(videoId)) return "skip";
+  for (const tab of ["videos", "shorts"]) {
+    const ids = await getChannelTabIds(channelId, tab);
+    if (ids?.has(videoId)) return "notify";
+  }
+  return "wait"; // 탭에 아직 안 나타남 — 다음 확인 때 다시 본다
+}
+
+async function classifyUploadVideo(videoId, channelId) {
+  const kind = await classifyByWatchPage(videoId);
+  if (kind !== "wait" || !channelId) return kind;
+  return classifyByChannelTabs(videoId, channelId);
 }
 const UPLOAD_WAIT_MAX = 12; // "wait"이 이만큼(약 1시간) 이어지면 더 기다리지 않고 본 목록에 넣는다
 
@@ -220,21 +257,18 @@ async function checkYouTubeLive(channelId) {
     const url = channelId.startsWith("@")
       ? `https://www.youtube.com/${channelId}/live`
       : `https://www.youtube.com/channel/${channelId}/live`;
-    const res = await fetchWithTimeout(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
-      },
-    });
+    const res = await fetchWithTimeout(url, { headers: BROWSER_HEADERS });
     // 404는 핸들이 바뀌었거나 없는 채널이다. 꺼진 것으로 보지 않고 "모름"(null)으로 둔다.
     if (!res.ok) return null;
     const html = await res.text();
     // 방송 중이면 /live가 그 방송 페이지가 되고 "isLiveNow":true가 있다. 예약 방송은 isLiveNow:false, isUpcoming:true.
-    if (html.includes('"isLiveNow":true') || html.includes('"hlsManifestUrl"')) return true;
-    if (html.includes('"isLive":true') && !html.includes('"isUpcoming":true')) return true;
+    const live =
+      html.includes('"isLiveNow":true') ||
+      html.includes('"hlsManifestUrl"') ||
+      (html.includes('"isLive":true') && !html.includes('"isUpcoming":true'));
+    if (live) return { live: true, title: await getLiveTitle(html) };
     // 채널 페이지(방송 없음)나 예약 방송 페이지가 제대로 왔을 때만 꺼짐으로 본다.
-    return html.includes("ytInitialData") ? false : null;
+    return html.includes("ytInitialData") ? { live: false } : null;
   } catch {
     return null;
   }
@@ -250,7 +284,7 @@ async function checkChzzkLive(channelId) {
     if (!res.ok) return null;
     const json = await res.json();
     if (json.code !== 200) return null;
-    return json.content?.status === "OPEN";
+    return { live: json.content?.status === "OPEN", title: json.content?.liveTitle ?? "" };
   } catch {
     return null;
   }
@@ -265,13 +299,43 @@ async function checkSoopLive(userId) {
     if (!res.ok) return null;
     const json = await res.json();
     if (!json.station) return null; // {"code":9000} 없는 방송국 등
-    return Boolean(json.broad?.broad_no);
+    return { live: Boolean(json.broad?.broad_no), title: json.broad?.broad_title ?? "" };
   } catch {
     return null;
   }
 }
 
-// true(방송 중) / false(꺼짐) / null(확인 실패 — 상태를 바꾸지 않음)
+// 방송 제목: 페이지의 <meta name="title">에서 읽고, 없으면(봇 서버에서는 빠져 있다) 방송 영상 ID로 oEmbed에서 가져온다.
+async function getLiveTitle(html) {
+  const meta = decodeHtml(html.match(/<meta name="title" content="([^"]*)"/)?.[1] ?? "");
+  if (meta) return meta;
+  const videoId =
+    html.match(/<link rel="canonical" href="https:\/\/www\.youtube\.com\/watch\?v=([\w-]{11})"/)?.[1] ??
+    html.match(/"videoId":"([\w-]{11})"/)?.[1];
+  if (!videoId) return "";
+  try {
+    const res = await fetchWithTimeout(
+      `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}`,
+      { headers: BROWSER_HEADERS },
+    );
+    if (!res.ok) return "";
+    return (await res.json()).title ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function decodeHtml(text) {
+  return text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)));
+}
+
+// { live: true/false, title } / null(확인 실패 — 상태를 바꾸지 않음)
 async function checkIsLive(alert) {
   switch (alert.platform) {
     case "youtube": return checkYouTubeLive(alert.channelId);
@@ -292,12 +356,16 @@ function buildLiveUrl(alert) {
   return alert.channelLink;
 }
 
-function buildNotificationContent(alert) {
+// 라이브 알림 문구: {name} 채널명, {title} 방송 제목, {url} 방송 링크.
+// {url}을 안 쓰면 링크를 맨 뒤에 붙인다(디스코드가 링크 아래에 방송 제목이 담긴 카드를 자동으로 보여 준다).
+// {title}은 쓴 사람만 문구 안에 넣는다(카드에 제목이 이미 나오므로 따로 붙이지 않는다).
+function buildNotificationContent(alert, info = {}) {
   const liveUrl = buildLiveUrl(alert);
   const parts = [];
   if (alert.mention !== "none") parts.push(`@${alert.mention}`);
   const text = (alert.customText || "{name}님이 방송을 시작했습니다! 🎉")
     .replace(/{name}/g, alert.channelName)
+    .replace(/{title}/g, info.title || "방송")
     .replace(/{url}/g, liveUrl);
   parts.push(text);
   if (!alert.customText?.includes("{url}")) {
@@ -316,6 +384,28 @@ function sendAlertOnce(channel, content, key) {
 }
 
 let checking = false;
+let selfCheckDone = false;
+
+// 봇이 켜질 때 한 번, 호스팅 서버에서 유튜브를 실제로 읽을 수 있는지 로그로 남긴다.
+// (데이터센터 IP는 유튜브가 봇 확인 페이지를 줄 수 있는데, 그러면 영상 페이지가 "wait"만 나와 업로드 알림이 막힌다.)
+async function runSelfCheck(data) {
+  const alerts = Object.values(data).flat();
+  const upload = alerts.find((a) => a.platform === "youtube_upload");
+  const live = alerts.find((a) => a.platform === "youtube" && a.channelId.startsWith("UC"));
+  const parts = [];
+  if (upload) {
+    const entries = await checkYouTubeUpload(upload.channelId);
+    parts.push(`RSS ${entries.length}개`);
+    if (entries[0]) {
+      parts.push(`영상 페이지 ${await classifyByWatchPage(entries[0].videoId)}`);
+      parts.push(`채널 탭 ${await classifyByChannelTabs(entries[0].videoId, upload.channelId)}`);
+    }
+  }
+  if (live) parts.push(`라이브(등록 채널) ${JSON.stringify(await checkYouTubeLive(live.channelId))}`);
+  // 늘 방송 중인 공개 채널(Lofi Girl)로 서버에서 "방송 중" 감지가 되는지도 본다.
+  parts.push(`라이브(상시 방송 채널) ${JSON.stringify(await checkYouTubeLive("UCSJ4gkVC6NrvII8umztf0Ow"))}`);
+  if (parts.length) console.log(`[방송알림] 시작 점검(유튜브 읽기): ${parts.join(", ")}`);
+}
 const warnedAlerts = new Set(); // 같은 경고를 5분마다 되풀이해 찍지 않게
 
 async function checkAllStreams(client) {
@@ -331,6 +421,10 @@ async function checkAllStreams(client) {
 
 async function checkAllStreamsOnce(client) {
   const data = load();
+  if (!selfCheckDone) {
+    selfCheckDone = true;
+    await runSelfCheck(data).catch((err) => console.error("[방송알림] 시작 점검 실패:", err?.message ?? err));
+  }
   for (const [guildId, alerts] of Object.entries(data)) {
     for (const alert of alerts) {
       try {
@@ -354,12 +448,14 @@ async function checkAllStreamsOnce(client) {
 
           for (const entry of newEntries) {
             // 라이브 방송(다시보기 포함)은 건너뛰고, 공개 전 프리미어·읽기 실패는 다음 확인 때 다시 본다.
-            const kind = await classifyUploadVideo(entry.videoId);
+            const kind = await classifyUploadVideo(entry.videoId, alert.channelId);
             if (kind === "upcoming") continue;
             if (kind === "wait" && (waiting[entry.videoId] ?? 0) + 1 < UPLOAD_WAIT_MAX) {
               waiting[entry.videoId] = (waiting[entry.videoId] ?? 0) + 1;
+              if (waiting[entry.videoId] === 1) console.warn(`[방송알림] ${alert.channelName} 새 영상 ${entry.videoId}: 영상 페이지를 읽지 못해 5분 뒤 다시 확인합니다.`);
               continue;
             }
+            if (kind === "wait") console.warn(`[방송알림] ${alert.channelName} 새 영상 ${entry.videoId}: 1시간 동안 영상 페이지를 읽지 못해 알림을 보내지 않고 넘깁니다.`);
             delete waiting[entry.videoId];
             done.push(entry.videoId);
             // 본 목록에 먼저 넣고 보낸다(보내는 중 오류가 나도 같은 영상을 다시 알리지 않게).
@@ -389,15 +485,16 @@ async function checkAllStreamsOnce(client) {
             }
           }
           // 라이브 방송 알림: 꺼짐→켜짐으로 바뀔 때 1회만 보낸다. 확인 실패(null)는 상태를 바꾸지 않는다.
-          const live = await checkIsLive(alert);
-          if (live === null) continue;
+          const result = await checkIsLive(alert);
+          if (result === null) continue;
+          const live = result.live;
           if (live) {
             if (!alert.isLive) {
               setLiveStatus(guildId, alert.id, true);
               const guild = client.guilds.cache.get(guildId);
               const channel = guild?.channels.cache.get(alert.notifChannelId);
               if (channel?.isTextBased()) {
-                await sendAlertOnce(channel, buildNotificationContent(alert), `${alert.id}:live:${Date.now()}`);
+                await sendAlertOnce(channel, buildNotificationContent(alert, result), `${alert.id}:live:${Date.now()}`);
               }
             }
             if (alert.offlineChecks) updateAlert(guildId, alert.id, { offlineChecks: 0 });
