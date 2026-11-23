@@ -16,7 +16,6 @@ const {
   TextInputStyle,
   UserSelectMenuBuilder,
 } = require("discord.js");
-const path = require("node:path");
 const { nya } = require("../utils/nya");
 const { getBalance, getAllBalances, addBalance, setBalance, STARTING_BALANCE } = require("../utils/credits");
 const {
@@ -93,25 +92,13 @@ const {
   buildBjEmbed,
 } = require("../utils/blackjack");
 const { wait: slotWait, buildReelText: buildSlotReelText, spin: spinSlot } = require("../utils/slot");
-const {
-  getAccountByRiotId,
-  getSummonerByPuuid,
-  getLeagueEntriesByPuuid,
-  getMatchIdsByPuuid,
-  getMatchById,
-} = require("../utils/riot");
-const {
-  createSession: createStatsSession,
-  getSession: getStatsSession,
-} = require("../utils/statsSession");
+const { userStatsTokens, cleanupUserStats } = require("../utils/statsUi");
+const { LOL_MODAL_ID, showLolStatsModal, handleLolStatsModal, handleLolComponent } = require("../utils/lolStats");
 const {
   VAL_MODAL_ID,
-  VAL_FILTER_PREFIX,
-  VAL_DETAIL_PREFIX,
   showValorantStatsModal,
   handleValorantStatsModal,
-  handleValorantFilterButton,
-  handleValorantDetailButton,
+  handleValorantComponent,
 } = require("../utils/valorantStats");
 const { buildWordChainEmbed, buildWordChainRow } = require("../commands/wordchain");
 const {
@@ -149,9 +136,6 @@ const {
 const COIN_ACTION_PREFIX = "coin-action:";
 const BJ_ACTION_PREFIX = "bj-action:";
 const STATS_ACTION_PREFIX = "stats-action:";
-const STATS_MODAL_PREFIX = "stats-modal:";
-const STATS_DETAIL_PREFIX = "stats-detail:";
-const STATS_FILTER_PREFIX = "stats-filter:";
 const GAMBLE_ACTION_PREFIX = "gamble-action:";
 const GAMBLE_MULT_PREFIX = "gamble-mult:";
 const GAMBLE_MODAL_PREFIX = "gamble-modal:";
@@ -2230,6 +2214,10 @@ async function handleRoleSelect(interaction) {
 }
 
 async function handleStringSelect(interaction) {
+  // 전적검색 "자세히 볼 경기를 고르세요" 드롭다운
+  if (await handleValorantComponent(interaction)) return;
+  if (await handleLolComponent(interaction)) return;
+
   if (interaction.customId.startsWith(YUMI_CHANNEL_PREFIX)) {
     await handleYumiChannelComponent(interaction);
     return;
@@ -3318,25 +3306,9 @@ async function handleButton(interaction) {
     return;
   }
 
-  if (interaction.customId.startsWith(VAL_FILTER_PREFIX)) {
-    await handleValorantFilterButton(interaction);
-    return;
-  }
-
-  if (interaction.customId.startsWith(VAL_DETAIL_PREFIX)) {
-    await handleValorantDetailButton(interaction);
-    return;
-  }
-
-  if (interaction.customId.startsWith(STATS_FILTER_PREFIX)) {
-    await handleStatsFilterButton(interaction);
-    return;
-  }
-
-  if (interaction.customId.startsWith(STATS_DETAIL_PREFIX)) {
-    await handleStatsDetailButton(interaction);
-    return;
-  }
+  // 전적검색 목록·상세의 버튼(필터, 이전/다음, 목록으로, 공유)
+  if (await handleValorantComponent(interaction)) return;
+  if (await handleLolComponent(interaction)) return;
 
   if (interaction.customId.startsWith(RANK_PAGE_PREFIX)) {
     await handleRankPageButton(interaction);
@@ -3641,367 +3613,6 @@ async function handleDevGrantModal(interaction, direction) {
     ),
     components: [],
   });
-}
-
-async function showLolStatsModal(interaction) {
-  const modal = new ModalBuilder()
-    .setCustomId(STATS_MODAL_PREFIX)
-    .setTitle("리그 오브 레전드 전적 검색");
-
-  const riotIdInput = new TextInputBuilder()
-    .setCustomId("riot_id")
-    .setLabel("닉네임#태그")
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder("예: Hide on bush#KR1")
-    .setRequired(true);
-
-  modal.addComponents(new ActionRowBuilder().addComponents(riotIdInput));
-
-  await interaction.showModal(modal);
-}
-
-const QUEUE_NAMES = {
-  420: "솔로랭크",
-  440: "자유랭크",
-  430: "일반(블라인드)",
-  400: "일반(드래프트)",
-  450: "칼바람 나락",
-};
-
-function formatDuration(seconds) {
-  const minutes = Math.floor(seconds / 60);
-  const remaining = seconds % 60;
-  return `${minutes}분 ${remaining}초`;
-}
-
-async function handleLolStatsModal(interaction) {
-  const riotId = interaction.fields.getTextInputValue("riot_id").trim();
-  const [gameName, tagLine] = riotId.split("#").map((part) => part?.trim());
-
-  if (!gameName || !tagLine) {
-    await interaction.reply({
-      content: nya("닉네임#태그 형식으로 입력해주세요. 예: Hide on bush#KR1") + "\n(오류 코드: STATS-001)",
-      ephemeral: true,
-    });
-    return;
-  }
-
-  // 게임 선택 메시지 삭제 (모달 제출 시점에 더 이상 필요 없음)
-  const prevStatsState = userStatsTokens.get(interaction.user.id);
-  if (prevStatsState?.cmdToken) {
-    userStatsTokens.set(interaction.user.id, { applicationId: prevStatsState.applicationId });
-    await tryDeleteInteractionMsg(interaction.client, prevStatsState.applicationId, prevStatsState.cmdToken);
-  }
-
-  await interaction.deferReply({ ephemeral: true });
-
-  let account;
-  try {
-    account = await getAccountByRiotId(gameName, tagLine);
-  } catch (error) {
-    if (error.status === 404) {
-      await interaction.editReply(nya(`'${riotId}' 소환사를 찾을 수 없습니다.`) + "\n(오류 코드: STATS-002)");
-      return;
-    }
-    console.error(error);
-    await interaction.editReply(nya("전적을 불러오는 중 오류가 발생했습니다.") + "\n(오류 코드: STATS-003)");
-    return;
-  }
-
-  try {
-    const [summoner, leagueEntries, matchIds] = await Promise.all([
-      getSummonerByPuuid(account.puuid),
-      getLeagueEntriesByPuuid(account.puuid),
-      getMatchIdsByPuuid(account.puuid, 10),
-    ]);
-
-    if (matchIds.length === 0) {
-      await interaction.editReply(nya(`'${riotId}'님은 전적이 비공개라서 표시할 수 없습니다.`));
-      return;
-    }
-
-    const matches = await Promise.all(matchIds.map((id) => getMatchById(id)));
-
-    const soloEntry = leagueEntries.find((e) => e.queueType === "RANKED_SOLO_5x5") ?? null;
-    const flexEntry = leagueEntries.find((e) => e.queueType === "RANKED_FLEX_SR") ?? null;
-
-    const session = {
-      puuid: account.puuid,
-      account,
-      summoner,
-      soloEntry,
-      flexEntry,
-      matches,
-    };
-    const sessionId = createStatsSession(session);
-
-    const displayWithIdx = matches.slice(0, 5).map((match, i) => ({ match, originalIndex: i }));
-    const { embeds, files } = buildStatsEmbeds(session, displayWithIdx);
-    const components = buildStatsRows(sessionId, displayWithIdx, session);
-
-    await interaction.editReply({ content: null, embeds, components, files });
-
-    // 다음 검색 시 삭제할 수 있도록 토큰 보관
-    userStatsTokens.set(interaction.user.id, {
-      applicationId: interaction.applicationId,
-      statsToken: interaction.token,
-    });
-  } catch (error) {
-    console.error(error);
-    await interaction.editReply(nya("전적을 불러오는 중 오류가 발생했습니다.") + "\n(오류 코드: STATS-003)");
-  }
-}
-
-const POSITION_LABELS = {
-  TOP: "탑",
-  JUNGLE: "정글",
-  MIDDLE: "미드",
-  BOTTOM: "원딜",
-  UTILITY: "지원",
-};
-const POSITION_ORDER = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"];
-
-function formatParticipantName(participant) {
-  if (participant.riotIdGameName) {
-    const tagLine = participant.riotIdTagline ? `#${participant.riotIdTagline}` : "";
-    return `${participant.riotIdGameName}${tagLine}`;
-  }
-
-  return participant.summonerName || "알 수 없음";
-}
-
-function buildMatchupText(participants) {
-  const byPosition = new Map();
-
-  for (const p of participants) {
-    if (!byPosition.has(p.teamPosition)) byPosition.set(p.teamPosition, []);
-    byPosition.get(p.teamPosition).push(p);
-  }
-
-  const lines = POSITION_ORDER.map((position) => {
-    const pair = byPosition.get(position);
-    const blue = pair?.find((p) => p.teamId === 100);
-    const red = pair?.find((p) => p.teamId === 200);
-
-    if (!blue || !red) return null;
-
-    return (
-      `${POSITION_LABELS[position]}: ${blue.championName} (${formatParticipantName(blue)}) ` +
-      `${blue.kills}/${blue.deaths}/${blue.assists} vs ` +
-      `${red.championName} (${formatParticipantName(red)}) ${red.kills}/${red.deaths}/${red.assists}`
-    );
-  }).filter(Boolean);
-
-  return lines.length > 0 ? lines.join("\n") : "매치업 정보 없음";
-}
-
-const TIER_COLORS = {
-  IRON: 0x958a8a,
-  BRONZE: 0xad5624,
-  SILVER: 0x839aa3,
-  GOLD: 0xcd8b3d,
-  PLATINUM: 0x4aa387,
-  EMERALD: 0x1a9e60,
-  DIAMOND: 0x576cce,
-  MASTER: 0x9d48e0,
-  GRANDMASTER: 0xd44942,
-  CHALLENGER: 0xf4c874,
-};
-
-const TIER_DATA = (() => {
-  try {
-    return require(path.join(__dirname, "..", "assets", "tiers", "tierData.js"));
-  } catch {
-    return {};
-  }
-})();
-
-// userId → { applicationId, cmdToken?, statsToken? }
-const userStatsTokens = new Map();
-
-async function tryDeleteInteractionMsg(client, applicationId, token) {
-  if (!token) return;
-  try {
-    await client.rest.delete(`/webhooks/${applicationId}/${token}/messages/@original`);
-  } catch {}
-}
-
-async function cleanupUserStats(client, userId) {
-  const state = userStatsTokens.get(userId);
-  if (!state) return;
-  userStatsTokens.delete(userId);
-  await Promise.allSettled([
-    tryDeleteInteractionMsg(client, state.applicationId, state.cmdToken),
-    tryDeleteInteractionMsg(client, state.applicationId, state.statsToken),
-  ]);
-}
-
-function getTierAttachment(tier, suffix) {
-  if (!tier) return null;
-  const key = tier.toLowerCase();
-  const b64 = TIER_DATA[key];
-  if (!b64) return null;
-  const name = suffix ? `${key}-${suffix}.png` : `${key}.png`;
-  return new AttachmentBuilder(Buffer.from(b64, "base64"), { name });
-}
-
-function formatRankEntry(entry) {
-  if (!entry) return "정보 없음";
-  return `${entry.tier} ${entry.rank}  ${entry.leaguePoints}LP\n${entry.wins}승 ${entry.losses}패`;
-}
-
-function buildMatchLines(matches, puuid) {
-  if (matches.length === 0) return "해당 게임 모드의 전적이 없습니다";
-  return matches.map(({ match }, i) => {
-    const p = match.info.participants.find((x) => x.puuid === puuid);
-    if (!p) return null;
-    const queue = QUEUE_NAMES[match.info.queueId] ?? `큐 ${match.info.queueId}`;
-    const result = p.win ? "✅ 승리" : "❌ 패배";
-    return `\`${i + 1}\` ${queue}  **${p.championName}**  ${p.kills}/${p.deaths}/${p.assists}  ${result}  ${formatDuration(match.info.gameDuration)}`;
-  }).filter(Boolean).join("\n") || "해당 게임 모드의 전적이 없습니다";
-}
-
-function buildStatsEmbeds(session, displayWithIdx) {
-  const { account, summoner, soloEntry, flexEntry } = session;
-
-  const soloAttachment = getTierAttachment(soloEntry?.tier, "solo");
-  const flexAttachment = getTierAttachment(flexEntry?.tier, "flex");
-
-  const embed1 = new EmbedBuilder()
-    .setTitle(`${account.gameName}#${account.tagLine}`)
-    .setColor(TIER_COLORS[soloEntry?.tier?.toUpperCase()] ?? 0xe1aa74)
-    .addFields(
-      { name: "소환사 레벨", value: `Lv. **${summoner.summonerLevel}**`, inline: true },
-      { name: "솔로랭크", value: formatRankEntry(soloEntry), inline: true },
-    );
-  if (soloAttachment) embed1.setThumbnail(`attachment://${soloAttachment.name}`);
-
-  const embed2 = new EmbedBuilder()
-    .setColor(TIER_COLORS[flexEntry?.tier?.toUpperCase()] ?? 0xe1aa74)
-    .addFields(
-      { name: "자유랭크", value: formatRankEntry(flexEntry), inline: true },
-      { name: "최근 전적", value: buildMatchLines(displayWithIdx, session.puuid) },
-    );
-  if (flexAttachment) embed2.setThumbnail(`attachment://${flexAttachment.name}`);
-
-  const files = [soloAttachment, flexAttachment].filter(Boolean);
-  return { embeds: [embed1, embed2], files };
-}
-
-function buildStatsRows(sessionId, displayWithIdx, session) {
-  const presentQueues = new Set(session.matches.map((m) => m.info.queueId));
-  const filterDefs = [
-    { label: "전체", id: 0 },
-    { label: "솔로랭크", id: 420 },
-    { label: "자유랭크", id: 440 },
-    { label: "칼바람", id: 450 },
-  ];
-
-  const filterRow = new ActionRowBuilder().addComponents(
-    filterDefs
-      .filter((f) => f.id === 0 || presentQueues.has(f.id))
-      .map((f) =>
-        new ButtonBuilder()
-          .setCustomId(`${STATS_FILTER_PREFIX}${sessionId}:${f.id}`)
-          .setLabel(f.label)
-          .setStyle(ButtonStyle.Secondary),
-      ),
-  );
-
-  const detailRow = new ActionRowBuilder().addComponents(
-    displayWithIdx.map(({ originalIndex }, i) =>
-      new ButtonBuilder()
-        .setCustomId(`${STATS_DETAIL_PREFIX}${sessionId}:${originalIndex}`)
-        .setLabel(`${i + 1}경기 더보기`)
-        .setStyle(ButtonStyle.Primary),
-    ),
-  );
-
-  return [filterRow, detailRow];
-}
-
-async function handleStatsFilterButton(interaction) {
-  const [sessionId, queueIdStr] = interaction.customId
-    .slice(STATS_FILTER_PREFIX.length)
-    .split(":");
-  const queueId = Number(queueIdStr);
-  const session = getStatsSession(sessionId);
-
-  if (!session) {
-    await interaction.reply({
-      content: nya("전적 정보가 만료되었습니다. 다시 검색해주세요.") + "\n(오류 코드: STATS-004)",
-      ephemeral: true,
-    });
-    return;
-  }
-
-  const filteredWithIdx = session.matches
-    .map((match, originalIndex) => ({ match, originalIndex }))
-    .filter(({ match }) => queueId === 0 || match.info.queueId === queueId);
-
-  const displayWithIdx = filteredWithIdx.slice(0, 5);
-  const { embeds, files } = buildStatsEmbeds(session, displayWithIdx);
-  const components = buildStatsRows(sessionId, displayWithIdx, session);
-
-  await interaction.update({ embeds, components, files });
-}
-
-async function handleStatsDetailButton(interaction) {
-  const [sessionId, indexText] = interaction.customId
-    .slice(STATS_DETAIL_PREFIX.length)
-    .split(":");
-  const session = getStatsSession(sessionId);
-
-  if (!session) {
-    await interaction.reply({
-      content: nya("전적 정보가 만료되었습니다. 다시 검색해주세요.") + "\n(오류 코드: STATS-004)",
-      ephemeral: true,
-    });
-    return;
-  }
-
-  const match = session.matches[Number(indexText)];
-
-  if (!match) {
-    await interaction.reply({
-      content: nya("해당 경기를 찾을 수 없습니다.") + "\n(오류 코드: STATS-005)",
-      ephemeral: true,
-    });
-    return;
-  }
-
-  const participant = match.info.participants.find((p) => p.puuid === session.puuid);
-  if (!participant) {
-    await interaction.reply({
-      content: nya("경기 데이터를 불러올 수 없습니다.") + "\n(오류 코드: STATS-006)",
-      ephemeral: true,
-    });
-    return;
-  }
-
-  const queueName = QUEUE_NAMES[match.info.queueId] ?? `큐 ${match.info.queueId}`;
-
-  const embed = new EmbedBuilder()
-    .setTitle(`${participant.championName} - ${participant.win ? "승리" : "패배"}`)
-    .setDescription(
-      nya(`${queueName} | ${formatDuration(match.info.gameDuration)}`),
-    )
-    .addFields(
-      {
-        name: "전투 지표",
-        value: nya(
-          `킬/데스/어시스트: ${participant.kills}/${participant.deaths}/${participant.assists}\n` +
-            `골드: ${participant.goldEarned}\n` +
-            `CS: ${participant.totalMinionsKilled + participant.neutralMinionsKilled}\n` +
-            `챔피언 대상 피해량: ${participant.totalDamageDealtToChampions}\n` +
-            `시야 점수: ${participant.visionScore}`,
-        ),
-      },
-      { name: "라인전 매치업", value: buildMatchupText(match.info.participants) },
-    )
-    .setColor(0xe1aa74);
-
-  await interaction.reply({ embeds: [embed] });
 }
 
 async function showWelcomeMessageModal(interaction, type) {
@@ -4863,13 +4474,13 @@ async function handleModalSubmit(interaction) {
     return;
   }
 
-  if (interaction.customId === STATS_MODAL_PREFIX) {
+  if (interaction.customId === LOL_MODAL_ID) {
     await handleLolStatsModal(interaction);
     return;
   }
 
   if (interaction.customId === VAL_MODAL_ID) {
-    await handleValorantStatsModal(interaction, { userStatsTokens, tryDeleteInteractionMsg });
+    await handleValorantStatsModal(interaction);
     return;
   }
 
