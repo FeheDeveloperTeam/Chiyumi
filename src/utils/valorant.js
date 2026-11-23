@@ -114,6 +114,8 @@ function slimMatch(match, locale) {
       won: Boolean(t.won),
       roundsWon: t.rounds?.won ?? 0,
       roundsLost: t.rounds?.lost ?? 0,
+      // 데스매치 같은 개인전은 플레이어마다 팀이 하나씩 오고, 순위가 placement에 있다.
+      placement: t.placement ?? null,
     })),
     players: (match.players ?? []).map((p) => {
       const agentId = String(p.agent?.id ?? "").toLowerCase();

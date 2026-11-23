@@ -82,6 +82,7 @@ Chiyumi는 디스코드 서버 운영과 놀이 기능을 함께 제공하는 No
 ## 개발 정보
 
 - **서버 전용**: 모든 슬래시 명령어는 서버에서만 보이고 실행됩니다(`contexts: [0]`, `integration_types: [0]`, `src/utils/guildOnly.js`의 `toGuildOnlyCommandJSON`으로 등록). 앱의 사용자 설치(User Install)는 꺼져 있고, DM 메시지 인텐트도 받지 않습니다. 서버 밖이나 봇이 없는 서버에서 온 요청은 `interactionCreate`가 GUILD-001로 막습니다.
+- 환경변수: `.env`는 로컬과 CoredLab 서버 두 곳에 같은 키를 둔다(예외: `DISCORD_TOKEN`은 서버에서 CoredLab 패널 시작 변수). 키를 추가·변경하면 두 곳 모두 고친다.
 - 호스팅(CoredLab) 제어: `node scripts/coredlab.js status | restart | start | stop | logs [초]` — `.env`의 `COREDLAB_API_KEY`, `COREDLAB_SERVER_ID`(선택 `COREDLAB_BASE_URL`, 기본 `https://host.coredlabgame.cloud`)를 사용합니다.
 
 - Node.js
@@ -93,7 +94,7 @@ Chiyumi는 디스코드 서버 운영과 놀이 기능을 함께 제공하는 No
 - google-auth-library (구글 시트 데이터 백업/뷰어 동기화, `.env`에 `GOOGLE_SHEET_ID`/`GOOGLE_SERVICE_ACCOUNT_EMAIL`/`GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` 설정 시에만 동작)
 - 국립국어원 우리말샘 Open API (끝말잇기 단어 사전 검증, `.env`에 `WORDCHAIN_DICT_API_KEY` 설정 시에만 동작, 미설정 시 끝말잇기 규칙만으로 검증)
 - Open-Meteo 날씨·대기질 API (날씨·미세먼지 조회, API 키 불필요) → 실패 시 MET Norway Locationforecast API로 전환 (API 키 불필요)
-- HenrikDev 발로란트 API (비공식, `/전적검색` 발로란트. `.env`의 `HENRIK_API_KEY` 사용, 키가 없으면 발로란트 버튼을 숨긴다. 라이엇 공식 발로란트 API는 승인된 서비스 키 전용이라 `RIOT_API_KEY`로는 403) + valorant-api.com (요원·맵·티어 한국어 이름·아이콘, 키 불필요, 하루 캐시)
+- HenrikDev 발로란트 API (비공식, `/전적검색` 발로란트. `.env`의 `HENRIK_API_KEY`(대시보드 https://api.henrikdev.xyz/dashboard 에서 Valorant·Standard 30회/분으로 발급) 사용, 키가 없으면 발로란트 버튼을 숨긴다. 데스매치는 플레이어마다 팀이 하나씩 와서 팀이 2개일 때만 팀전으로 보고, 개인전은 순위(placement)로 표시한다. 라이엇 공식 발로란트 API는 승인된 서비스 키 전용이라 `RIOT_API_KEY`로는 403) + valorant-api.com (요원·맵·티어 한국어 이름·아이콘, 키 불필요, 하루 캐시)
 - 기상청 API (강수 레이더·지진 지도, `.env`의 `KMA_API_KEY` 사용. 공공데이터포털 지진정보는 이 키로 동작하지만 기상청 API 허브 레이더는 401이라 RainViewer로 대체)
 - 레이더·지진·태풍 지도의 배경 지도는 외부 타일 없이 `src/utils/baseMap.js`가 `src/assets/eastAsiaMap.json`(Natural Earth 1:10m, 퍼블릭 도메인, 경도 110~149°·위도 20~50°만 잘라 단순화)으로 직접 그린다. 이전에 쓰던 CARTO 무료 타일은 API 키를 요구하도록 바뀌어 "API KEY REQUIRED" 타일만 내려온다
 - 호스팅 컨테이너의 IPv6 경로가 불안정해서 `src/index.js`에서 DNS를 IPv4 우선(`ipv4first`)으로 두고, 외부 요청 실패 로그에는 실제 원인 코드(`ENETUNREACH`, `ETIMEDOUT` 등)를 함께 남긴다

@@ -69,20 +69,24 @@ function findMe(match, puuid) {
   return match.players.find((p) => p.puuid === puuid) ?? null;
 }
 
-// 팀전이면 승리/패배/무승부와 라운드 점수, 개인전(데스매치 등)이면 킬 순위.
+// 팀이 정확히 2개일 때만 팀전(경쟁전·일반전·신속플레이 등). 데스매치는 플레이어마다 팀이 하나씩 온다.
+const isTeamMatch = (match) => match.teams.length === 2;
+
+// 팀전이면 승리/패배/무승부와 라운드 점수, 개인전(데스매치 등)이면 순위.
 function resultOf(match, me) {
-  const team = match.teams.length >= 2 ? match.teams.find((t) => t.id === me.teamId) : null;
+  const team = isTeamMatch(match) ? match.teams.find((t) => t.id === me.teamId) : null;
   if (team) {
     const score = `${team.roundsWon}:${team.roundsLost}`;
     if (team.won) return { icon: "✅", text: "승리", score };
     if (team.roundsWon === team.roundsLost) return { icon: "➖", text: "무승부", score };
     return { icon: "❌", text: "패배", score };
   }
-  const rank = [...match.players].sort((a, b) => b.kills - a.kills || b.score - a.score).findIndex((p) => p.puuid === me.puuid) + 1;
+  const placement = match.teams.find((t) => t.id === me.teamId)?.placement;
+  const rank = placement ?? [...match.players].sort((a, b) => b.kills - a.kills || b.score - a.score).findIndex((p) => p.puuid === me.puuid) + 1;
   return { icon: rank === 1 ? "🏆" : "▫️", text: `${rank}위`, score: "" };
 }
 
-const acsOf = (match, p) => (match.roundsPlayed > 0 ? Math.round(p.score / match.roundsPlayed) : null);
+const acsOf = (match, p) => (isTeamMatch(match) && match.roundsPlayed > 0 ? Math.round(p.score / match.roundsPlayed) : null);
 
 function headshotRate(p) {
   const shots = p.headshots + p.bodyshots + p.legshots;
@@ -280,7 +284,7 @@ function playerLine(match, p, puuid) {
 
 function teamFields(match, puuid) {
   const byScore = (a, b) => b.score - a.score;
-  if (match.teams.length >= 2) {
+  if (isTeamMatch(match)) {
     return match.teams.map((team) => {
       const label = team.id === "Blue" ? "🔵 블루팀" : team.id === "Red" ? "🔴 레드팀" : team.id;
       const lines = match.players.filter((p) => p.teamId === team.id).sort(byScore).map((p) => playerLine(match, p, puuid));
@@ -290,11 +294,12 @@ function teamFields(match, puuid) {
       };
     });
   }
+  const placeOf = (p) => match.teams.find((t) => t.id === p.teamId)?.placement ?? null;
   const lines = [...match.players]
-    .sort((a, b) => b.kills - a.kills || byScore(a, b))
-    .slice(0, 10)
-    .map((p, i) => `\`${i + 1}\` ${playerLine(match, p, puuid)}`);
-  return [{ name: "참가자 (킬 순)", value: (lines.join("\n") || "정보 없음").slice(0, 1024) }];
+    .sort((a, b) => (placeOf(a) ?? 99) - (placeOf(b) ?? 99) || b.kills - a.kills || byScore(a, b))
+    .slice(0, 14)
+    .map((p, i) => `\`${placeOf(p) ?? i + 1}\` ${playerLine(match, p, puuid)}`);
+  return [{ name: "순위", value: (lines.join("\n") || "정보 없음").slice(0, 1024) }];
 }
 
 async function handleValorantDetailButton(interaction) {
@@ -324,7 +329,10 @@ async function handleValorantDetailButton(interaction) {
   const stats = [
     `킬/데스/어시스트: ${me.kills}/${me.deaths}/${me.assists} (K/D ${kd})`,
     acs != null ? `평균 전투 점수(ACS): ${acs}` : null,
-    `피해량: ${me.damage}${match.roundsPlayed > 0 ? ` (라운드당 ${Math.round(me.damage / match.roundsPlayed)})` : ""}`,
+    // 데스매치는 피해량이 0으로만 와서 0이면 줄을 뺀다.
+    me.damage > 0
+      ? `피해량: ${me.damage}${isTeamMatch(match) && match.roundsPlayed > 0 ? ` (라운드당 ${Math.round(me.damage / match.roundsPlayed)})` : ""}`
+      : null,
     hs != null ? `헤드샷 비율: ${hs}%` : null,
   ].filter(Boolean);
 
