@@ -24,7 +24,7 @@ module.exports = {
         new ButtonBuilder()
           .setCustomId("stats-action:valorant")
           .setLabel("발로란트")
-          .setStyle(ButtonStyle.Danger),
+          .setStyle(ButtonStyle.Primary),
       );
     }
 
