@@ -104,6 +104,15 @@ const {
   createSession: createStatsSession,
   getSession: getStatsSession,
 } = require("../utils/statsSession");
+const {
+  VAL_MODAL_ID,
+  VAL_FILTER_PREFIX,
+  VAL_DETAIL_PREFIX,
+  showValorantStatsModal,
+  handleValorantStatsModal,
+  handleValorantFilterButton,
+  handleValorantDetailButton,
+} = require("../utils/valorantStats");
 const { buildWordChainEmbed, buildWordChainRow } = require("../commands/wordchain");
 const {
   getGuildAlerts,
@@ -3302,6 +3311,20 @@ async function handleButton(interaction) {
       await showLolStatsModal(interaction);
     }
 
+    if (action === "valorant") {
+      await showValorantStatsModal(interaction);
+    }
+
+    return;
+  }
+
+  if (interaction.customId.startsWith(VAL_FILTER_PREFIX)) {
+    await handleValorantFilterButton(interaction);
+    return;
+  }
+
+  if (interaction.customId.startsWith(VAL_DETAIL_PREFIX)) {
+    await handleValorantDetailButton(interaction);
     return;
   }
 
@@ -4842,6 +4865,11 @@ async function handleModalSubmit(interaction) {
 
   if (interaction.customId === STATS_MODAL_PREFIX) {
     await handleLolStatsModal(interaction);
+    return;
+  }
+
+  if (interaction.customId === VAL_MODAL_ID) {
+    await handleValorantStatsModal(interaction, { userStatsTokens, tryDeleteInteractionMsg });
     return;
   }
 

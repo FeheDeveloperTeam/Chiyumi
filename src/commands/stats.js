@@ -1,5 +1,6 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, SlashCommandBuilder } = require("discord.js");
 const { nya } = require("../utils/nya");
+const { isValorantConfigured } = require("../utils/valorant");
 
 module.exports = {
   category: "정보",
@@ -16,6 +17,16 @@ module.exports = {
       .setStyle(ButtonStyle.Primary);
 
     const row = new ActionRowBuilder().addComponents(lolButton);
+
+    // 발로란트는 HenrikDev API 키(HENRIK_API_KEY)가 있어야 조회할 수 있어서, 키가 있을 때만 버튼을 보인다.
+    if (isValorantConfigured()) {
+      row.addComponents(
+        new ButtonBuilder()
+          .setCustomId("stats-action:valorant")
+          .setLabel("발로란트")
+          .setStyle(ButtonStyle.Danger),
+      );
+    }
 
     await interaction.reply({
       content: nya("어떤 게임의 전적을 검색할까요?"),

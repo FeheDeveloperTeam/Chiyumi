@@ -72,7 +72,7 @@ Chiyumi는 디스코드 서버 운영과 놀이 기능을 함께 제공하는 No
 | 명령어 | 설명 |
 |--------|------|
 | `/순위` | 채팅·음성 활동 기반 레벨·경험치 카드 이미지 및 서버 순위 조회 (레벨업 알림 설정은 `/레벨업알림설정`으로 옮김) |
-| `/전적검색` | 리그 오브 레전드 최근 전적·라인별 매치업·티어 조회 (Riot Games API) |
+| `/전적검색` | 리그 오브 레전드(Riot Games API) 최근 전적·라인별 매치업·티어, 발로란트(HenrikDev API) 현재·최고 티어·최근 10경기·모드 필터·팀별 K/D/A·ACS 조회 |
 | `/문의` | 유저 신고·피드백·버그 신고를 모달로 접수해 운영 채널로 전달 |
 | `/도움말` | 카테고리별 전체 명령어 안내 |
 | `/핑` | 봇 응답 속도 확인 |
@@ -93,6 +93,7 @@ Chiyumi는 디스코드 서버 운영과 놀이 기능을 함께 제공하는 No
 - google-auth-library (구글 시트 데이터 백업/뷰어 동기화, `.env`에 `GOOGLE_SHEET_ID`/`GOOGLE_SERVICE_ACCOUNT_EMAIL`/`GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` 설정 시에만 동작)
 - 국립국어원 우리말샘 Open API (끝말잇기 단어 사전 검증, `.env`에 `WORDCHAIN_DICT_API_KEY` 설정 시에만 동작, 미설정 시 끝말잇기 규칙만으로 검증)
 - Open-Meteo 날씨·대기질 API (날씨·미세먼지 조회, API 키 불필요) → 실패 시 MET Norway Locationforecast API로 전환 (API 키 불필요)
+- HenrikDev 발로란트 API (비공식, `/전적검색` 발로란트. `.env`의 `HENRIK_API_KEY` 사용, 키가 없으면 발로란트 버튼을 숨긴다. 라이엇 공식 발로란트 API는 승인된 서비스 키 전용이라 `RIOT_API_KEY`로는 403) + valorant-api.com (요원·맵·티어 한국어 이름·아이콘, 키 불필요, 하루 캐시)
 - 기상청 API (강수 레이더·지진 지도, `.env`의 `KMA_API_KEY` 사용. 공공데이터포털 지진정보는 이 키로 동작하지만 기상청 API 허브 레이더는 401이라 RainViewer로 대체)
 - 레이더·지진·태풍 지도의 배경 지도는 외부 타일 없이 `src/utils/baseMap.js`가 `src/assets/eastAsiaMap.json`(Natural Earth 1:10m, 퍼블릭 도메인, 경도 110~149°·위도 20~50°만 잘라 단순화)으로 직접 그린다. 이전에 쓰던 CARTO 무료 타일은 API 키를 요구하도록 바뀌어 "API KEY REQUIRED" 타일만 내려온다
 - 호스팅 컨테이너의 IPv6 경로가 불안정해서 `src/index.js`에서 DNS를 IPv4 우선(`ipv4first`)으로 두고, 외부 요청 실패 로그에는 실제 원인 코드(`ENETUNREACH`, `ETIMEDOUT` 등)를 함께 남긴다
