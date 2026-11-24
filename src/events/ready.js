@@ -1,6 +1,7 @@
 const { Events, ActivityType } = require("discord.js");
 const { nya } = require("../utils/nya");
 const { syncDataToSheets } = require("../utils/googleSheets");
+const { checkExpiredProfiles } = require("../utils/premium");
 const { updateDailyPrices } = require("../utils/stocks");
 const { applyDailyInterest } = require("../utils/bank");
 const { buildSupportEmbed } = require("../utils/supportInfo");
@@ -126,6 +127,11 @@ module.exports = {
 
     runSheetsSync(client);
     setInterval(() => runSheetsSync(client), SHEETS_SYNC_INTERVAL_MS);
+
+    // 유료 봇 프로필: 이용권이 끝난 서버는 기본 프로필로 되돌린다(시트 「유료이용권」·「봇프로필」).
+    const runProfileExpiry = () => checkExpiredProfiles(client).catch((err) => console.error("[봇프로필] 만료 확인 실패:", err.message));
+    runProfileExpiry();
+    setInterval(runProfileExpiry, 30 * 60 * 1000);
 
     checkAllStreams(client).catch(() => {});
     setInterval(() => checkAllStreams(client).catch(() => {}), 5 * 60 * 1000);
