@@ -40,7 +40,9 @@ module.exports = {
       return;
     }
 
-    const statusText = subscription.active
+    const statusText = subscription.permanent
+      ? "✅ 이용 중 · **영구 이용권** (기간 제한 없음)"
+      : subscription.active
       ? `✅ 이용 중 · 만료일 **${subscription.endDate}**${subscription.daysLeft === 0 ? " (오늘까지)" : ` (${subscription.daysLeft}일 남음)`}`
       : [
           `❌ 이 서버에는 이용권이 없어요${subscription.endDate ? ` (${subscription.endDate}에 끝남)` : ""}.`,
@@ -57,7 +59,7 @@ module.exports = {
         ].join("\n"),
       )
       .addFields({ name: "이용권", value: statusText })
-      .setFooter({ text: "이용권이 끝나면 치유미가 자동으로 기본 프로필로 돌아가요" });
+      .setFooter({ text: subscription.permanent ? "영구 이용권은 기간이 끝나지 않아요" : "이용권이 끝나면 치유미가 자동으로 기본 프로필로 돌아가요" });
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel("봇 프로필 설정 열기").setURL(SETTINGS_URL(interaction.guildId)),

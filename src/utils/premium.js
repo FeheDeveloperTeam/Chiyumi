@@ -66,6 +66,9 @@ const todayKst = () => new Date(Date.now() + 9 * 3600_000).toISOString().slice(0
 const nowKstText = () => new Date(Date.now() + 9 * 3600_000).toISOString().replace("T", " ").slice(0, 19);
 const daysBetween = (a, b) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
 
+// 만료일 칸에 「영구」(또는 무기한·permanent)라고 적으면 기간 없는 이용권이다(개발자 관리자 화면에서 줄 수 있음).
+const isPermanentText = (value) => /^\s*(영구|무기한|permanent)\s*$/i.test(String(value || ""));
+
 function subscriptionsFromRows(rows) {
   const today = todayKst();
   const best = new Map();
@@ -73,15 +76,21 @@ function subscriptionsFromRows(rows) {
     const guildId = String(row[0] || "").trim();
     const product = String(row[2] || "").trim();
     if (!guildId || (product && product !== PRODUCT_NAME)) continue;
-    const endDate = parseSheetDate(row[4]);
-    if (!endDate) continue;
     const startDate = parseSheetDate(row[3]);
     if (startDate && startDate > today) continue;
+    const permanent = isPermanentText(row[4]);
+    const endDate = permanent ? null : parseSheetDate(row[4]);
+    if (!permanent && !endDate) continue;
     const prev = best.get(guildId);
-    if (!prev || endDate > prev.endDate) best.set(guildId, { startDate, endDate });
+    if (prev?.permanent) continue;
+    if (!prev || permanent || endDate > prev.endDate) best.set(guildId, { permanent, startDate, endDate });
   }
   const result = new Map();
   for (const [guildId, sub] of best) {
+    if (sub.permanent) {
+      result.set(guildId, { ...sub, daysLeft: null, active: true });
+      continue;
+    }
     const daysLeft = daysBetween(today, sub.endDate);
     result.set(guildId, { ...sub, daysLeft, active: daysLeft >= 0 });
   }
@@ -90,7 +99,7 @@ function subscriptionsFromRows(rows) {
 
 async function getSubscription(guildId) {
   const subs = subscriptionsFromRows(await readTab(SUBSCRIPTION_TAB));
-  return subs.get(guildId) ?? { active: false, endDate: null, daysLeft: null };
+  return subs.get(guildId) ?? { active: false, permanent: false, endDate: null, daysLeft: null };
 }
 
 // 이용권이 끝난 서버의 커스텀 프로필을 기본으로 되돌린다. ready.js가 주기적으로 부른다.
