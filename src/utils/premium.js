@@ -117,9 +117,15 @@ async function checkExpiredProfiles(client) {
     let status = "만료로 해제";
     if (client.guilds.cache.has(guildId)) {
       try {
-        await client.rest.patch(Routes.guildMember(guildId, "@me"), {
-          body: { nick: null, avatar: null, banner: null, bio: null },
-        });
+        // 실제로 바뀌어 있는 항목만 되돌린다. 사진·배너는 디스코드가 변경 횟수를 제한해서(AVATAR_RATE_LIMIT)
+        // 바꾸지 않은 항목까지 보내면 그 제한에 걸려 전체가 실패할 수 있다. 소개글은 API로 읽을 수 없어 시트 기록으로 판단한다.
+        const member = await client.rest.get(Routes.guildMember(guildId, client.user.id));
+        const body = {};
+        if (member.nick) body.nick = null;
+        if (member.avatar) body.avatar = null;
+        if (member.banner) body.banner = null;
+        if (row[3] || Object.keys(body).length === 0) body.bio = null;
+        await client.rest.patch(Routes.guildMember(guildId, "@me"), { body });
       } catch (err) {
         console.error(`[봇프로필] ${guildId} 만료 해제 실패:`, err.message);
         continue; // 다음 확인 때 다시 시도
